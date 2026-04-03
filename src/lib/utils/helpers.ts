@@ -53,3 +53,13 @@ export function getIconEmoji(icon: string): string {
 export function pluralize(count: number, singular: string, plural?: string): string {
   return count === 1 ? `${count} ${singular}` : `${count} ${plural || singular + "s"}`;
 }
+
+export const DAY_LABELS: Record<number, string> = {
+  0: "Seg",
+  1: "Ter",
+  2: "Qua",
+  3: "Qui",
+  4: "Sex",
+  5: "Sáb",
+  6: "Dom",
+};
