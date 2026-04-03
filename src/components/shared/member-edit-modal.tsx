@@ -48,8 +48,15 @@ export function MemberEditModal({ member, departments, allDeptMembers, allMember
             </select>
           </div>
           <div><label className="input-label">Status</label>
-            <select className="input-field" value={status} onChange={e => setStatus(e.target.value)}>
-              <option value="active">Ativo</option><option value="paused">Pausa</option><option value="vacation">Ferias</option><option value="inactive">Inativo</option>
+            <select
+              className="input-field"
+              value={status}
+              onChange={e => setStatus(e.target.value as "active" | "inactive" | "paused" | "vacation")}
+            >
+              <option value="active">Ativo</option>
+              <option value="paused">Pausa</option>
+              <option value="vacation">Ferias</option>
+              <option value="inactive">Inativo</option>
             </select>
           </div>
         </div>
