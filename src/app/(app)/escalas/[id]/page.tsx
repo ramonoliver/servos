@@ -1,0 +1,358 @@
+"use client";
+import { useState, useRef, useEffect } from "react";
+import { useApp } from "@/hooks/use-app";
+import { getDB } from "@/lib/db/local-db";
+import { suggestSubstitute } from "@/lib/ai/engine";
+import { formatDate, getDayOfWeek, getInitials, getIconEmoji } from "@/lib/utils/helpers";
+import { Modal } from "@/components/ui";
+import Link from "next/link";
+import type { Schedule, ScheduleMember, Event, User, DepartmentMember, UnavailableDate, Message } from "@/types";
+
+// ─────────────────────────────────────────────────────────────────
+// Escala detail — com agrupamento por função + chat da escala
+// ─────────────────────────────────────────────────────────────────
+
+export default function EscalaDetailPage({ params }: { params: { id: string } }) {
+  const { user, toast, canDo, departments } = useApp();
+  const db = getDB();
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [activeTab, setActiveTab] = useState<"escalados" | "chat">("escalados");
+  const [groupByFunction, setGroupByFunction] = useState(true);
+  const [chatMsg, setChatMsg] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const schedule = db.getById<Schedule>("schedules", params.id);
+  if (!schedule) return <div className="py-20 text-center text-ink-faint">Escala nao encontrada.</div>;
+
+  const ev = db.getById<Event>("events", schedule.event_id);
+  const dept = departments.find(d => d.id === schedule.department_id);
+  const sm = db.getWhere<ScheduleMember>("schedule_members", { schedule_id: schedule.id });
+  const members = db.getWhere<User>("users", { church_id: user.church_id }).filter(u => u.active);
+  const deptMembers = db.getWhere<DepartmentMember>("department_members", { department_id: schedule.department_id });
+  const allUD = db.getAll<UnavailableDate>("unavailable_dates");
+  const allSchedules = db.getAll<Schedule>("schedules");
+  const allSM = db.getAll<ScheduleMember>("schedule_members");
+
+  // Chat messages scoped to this schedule via department_id + "schedule:ID" prefix in content
+  const CHAT_TABLE = "schedule_chats";
+  const chatMessages: Array<{id:string; schedule_id:string; sender_id:string; content:string; created_at:string}> =
+    db.getAll(CHAT_TABLE).filter((m: any) => m.schedule_id === schedule.id)
+      .sort((a: any, b: any) => a.created_at.localeCompare(b.created_at));
+
+  const confirmed = sm.filter(m => m.status === "confirmed").length;
+  const pending = sm.filter(m => m.status === "pending");
+  const declined = sm.filter(m => m.status === "declined");
+  const allOk = confirmed === sm.length && sm.length > 0;
+  const dow = getDayOfWeek(schedule.date);
+  const avgSchedules = members.length ? members.reduce((a, m) => a + m.total_schedules, 0) / members.length : 0;
+
+  const scheduledUserIds = sm.map(s => s.user_id);
+  const availableToAdd = deptMembers.filter(dm => !scheduledUserIds.includes(dm.user_id)).map(dm => {
+    const m = members.find(u => u.id === dm.user_id);
+    return m ? { ...m, function_name: dm.function_name } : null;
+  }).filter(Boolean) as (User & { function_name: string })[];
+
+  // Group members by function
+  const byFunction: Record<string, ScheduleMember[]> = {};
+  sm.forEach(item => {
+    const fn = item.function_name || "Sem função";
+    if (!byFunction[fn]) byFunction[fn] = [];
+    byFunction[fn].push(item);
+  });
+
+  function addMemberToSchedule(userId: string) {
+    const dm = deptMembers.find(d => d.user_id === userId);
+    db.insert("schedule_members", {
+      schedule_id: schedule.id, user_id: userId, function_name: dm?.function_name || "",
+      status: "pending", decline_reason: "", substitute_id: null, substitute_for: null,
+      is_reserve: false, responded_at: null, notified_at: new Date().toISOString(),
+    });
+    toast("Membro adicionado a escala!");
+    setShowAddMember(false);
+    location.href = `/escalas/${schedule.id}`;
+  }
+
+  function removeMemberFromSchedule(smItem: ScheduleMember) {
+    const m = members.find(u => u.id === smItem.user_id);
+    if (!confirm(`Remover ${m?.name || "este membro"} da escala?`)) return;
+    db.delete("schedule_members", smItem.id);
+    toast((m?.name || "Membro") + " removido da escala.");
+    location.href = `/escalas/${schedule.id}`;
+  }
+
+  function acceptSubstitute(declinedSM: ScheduleMember, substituteId: string) {
+    const sub = members.find(m => m.id === substituteId);
+    if (!sub) return;
+    const dm = deptMembers.find(d => d.user_id === substituteId);
+    db.insert("schedule_members", {
+      schedule_id: schedule.id, user_id: substituteId, function_name: dm?.function_name || declinedSM.function_name,
+      status: "pending", decline_reason: "", substitute_id: null, substitute_for: declinedSM.user_id,
+      is_reserve: false, responded_at: null, notified_at: new Date().toISOString(),
+    });
+    db.update("schedule_members", declinedSM.id, { substitute_id: substituteId });
+    toast(`${sub.name} adicionado como substituto!`);
+    location.href = `/escalas/${schedule.id}`;
+  }
+
+  function sendChat() {
+    const text = chatMsg.trim();
+    if (!text) return;
+    db.insert(CHAT_TABLE, {
+      schedule_id: schedule.id,
+      sender_id: user.id,
+      content: text,
+    });
+    setChatMsg("");
+    location.reload();
+  }
+
+  function MemberRow({ item, showFn = true }: { item: ScheduleMember; showFn?: boolean }) {
+    const m = members.find(u => u.id === item.user_id);
+    if (!m) return null;
+    const spouse = m.spouse_id ? members.find(u => u.id === m.spouse_id) : null;
+    const isDeclined = item.status === "declined";
+
+    let substitute = null;
+    if (isDeclined && !item.substitute_id && canDo("schedule.edit")) {
+      substitute = suggestSubstitute(members, deptMembers, item.user_id, item.function_name, {
+        date: schedule.date, dayOfWeek: dow, deptMemberIds: deptMembers.map(dm => dm.user_id),
+        unavailableDates: allUD, existingSchedules: allSchedules, existingScheduleMembers: allSM, avgSchedules,
+      }, scheduledUserIds);
+    }
+
+    return (
+      <div>
+        <div className="flex items-center gap-3.5 px-5 py-3 border-t border-border-soft group">
+          {m.photo_url ? (
+            <img src={m.photo_url} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+              style={{ background: m.avatar_color }}>{getInitials(m.name)}</div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium truncate">{m.name}</div>
+            {showFn && !groupByFunction && (
+              <div className="text-[11px] text-ink-faint">{item.function_name}</div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {spouse && (
+              <span className="text-[9px] font-semibold text-brand bg-brand-light px-1.5 py-0.5 rounded-full hidden sm:inline">
+                &#128145; {spouse.name.split(" ")[0]}
+              </span>
+            )}
+            <span className={`badge ${item.status === "confirmed" ? "badge-green" : item.status === "pending" ? "badge-amber" : "badge-red"}`}>
+              {item.status === "confirmed" ? "✓ Confirmou" : item.status === "pending" ? "⏳ Pendente" : "✕ Recusou"}
+            </span>
+            {canDo("schedule.edit") && (
+              <button onClick={() => removeMemberFromSchedule(item)}
+                className="btn btn-ghost btn-sm text-danger opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+                title="Remover">✕</button>
+            )}
+          </div>
+        </div>
+        {isDeclined && item.decline_reason && (
+          <div className="px-5 pb-2">
+            <div className="text-xs text-ink-faint italic ml-[52px]">Motivo: &quot;{item.decline_reason}&quot;</div>
+          </div>
+        )}
+        {substitute && (
+          <div className="mx-5 mb-3 flex items-center gap-3 p-3 bg-brand-glow border border-brand-light rounded-[10px]">
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
+              style={{ background: substitute.user.avatar_color }}>{getInitials(substitute.user.name)}</div>
+            <div className="flex-1">
+              <div className="text-[10px] font-bold text-brand uppercase tracking-wider">🤖 Substituto sugerido</div>
+              <div className="text-[13px] font-semibold">{substitute.user.name}</div>
+              <div className="text-[10px] text-ink-muted">{substitute.user.total_schedules} escalas · {substitute.user.confirm_rate}% confirmação</div>
+            </div>
+            <button onClick={() => acceptSubstitute(item, substitute!.user.id)} className="btn btn-brand btn-sm">Aceitar</button>
+          </div>
+        )}
+        {isDeclined && item.substitute_id && (() => {
+          const sub = members.find(u => u.id === item.substitute_id);
+          return sub ? <div className="mx-5 mb-3 text-xs text-success font-medium ml-[52px]">Substituído por {sub.name}</div> : null;
+        })()}
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-[720px] mx-auto">
+      <Link href="/escalas" className="inline-flex items-center gap-1.5 text-[13px] text-brand font-medium mb-5 hover:underline">
+        &larr; Escalas
+      </Link>
+
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 className="page-title flex items-center gap-2">
+            {ev && getIconEmoji(ev.icon)} {ev?.name || "Escala"}
+          </h1>
+          <p className="page-subtitle">{formatDate(schedule.date)} · {schedule.time} · {dept?.name}</p>
+          {schedule.arrival_time && <p className="text-xs text-ink-faint mt-1">Chegada: {schedule.arrival_time}</p>}
+          <div className="flex flex-wrap gap-2 mt-3">
+            <span className="badge badge-green">{confirmed} confirmados</span>
+            {pending.length > 0 && <span className="badge badge-amber">{pending.length} pendentes</span>}
+            {declined.length > 0 && <span className="badge badge-red">{declined.length} recusaram</span>}
+            {!schedule.published && <span className="badge badge-info">Rascunho</span>}
+          </div>
+        </div>
+        {canDo("schedule.edit") && (
+          <button onClick={() => setShowAddMember(true)} className="btn btn-primary btn-sm self-start">
+            + Adicionar membro
+          </button>
+        )}
+      </div>
+
+      {/* Alerts */}
+      {allOk && (
+        <div className="flex items-center gap-3 px-5 py-3.5 bg-success-light rounded-[14px] border border-success/10 mb-5">
+          <span className="text-lg">🎉</span>
+          <span className="text-[13px] text-success font-medium">Todos confirmados!</span>
+        </div>
+      )}
+      {pending.length > 0 && canDo("schedule.edit") && (
+        <div className="flex items-center gap-3 px-5 py-3.5 bg-amber-light rounded-[14px] border border-amber/10 mb-5">
+          <span className="text-lg">🔔</span>
+          <span className="text-[13px] text-ink-soft flex-1"><strong>{pending.length}</strong> pendentes.</span>
+          <button onClick={() => toast("Lembrete enviado!")} className="text-xs font-semibold text-brand hover:underline">
+            Lembrar &rarr;
+          </button>
+        </div>
+      )}
+
+      {schedule.instructions && (
+        <div className="bg-surface-alt rounded-[14px] px-5 py-4 mb-5">
+          <div className="text-xs font-bold text-ink-faint uppercase tracking-wider mb-1">Instruções</div>
+          <div className="text-sm text-ink-soft">{schedule.instructions}</div>
+        </div>
+      )}
+
+      {/* Tabs: Escalados | Chat */}
+      <div className="flex gap-1 mb-4 bg-surface-alt rounded-[10px] p-0.5 w-fit">
+        {(["escalados", "chat"] as const).map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            className={`px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all capitalize ${
+              activeTab === tab ? "bg-surface text-ink font-semibold shadow-sm" : "text-ink-muted"
+            }`}>
+            {tab === "escalados" ? `Escalados (${sm.length})` : `💬 Chat ${chatMessages.length > 0 ? `(${chatMessages.length})` : ""}`}
+          </button>
+        ))}
+        {activeTab === "escalados" && (
+          <button onClick={() => setGroupByFunction(g => !g)}
+            className="ml-2 px-3 py-1.5 rounded-lg text-[12px] font-medium text-ink-muted hover:text-ink transition-colors">
+            {groupByFunction ? "🔀 Lista" : "📋 Funções"}
+          </button>
+        )}
+      </div>
+
+      {/* TAB: Escalados */}
+      {activeTab === "escalados" && (
+        <div className="card mb-5">
+          {sm.length === 0 ? (
+            <div className="px-5 py-16 text-center text-sm text-ink-faint">Nenhum membro escalado.</div>
+          ) : groupByFunction ? (
+            // Agrupado por função
+            Object.entries(byFunction).map(([fn, items]) => (
+              <div key={fn}>
+                <div className="px-5 py-2 bg-surface-alt border-t border-border-soft first:border-t-0">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-ink-faint">{fn}</span>
+                  <span className="text-[10px] text-ink-ghost ml-2">({items.length})</span>
+                </div>
+                {items.map(item => <MemberRow key={item.id} item={item} showFn={false} />)}
+              </div>
+            ))
+          ) : (
+            // Lista plana
+            sm.map(item => <MemberRow key={item.id} item={item} showFn={true} />)
+          )}
+        </div>
+      )}
+
+      {/* TAB: Chat da escala */}
+      {activeTab === "chat" && (
+        <div className="card mb-5 flex flex-col" style={{ minHeight: 320 }}>
+          <div className="px-5 pt-4 pb-3 border-b border-border-soft">
+            <span className="font-display text-[15px]">Chat da escala</span>
+            <p className="text-[11px] text-ink-faint mt-0.5">Visível apenas para escalados e líderes</p>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3" style={{ maxHeight: 360 }}>
+            {chatMessages.length === 0 ? (
+              <div className="text-center text-sm text-ink-faint py-8">Nenhuma mensagem. Seja o primeiro!</div>
+            ) : chatMessages.map((msg: any) => {
+              const sender = members.find(u => u.id === msg.sender_id);
+              const isMe = msg.sender_id === user.id;
+              return (
+                <div key={msg.id} className={`flex gap-2.5 ${isMe ? "flex-row-reverse" : ""}`}>
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"
+                    style={{ background: sender?.avatar_color || "#999" }}>
+                    {getInitials(sender?.name || "?")}
+                  </div>
+                  <div className={`max-w-[72%] ${isMe ? "items-end" : "items-start"} flex flex-col gap-0.5`}>
+                    {!isMe && <span className="text-[10px] text-ink-faint font-medium">{sender?.name?.split(" ")[0]}</span>}
+                    <div className={`text-[13px] px-3.5 py-2 rounded-[12px] leading-snug ${
+                      isMe ? "bg-brand text-white rounded-tr-[4px]" : "bg-surface-alt text-ink rounded-tl-[4px]"
+                    }`}>
+                      {msg.content}
+                    </div>
+                    <span className="text-[10px] text-ink-ghost">
+                      {new Date(msg.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="px-4 py-3 border-t border-border-soft flex gap-2">
+            <input
+              value={chatMsg}
+              onChange={e => setChatMsg(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
+              placeholder="Mensagem para a equipe..."
+              className="input-field flex-1 py-2"
+              maxLength={500}
+            />
+            <button onClick={sendChat} disabled={!chatMsg.trim()} className="btn btn-primary px-4 py-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add member modal */}
+      {showAddMember && (
+        <Modal title="Adicionar Membro a Escala" close={() => setShowAddMember(false)} width={460}>
+          {availableToAdd.length === 0 ? (
+            <div className="text-sm text-ink-faint text-center py-8">Todos os membros do ministério já estão escalados.</div>
+          ) : (
+            <div className="space-y-1.5">
+              <p className="text-sm text-ink-muted mb-3">Selecione um membro do ministério {dept?.name}:</p>
+              {availableToAdd.map(m => (
+                <button key={m.id} onClick={() => addMemberToSchedule(m.id)}
+                  className="flex items-center gap-3 w-full px-3.5 py-2.5 rounded-[10px] border-[1.5px] border-border-soft hover:border-brand hover:bg-brand-glow transition-all text-left">
+                  {m.photo_url ? (
+                    <img src={m.photo_url} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
+                      style={{ background: m.avatar_color }}>{getInitials(m.name)}</div>
+                  )}
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">{m.name}</div>
+                    <div className="text-[11px] text-ink-faint">{m.function_name}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </Modal>
+      )}
+    </div>
+  );
+}
