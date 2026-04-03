@@ -37,8 +37,14 @@ export function MemberEditModal({ member, departments, allDeptMembers, allMember
         <div><label className="input-label">Telefone</label><input className="input-field" value={phone} onChange={e => setPhone(e.target.value)} /></div>
         <div className="grid grid-cols-2 gap-4">
           <div><label className="input-label">Perfil</label>
-            <select className="input-field" value={role} onChange={e => setRole(e.target.value)}>
-              <option value="member">Membro</option><option value="leader">Lider</option><option value="admin">Administrador</option>
+            <select
+              className="input-field"
+              value={role}
+              onChange={e => setRole(e.target.value as "admin" | "leader" | "member")}
+            >
+              <option value="member">Membro</option>
+              <option value="leader">Lider</option>
+              <option value="admin">Administrador</option>
             </select>
           </div>
           <div><label className="input-label">Status</label>
