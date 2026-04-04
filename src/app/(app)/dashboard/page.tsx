@@ -1,38 +1,108 @@
 "use client";
+
+import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
-import { getDB } from "@/lib/db/local-db";
+import { supabase } from "@/lib/supabase/client";
 import { getVerseOfDay } from "@/lib/ai/engine";
 import { getGreeting, getDayName, getInitials, formatShortDate } from "@/lib/utils/helpers";
 import Link from "next/link";
-import type { Schedule, ScheduleMember, Event, Department, User, Notification } from "@/types";
+import type { Schedule, ScheduleMember, Event, User, Notification } from "@/types";
 
 export default function DashboardPage() {
-  const { user, church, departments, canDo } = useApp();
-  const db = getDB();
+  const { user, departments, canDo } = useApp();
   const verse = getVerseOfDay();
-  const members = db.getWhere<User>("users", { church_id: user.church_id }).filter(u => u.active);
-  const schedules = db.getAll<Schedule>("schedules").filter(s => s.church_id === user.church_id && s.status !== "cancelled");
-  const allSM = db.getAll<ScheduleMember>("schedule_members");
-  const events = db.getWhere<Event>("events", { church_id: user.church_id });
-  const notifications = db.getWhere<Notification>("notifications", { user_id: user.id }).filter(n => !n.read);
-  const today = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
-  const upcoming = schedules.filter(s => s.status === "active" && s.published).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5);
-  const pendingTotal = allSM.filter(sm => schedules.some(s => s.id === sm.schedule_id && s.status === "active") && sm.status === "pending").length;
+  const [members, setMembers] = useState<User[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [allSM, setAllSM] = useState<ScheduleMember[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const mySchedules = allSM.filter(sm => sm.user_id === user.id && schedules.some(s => s.id === sm.schedule_id && s.status === "active"));
-  const myPending = mySchedules.filter(sm => sm.status === "pending");
+  const todayLabel = new Date().toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
+  async function loadData() {
+    setLoading(true);
+
+    const [
+      { data: membersData, error: membersError },
+      { data: schedulesData, error: schedulesError },
+      { data: smData, error: smError },
+      { data: eventsData, error: eventsError },
+      { data: notificationsData, error: notificationsError },
+    ] = await Promise.all([
+      supabase.from("users").select("*").eq("church_id", user.church_id).eq("active", true),
+      supabase.from("schedules").select("*").eq("church_id", user.church_id).neq("status", "cancelled"),
+      supabase.from("schedule_members").select("*"),
+      supabase.from("events").select("*").eq("church_id", user.church_id),
+      supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false),
+    ]);
+
+    if (membersError || schedulesError || smError || eventsError || notificationsError) {
+      console.error({
+        membersError,
+        schedulesError,
+        smError,
+        eventsError,
+        notificationsError,
+      });
+      setLoading(false);
+      return;
+    }
+
+    setMembers((membersData || []) as User[]);
+    setSchedules((schedulesData || []) as Schedule[]);
+    setAllSM((smData || []) as ScheduleMember[]);
+    setEvents((eventsData || []) as Event[]);
+    setNotifications((notificationsData || []) as Notification[]);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadData();
+  }, [user.church_id, user.id]);
+
+  const upcoming = useMemo(() => {
+    return schedules
+      .filter((s) => s.status === "active" && s.published)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 5);
+  }, [schedules]);
+
+  const pendingTotal = useMemo(() => {
+    return allSM.filter(
+      (sm) =>
+        schedules.some((s) => s.id === sm.schedule_id && s.status === "active") &&
+        sm.status === "pending"
+    ).length;
+  }, [allSM, schedules]);
+
+  const mySchedules = useMemo(() => {
+    return allSM.filter(
+      (sm) =>
+        sm.user_id === user.id &&
+        schedules.some((s) => s.id === sm.schedule_id && s.status === "active")
+    );
+  }, [allSM, schedules, user.id]);
+
+  const myPending = useMemo(() => {
+    return mySchedules.filter((sm) => sm.status === "pending");
+  }, [mySchedules]);
 
   const isMember = user.role === "member";
 
   return (
     <div>
-      {/* Page header — greeting + primary CTA buttons top-right */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="page-title">{getGreeting()}, {user.name.split(" ")[0]}</h1>
-          <p className="page-subtitle capitalize">{today}</p>
+          <p className="page-subtitle capitalize">{todayLabel}</p>
         </div>
+
         {!isMember && canDo("schedule.create") && (
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link href="/escalas/nova" className="btn btn-primary btn-sm whitespace-nowrap">
@@ -45,6 +115,7 @@ export default function DashboardPage() {
             )}
           </div>
         )}
+
         {isMember && (
           <Link href="/perfil" className="btn btn-secondary btn-sm self-start sm:self-auto">
             Editar perfil
@@ -52,7 +123,6 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Stats */}
       <div className={`grid ${isMember ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4"} gap-3 mb-6`}>
         {isMember ? (
           <>
@@ -70,58 +140,97 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Alerts */}
       {isMember && myPending.length > 0 && (
         <div className="flex items-center gap-3 px-5 py-3.5 bg-amber-light rounded-[14px] border border-amber/10 mb-6">
           <span className="text-lg">&#9888;&#65039;</span>
-          <span className="text-[13px] text-ink-soft flex-1">Voce tem <strong>{myPending.length} {myPending.length === 1 ? "escala" : "escalas"}</strong> aguardando sua confirmacao.</span>
-          <Link href="/minhas-escalas" className="text-xs font-semibold text-brand hover:underline whitespace-nowrap">Ver &rarr;</Link>
-        </div>
-      )}
-      {!isMember && pendingTotal > 0 && (
-        <div className="flex items-center gap-3 px-5 py-3.5 bg-amber-light rounded-[14px] border border-amber/10 mb-6">
-          <span className="text-lg">&#9888;&#65039;</span>
-          <span className="text-[13px] text-ink-soft flex-1"><strong>{pendingTotal} {pendingTotal === 1 ? "membro" : "membros"}</strong> nao confirmaram escalas.</span>
-          <Link href="/escalas" className="text-xs font-semibold text-brand hover:underline whitespace-nowrap">Ver escalas &rarr;</Link>
+          <span className="text-[13px] text-ink-soft flex-1">
+            Voce tem <strong>{myPending.length} {myPending.length === 1 ? "escala" : "escalas"}</strong> aguardando sua confirmacao.
+          </span>
+          <Link href="/minhas-escalas" className="text-xs font-semibold text-brand hover:underline whitespace-nowrap">
+            Ver &rarr;
+          </Link>
         </div>
       )}
 
-      {/* Main content — stacks on mobile, side-by-side on lg */}
+      {!isMember && pendingTotal > 0 && (
+        <div className="flex items-center gap-3 px-5 py-3.5 bg-amber-light rounded-[14px] border border-amber/10 mb-6">
+          <span className="text-lg">&#9888;&#65039;</span>
+          <span className="text-[13px] text-ink-soft flex-1">
+            <strong>{pendingTotal} {pendingTotal === 1 ? "membro" : "membros"}</strong> nao confirmaram escalas.
+          </span>
+          <Link href="/escalas" className="text-xs font-semibold text-brand hover:underline whitespace-nowrap">
+            Ver escalas &rarr;
+          </Link>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
         <div className="space-y-5">
-          {/* Upcoming schedules */}
           <div className="card">
             <div className="flex items-center justify-between px-5 pt-4 pb-3">
               <span className="font-display text-[17px]">{isMember ? "Minhas proximas escalas" : "Proximas escalas"}</span>
             </div>
-            {(isMember ? mySchedules : upcoming).length === 0 ? (
+
+            {loading ? (
+              <div className="px-5 pb-6 text-sm text-ink-faint text-center py-8">Carregando...</div>
+            ) : (isMember ? mySchedules : upcoming).length === 0 ? (
               <div className="px-5 pb-6 text-sm text-ink-faint text-center py-8">Nenhuma escala encontrada.</div>
             ) : (
               (isMember ? mySchedules : upcoming).map((item, i) => {
-                const sched = isMember ? schedules.find(s => s.id === (item as ScheduleMember).schedule_id) : item as Schedule;
+                const sched = isMember
+                  ? schedules.find((s) => s.id === (item as ScheduleMember).schedule_id)
+                  : (item as Schedule);
+
                 if (!sched) return null;
-                const ev = events.find(e => e.id === sched.event_id);
-                const dept = departments.find(d => d.id === sched.department_id);
-                const sm = allSM.filter(m => m.schedule_id === sched.id);
-                const confirmed = sm.filter(m => m.status === "confirmed").length;
+
+                const ev = events.find((e) => e.id === sched.event_id);
+                const dept = departments.find((d) => d.id === sched.department_id);
+                const sm = allSM.filter((m) => m.schedule_id === sched.id);
+                const confirmed = sm.filter((m) => m.status === "confirmed").length;
                 const mySM = isMember ? (item as ScheduleMember) : null;
+
                 return (
-                  <Link key={sched.id + "-" + i} href={isMember ? `/minhas-escalas` : `/escalas/${sched.id}`}
-                    className="flex items-center gap-3.5 px-5 py-3 border-t border-border-soft hover:bg-brand-glow transition-colors">
+                  <Link
+                    key={sched.id + "-" + i}
+                    href={isMember ? "/minhas-escalas" : `/escalas/${sched.id}`}
+                    className="flex items-center gap-3.5 px-5 py-3 border-t border-border-soft hover:bg-brand-glow transition-colors"
+                  >
                     <div className="w-12 h-[50px] rounded-[10px] bg-surface-alt flex flex-col items-center justify-center flex-shrink-0">
-                      <span className="text-[9px] font-bold uppercase text-brand tracking-wide">{getDayName(sched.date)}</span>
-                      <span className="font-display text-[20px] leading-none">{sched.date.split("-")[2]}</span>
+                      <span className="text-[9px] font-bold uppercase text-brand tracking-wide">
+                        {getDayName(sched.date)}
+                      </span>
+                      <span className="font-display text-[20px] leading-none">
+                        {sched.date.split("-")[2]}
+                      </span>
                     </div>
+
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{ev?.name || "Escala"}</div>
-                      <div className="text-[11px] text-ink-faint">{sched.time} &middot; {dept?.name}</div>
+                      <div className="text-[11px] text-ink-faint">
+                        {sched.time} &middot; {dept?.name}
+                      </div>
                     </div>
+
                     {isMember && mySM ? (
-                      <span className={`badge ${mySM.status === "confirmed" ? "badge-green" : mySM.status === "pending" ? "badge-amber" : "badge-red"}`}>
-                        {mySM.status === "confirmed" ? "Confirmado" : mySM.status === "pending" ? "Pendente" : "Recusado"}
+                      <span
+                        className={`badge ${
+                          mySM.status === "confirmed"
+                            ? "badge-green"
+                            : mySM.status === "pending"
+                            ? "badge-amber"
+                            : "badge-red"
+                        }`}
+                      >
+                        {mySM.status === "confirmed"
+                          ? "Confirmado"
+                          : mySM.status === "pending"
+                          ? "Pendente"
+                          : "Recusado"}
                       </span>
                     ) : (
-                      <span className={`badge ${confirmed === sm.length && sm.length > 0 ? "badge-green" : "badge-amber"}`}>{confirmed}/{sm.length}</span>
+                      <span className={`badge ${confirmed === sm.length && sm.length > 0 ? "badge-green" : "badge-amber"}`}>
+                        {confirmed}/{sm.length}
+                      </span>
                     )}
                   </Link>
                 );
@@ -129,34 +238,55 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Pending confirmations */}
           {!isMember && pendingTotal > 0 && (
             <div className="card">
-              <div className="px-5 pt-4 pb-3"><span className="font-display text-[17px]">Aguardando confirmacao</span></div>
-              {allSM.filter(sm => sm.status === "pending" && schedules.some(s => s.id === sm.schedule_id && s.status === "active")).slice(0, 5).map(sm => {
-                const m = members.find(u => u.id === sm.user_id);
-                const sched = schedules.find(s => s.id === sm.schedule_id);
-                const ev = events.find(e => e.id === sched?.event_id);
-                if (!m || !sched) return null;
-                return (
-                  <div key={sm.id} className="flex items-center gap-3.5 px-5 py-3 border-t border-border-soft">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold" style={{ background: m.avatar_color }}>{getInitials(m.name)}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{m.name}</div>
-                      <div className="text-[11px] text-ink-faint">{ev?.name} &middot; {formatShortDate(sched.date)}</div>
+              <div className="px-5 pt-4 pb-3">
+                <span className="font-display text-[17px]">Aguardando confirmacao</span>
+              </div>
+
+              {allSM
+                .filter(
+                  (sm) =>
+                    sm.status === "pending" &&
+                    schedules.some((s) => s.id === sm.schedule_id && s.status === "active")
+                )
+                .slice(0, 5)
+                .map((sm) => {
+                  const m = members.find((u) => u.id === sm.user_id);
+                  const sched = schedules.find((s) => s.id === sm.schedule_id);
+                  const ev = events.find((e) => e.id === sched?.event_id);
+
+                  if (!m || !sched) return null;
+
+                  return (
+                    <div key={sm.id} className="flex items-center gap-3.5 px-5 py-3 border-t border-border-soft">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
+                        style={{ background: m.avatar_color }}
+                      >
+                        {getInitials(m.name)}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{m.name}</div>
+                        <div className="text-[11px] text-ink-faint">
+                          {ev?.name} &middot; {formatShortDate(sched.date)}
+                        </div>
+                      </div>
+
+                      <span className="badge badge-amber">Pendente</span>
                     </div>
-                    <span className="badge badge-amber">Pendente</span>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           )}
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-5">
           <div className="bg-brand-glow border border-brand/10 rounded-[14px] p-5">
-            <p className="font-display italic text-sm text-ink-soft leading-relaxed mb-1.5">&ldquo;{verse.text}&rdquo;</p>
+            <p className="font-display italic text-sm text-ink-soft leading-relaxed mb-1.5">
+              &ldquo;{verse.text}&rdquo;
+            </p>
             <p className="text-[11px] text-brand font-semibold">{verse.ref}</p>
           </div>
 
@@ -166,13 +296,20 @@ export default function DashboardPage() {
                 <span className="font-display text-[17px]">Notificacoes</span>
                 <span className="badge badge-red">{notifications.length}</span>
               </div>
-              {notifications.slice(0, 3).map(n => (
+
+              {notifications.slice(0, 3).map((n) => (
                 <div key={n.id} className="px-5 py-3 border-t border-border-soft">
                   <div className="text-[13px] font-semibold mb-0.5">{n.title}</div>
                   <div className="text-[11px] text-ink-muted leading-snug">{n.body}</div>
                 </div>
               ))}
-              <Link href="/notificacoes" className="block text-center text-xs text-brand font-semibold py-3 border-t border-border-soft hover:bg-brand-glow transition-colors">Ver todas &rarr;</Link>
+
+              <Link
+                href="/notificacoes"
+                className="block text-center text-xs text-brand font-semibold py-3 border-t border-border-soft hover:bg-brand-glow transition-colors"
+              >
+                Ver todas &rarr;
+              </Link>
             </div>
           )}
         </div>

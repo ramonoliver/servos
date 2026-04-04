@@ -1,9 +1,12 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { getDB } from "@/lib/db/local-db";
+import { supabase } from "@/lib/supabase/client";
 import { createSession } from "@/lib/auth/session";
+import { verifyPassword } from "@/lib/auth/password";
 import Link from "next/link";
+import type { User } from "@/types";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -16,16 +19,39 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+
     try {
-      const db = getDB();
-      const user = db.verifyUserPassword(email, password);
-      if (!user) { setError("Email ou senha incorretos."); setLoading(false); return; }
-      createSession(user);
+      const normalizedEmail = email.trim().toLowerCase();
+
+      const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", normalizedEmail)
+        .single();
+
+      if (userError || !user) {
+        setError("Email ou senha incorretos.");
+        setLoading(false);
+        return;
+      }
+
+      const isValidPassword = verifyPassword(password, user.password_hash);
+
+      if (!isValidPassword) {
+        setError("Email ou senha incorretos.");
+        setLoading(false);
+        return;
+      }
+
+      createSession(user as User);
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message || "Erro ao entrar.");
+      setError(err?.message || "Erro ao entrar.");
       setLoading(false);
+      return;
     }
+
+    setLoading(false);
   }
 
   return (
@@ -38,29 +64,65 @@ export default function LoginPage() {
           <h1 className="font-display text-3xl mb-1">Servos</h1>
           <p className="text-sm text-ink-muted">Organize. Sirva. Viva o proposito.</p>
         </div>
+
         <div className="bg-white rounded-2xl border border-border-soft shadow-lg p-8">
           <h2 className="font-display text-2xl text-center mb-1">Entrar</h2>
           <p className="text-sm text-ink-muted text-center mb-6">Acesse sua conta.</p>
-          {error && <div className="bg-danger-light text-danger text-sm px-4 py-3 rounded-[10px] mb-4 border border-danger/10">{error}</div>}
+
+          {error && (
+            <div className="bg-danger-light text-danger text-sm px-4 py-3 rounded-[10px] mb-4 border border-danger/10">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <label className="input-label">Email</label>
-              <input type="email" className="input-field" placeholder="seu@email.com" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
+              <input
+                type="email"
+                className="input-field"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoFocus
+              />
             </div>
+
             <div className="mb-6">
               <label className="input-label">Senha</label>
-              <input type="password" className="input-field" placeholder="Sua senha" value={password} onChange={e => setPassword(e.target.value)} required />
+              <input
+                type="password"
+                className="input-field"
+                placeholder="Sua senha"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
             </div>
+
             <button type="submit" disabled={loading} className="btn btn-primary w-full py-3 text-base">
               {loading ? "Entrando..." : "Entrar"}
             </button>
           </form>
-          <div className="flex items-center gap-4 my-5"><div className="flex-1 h-px bg-border-soft" /><span className="text-xs text-ink-faint">ou</span><div className="flex-1 h-px bg-border-soft" /></div>
-          <Link href="/cadastro" className="btn btn-secondary w-full py-3 text-base justify-center">Criar conta</Link>
+
+          <div className="flex items-center gap-4 my-5">
+            <div className="flex-1 h-px bg-border-soft" />
+            <span className="text-xs text-ink-faint">ou</span>
+            <div className="flex-1 h-px bg-border-soft" />
+          </div>
+
+          <Link href="/cadastro" className="btn btn-secondary w-full py-3 text-base justify-center">
+            Criar conta
+          </Link>
         </div>
+
         <div className="mt-6 bg-brand-glow border border-brand-light rounded-xl px-5 py-4 text-center">
           <p className="text-xs font-semibold text-brand mb-1">Demo</p>
-          <p className="text-xs text-ink-muted">Email: <strong className="text-ink">ramon@servosapp.com</strong> &middot; Senha: <strong className="text-ink">servos2026</strong></p>
+          <p className="text-xs text-ink-muted">
+            Email: <strong className="text-ink">ramon@servosapp.com</strong> &middot; Senha:{" "}
+            <strong className="text-ink">servos2026</strong>
+          </p>
         </div>
       </div>
     </div>

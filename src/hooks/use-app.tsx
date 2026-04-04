@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getDB } from "@/lib/db/local-db";
-import { getSession, clearSession, createSession } from "@/lib/auth/session";
+import { supabase } from "@/lib/supabase/client";
+import { getSession, clearSession } from "@/lib/auth/session";
 import { can, type Action } from "@/lib/auth/permissions";
 import type { User, Church, Department, Session } from "@/types";
 
@@ -42,22 +42,63 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTimeout(() => setToastMsg(""), 3200);
   }, []);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     const s = getSession();
-    if (!s) { router.replace("/login"); return; }
-    const db = getDB();
-    const u = db.getById<User>("users", s.user_id);
-    if (!u) { clearSession(); router.replace("/login"); return; }
-    const c = db.getById<Church>("churches", u.church_id);
-    const depts = db.getWhere<Department>("departments", { church_id: u.church_id });
-    // Departments where this user is leader or co-leader
-    const leadDeptIds = depts.filter(d =>
-      (d.leader_ids || []).includes(u.id) || (d.co_leader_ids || []).includes(u.id)
-    ).map(d => d.id);
-    setUser(u);
+
+    if (!s) {
+      router.replace("/login");
+      return;
+    }
+
+    // ===== USER =====
+    const { data: u, error: userError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", s.user_id)
+      .single();
+
+    if (userError || !u) {
+      clearSession();
+      router.replace("/login");
+      return;
+    }
+
+    // ===== CHURCH =====
+    const { data: c, error: churchError } = await supabase
+      .from("churches")
+      .select("*")
+      .eq("id", u.church_id)
+      .single();
+
+    if (churchError || !c) {
+      clearSession();
+      router.replace("/login");
+      return;
+    }
+
+    // ===== DEPARTMENTS =====
+    const { data: depts, error: deptError } = await supabase
+      .from("departments")
+      .select("*")
+      .eq("church_id", u.church_id);
+
+    if (deptError) {
+      console.error("Erro ao buscar departamentos:", deptError);
+      setLoading(false);
+      return;
+    }
+
+    const leadDeptIds = (depts || [])
+      .filter((d: any) =>
+        (d.leader_ids || []).includes(u.id) ||
+        (d.co_leader_ids || []).includes(u.id)
+      )
+      .map((d: any) => d.id);
+
+    setUser(u as User);
     setSessionState(s);
-    setChurch(c!);
-    setDepartments(depts);
+    setChurch(c as Church);
+    setDepartments((depts || []) as Department[]);
     setUserDeptIds(leadDeptIds);
     setLoading(false);
   }, [router]);
@@ -69,10 +110,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const canDo = useCallback((action: Action, deptId?: string) => {
     if (!user) return false;
-    return can(user.role, action, { departmentId: deptId, userDepartmentIds: userDeptIds });
+    return can(user.role, action, {
+      departmentId: deptId,
+      userDepartmentIds: userDeptIds,
+    });
   }, [user, userDeptIds]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   if (loading) {
     return (
@@ -88,8 +134,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   if (!user || !session || !church) return null;
 
   return (
-    <AppContext.Provider value={{ user, session, church, departments, userDeptIds, toast, canDo, refresh, logout }}>
+    <AppContext.Provider
+      value={{
+        user,
+        session,
+        church,
+        departments,
+        userDeptIds,
+        toast,
+        canDo,
+        refresh,
+        logout,
+      }}
+    >
       {children}
+
       {/* Toast */}
       <div
         className="fixed bottom-7 left-1/2 z-50 pointer-events-none"

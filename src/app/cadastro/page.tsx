@@ -1,43 +1,187 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { getDB } from "@/lib/db/local-db";
+import { supabase } from "@/lib/supabase/client";
 import { createSession } from "@/lib/auth/session";
 import { hashPassword } from "@/lib/auth/password";
+import { genId } from "@/lib/utils/helpers";
 import Link from "next/link";
+import type { User } from "@/types";
 
 export default function CadastroPage() {
-  const [f, setF] = useState({ name: "", email: "", phone: "", password: "", churchName: "" });
+  const [f, setF] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+    churchName: "",
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const u = (k: string, v: string) => setF(p => ({ ...p, [k]: v }));
+
+  const u = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
+
     try {
-      const db = getDB();
-      if (db.getUserByEmail(f.email)) { setError("Email ja cadastrado."); setLoading(false); return; }
-      if (f.password.length < 6) { setError("Senha deve ter pelo menos 6 caracteres."); setLoading(false); return; }
-      const church = db.insert("churches", { name: f.churchName || "Minha Igreja", city: "", state: "" });
+      const normalizedEmail = f.email.trim().toLowerCase();
+
+      if (f.password.length < 6) {
+        setError("Senha deve ter pelo menos 6 caracteres.");
+        setLoading(false);
+        return;
+      }
+
+      const { data: existingUser, error: existingUserError } = await supabase
+        .from("users")
+        .select("id, email")
+        .eq("email", normalizedEmail)
+        .maybeSingle();
+
+      if (existingUserError) {
+        setError("Erro ao verificar email.");
+        setLoading(false);
+        return;
+      }
+
+      if (existingUser) {
+        setError("Email ja cadastrado.");
+        setLoading(false);
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const churchId = genId();
+      const userId = genId();
+      const event1Id = genId();
+      const event2Id = genId();
+      const onboardingId = genId();
+
+      const { data: church, error: churchError } = await supabase
+        .from("churches")
+        .insert({
+          id: churchId,
+          name: f.churchName || "Minha Igreja",
+          city: "",
+          state: "",
+          created_at: now,
+        })
+        .select()
+        .single();
+
+      if (churchError || !church) {
+        setError("Erro ao criar igreja.");
+        setLoading(false);
+        return;
+      }
+
       const pw = hashPassword(f.password);
-      const user = db.insert("users", {
-        church_id: church.id, email: f.email.toLowerCase(), password_hash: pw, name: f.name, phone: f.phone, role: "admin", status: "active",
-        avatar_color: `hsl(${Math.floor(Math.random() * 360)}, 40%, 55%)`, photo_url: null, spouse_id: null,
-        availability: [true,true,true,true,true,true,true], total_schedules: 0, confirm_rate: 100,
-        must_change_password: false, last_served_at: null, notes: "", active: true, joined_at: new Date().toISOString(),
+
+      const { data: user, error: userError } = await supabase
+        .from("users")
+        .insert({
+          id: userId,
+          church_id: church.id,
+          email: normalizedEmail,
+          password_hash: pw,
+          name: f.name,
+          phone: f.phone || "",
+          role: "admin",
+          status: "active",
+          avatar_color: `hsl(${Math.floor(Math.random() * 360)}, 40%, 55%)`,
+          photo_url: null,
+          spouse_id: null,
+          availability: [true, true, true, true, true, true, true],
+          total_schedules: 0,
+          confirm_rate: 100,
+          must_change_password: false,
+          last_served_at: null,
+          notes: "",
+          active: true,
+          joined_at: now,
+          created_at: now,
+        })
+        .select()
+        .single();
+
+      if (userError || !user) {
+        setError("Erro ao criar usuario.");
+        setLoading(false);
+        return;
+      }
+
+      const { error: event1Error } = await supabase.from("events").insert({
+        id: event1Id,
+        church_id: church.id,
+        name: "Culto de Domingo",
+        description: "",
+        type: "recurring",
+        icon: "church",
+        location: "",
+        base_time: "18:00",
+        instructions: "",
+        recurrence: "weekly",
+        active: true,
+        created_at: now,
       });
-      db.insert("events", { church_id: church.id, name: "Culto de Domingo", description: "", type: "recurring", icon: "church", location: "", base_time: "18:00", instructions: "", recurrence: "weekly", active: true });
-      db.insert("events", { church_id: church.id, name: "Culto de Quarta", description: "", type: "recurring", icon: "church", location: "", base_time: "19:30", instructions: "", recurrence: "weekly", active: true });
-      db.insert("onboarding_progress", { church_id: church.id, completed_steps: ["church"], completed: false });
-      createSession(user);
+
+      if (event1Error) {
+        setError("Erro ao criar evento inicial.");
+        setLoading(false);
+        return;
+      }
+
+      const { error: event2Error } = await supabase.from("events").insert({
+        id: event2Id,
+        church_id: church.id,
+        name: "Culto de Quarta",
+        description: "",
+        type: "recurring",
+        icon: "church",
+        location: "",
+        base_time: "19:30",
+        instructions: "",
+        recurrence: "weekly",
+        active: true,
+        created_at: now,
+      });
+
+      if (event2Error) {
+        setError("Erro ao criar evento inicial.");
+        setLoading(false);
+        return;
+      }
+
+      const { error: onboardingError } = await supabase
+        .from("onboarding_progress")
+        .insert({
+          id: onboardingId,
+          church_id: church.id,
+          completed_steps: ["church"],
+          completed: false,
+          created_at: now,
+        });
+
+      if (onboardingError) {
+        setError("Erro ao iniciar onboarding.");
+        setLoading(false);
+        return;
+      }
+
+      createSession(user as User);
       router.push("/onboarding");
     } catch (err: any) {
-      setError(err.message || "Erro ao criar conta.");
+      setError(err?.message || "Erro ao criar conta.");
       setLoading(false);
+      return;
     }
+
+    setLoading(false);
   }
 
   return (
@@ -50,16 +194,73 @@ export default function CadastroPage() {
           <h1 className="font-display text-3xl mb-1">Criar conta</h1>
           <p className="text-sm text-ink-muted">Comece a organizar seu ministerio.</p>
         </div>
+
         <div className="bg-white rounded-2xl border border-border-soft shadow-lg p-8">
-          {error && <div className="bg-danger-light text-danger text-sm px-4 py-3 rounded-[10px] mb-4 border border-danger/10">{error}</div>}
+          {error && (
+            <div className="bg-danger-light text-danger text-sm px-4 py-3 rounded-[10px] mb-4 border border-danger/10">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div><label className="input-label">Seu nome</label><input className="input-field" placeholder="Como voce e chamado?" value={f.name} onChange={e => u("name", e.target.value)} required /></div>
-            <div><label className="input-label">Email</label><input type="email" className="input-field" placeholder="seu@email.com" value={f.email} onChange={e => u("email", e.target.value)} required /></div>
-            <div><label className="input-label">Nome da igreja</label><input className="input-field" placeholder="Ex: Igreja Batista Central" value={f.churchName} onChange={e => u("churchName", e.target.value)} required /></div>
-            <div><label className="input-label">Senha (min. 6 caracteres)</label><input type="password" className="input-field" placeholder="Crie uma senha" value={f.password} onChange={e => u("password", e.target.value)} required minLength={6} /></div>
-            <button type="submit" disabled={loading} className="btn btn-primary w-full py-3 text-base">{loading ? "Criando..." : "Criar conta gratuita"}</button>
+            <div>
+              <label className="input-label">Seu nome</label>
+              <input
+                className="input-field"
+                placeholder="Como voce e chamado?"
+                value={f.name}
+                onChange={(e) => u("name", e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="input-label">Email</label>
+              <input
+                type="email"
+                className="input-field"
+                placeholder="seu@email.com"
+                value={f.email}
+                onChange={(e) => u("email", e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="input-label">Nome da igreja</label>
+              <input
+                className="input-field"
+                placeholder="Ex: Igreja Batista Central"
+                value={f.churchName}
+                onChange={(e) => u("churchName", e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="input-label">Senha (min. 6 caracteres)</label>
+              <input
+                type="password"
+                className="input-field"
+                placeholder="Crie uma senha"
+                value={f.password}
+                onChange={(e) => u("password", e.target.value)}
+                required
+                minLength={6}
+              />
+            </div>
+
+            <button type="submit" disabled={loading} className="btn btn-primary w-full py-3 text-base">
+              {loading ? "Criando..." : "Criar conta gratuita"}
+            </button>
           </form>
-          <p className="text-center text-sm text-ink-muted mt-5">Ja tem conta? <Link href="/login" className="text-brand font-semibold hover:underline">Entrar</Link></p>
+
+          <p className="text-center text-sm text-ink-muted mt-5">
+            Ja tem conta?{" "}
+            <Link href="/login" className="text-brand font-semibold hover:underline">
+              Entrar
+            </Link>
+          </p>
         </div>
       </div>
     </div>

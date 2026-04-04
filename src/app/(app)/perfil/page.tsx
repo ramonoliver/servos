@@ -1,34 +1,42 @@
 "use client";
+
 import { useState, useRef } from "react";
 import { useApp } from "@/hooks/use-app";
-import { getDB } from "@/lib/db/local-db";
+import { supabase } from "@/lib/supabase/client";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { updateSession } from "@/lib/auth/session";
-import { DAY_LABELS } from "@/lib/ai/engine";
 import { getInitials } from "@/lib/utils/helpers";
 import { AvailabilityEditor } from "@/components/ui";
 
 export default function PerfilPage() {
-  const { user, toast } = useApp();
-  const db = getDB();
+  const { user, toast, refresh } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [tab, setTab] = useState<"perfil" | "senha">(user.must_change_password ? "senha" : "perfil");
+  const [tab, setTab] = useState<"perfil" | "senha">(
+    user.must_change_password ? "senha" : "perfil"
+  );
 
-  // Profile
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone || "");
   const [photoUrl, setPhotoUrl] = useState(user.photo_url || "");
-  const [avail, setAvail] = useState([...(user.availability || [true,true,true,true,true,true,true])]);
+  const [avail, setAvail] = useState([
+    ...(user.availability || [true, true, true, true, true, true, true]),
+  ]);
 
-  // Password
   const [curPw, setCurPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
 
   function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast("Imagem muito grande (max 2MB)."); return; }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast("Imagem muito grande (max 2MB).");
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (ev) => {
       const result = ev.target?.result as string;
@@ -41,56 +49,139 @@ export default function PerfilPage() {
     setPhotoUrl("");
   }
 
-  function saveProfile() {
-    db.update("users", user.id, {
-      name, phone, availability: avail,
-      photo_url: photoUrl || null,
-    });
-    updateSession({ name });
+  async function saveProfile() {
+    if (!name.trim()) {
+      toast("Informe seu nome.");
+      return;
+    }
+
+    setSavingProfile(true);
+
+    const { error } = await supabase
+      .from("users")
+      .update({
+        name: name.trim(),
+        phone: phone.trim(),
+        availability: avail,
+        photo_url: photoUrl || null,
+      })
+      .eq("id", user.id);
+
+    if (error) {
+      console.error("Erro ao atualizar perfil:", error);
+      toast("Erro ao atualizar perfil.");
+      setSavingProfile(false);
+      return;
+    }
+
+    updateSession({ name: name.trim() });
+    await refresh();
     toast("Perfil atualizado!");
-    location.href = "/perfil";
+    setSavingProfile(false);
   }
 
-  function changePassword() {
-    if (!curPw || !newPw) { toast("Preencha todos os campos."); return; }
-    if (newPw.length < 6) { toast("Minimo 6 caracteres."); return; }
-    if (newPw !== confirmPw) { toast("As senhas nao coincidem."); return; }
-    if (!verifyPassword(curPw, user.password_hash)) { toast("Senha atual incorreta."); return; }
+  async function changePassword() {
+    if (!curPw || !newPw || !confirmPw) {
+      toast("Preencha todos os campos.");
+      return;
+    }
+
+    if (newPw.length < 6) {
+      toast("Minimo 6 caracteres.");
+      return;
+    }
+
+    if (newPw !== confirmPw) {
+      toast("As senhas nao coincidem.");
+      return;
+    }
+
+    if (!verifyPassword(curPw, user.password_hash)) {
+      toast("Senha atual incorreta.");
+      return;
+    }
+
+    setSavingPassword(true);
+
     const hash = hashPassword(newPw);
-    db.update("users", user.id, { password_hash: hash, must_change_password: false });
-    setCurPw(""); setNewPw(""); setConfirmPw("");
+
+    const { error } = await supabase
+      .from("users")
+      .update({
+        password_hash: hash,
+        must_change_password: false,
+      })
+      .eq("id", user.id);
+
+    if (error) {
+      console.error("Erro ao alterar senha:", error);
+      toast("Erro ao alterar senha.");
+      setSavingPassword(false);
+      return;
+    }
+
+    setCurPw("");
+    setNewPw("");
+    setConfirmPw("");
+    await refresh();
     toast("Senha alterada com sucesso!");
+    setSavingPassword(false);
   }
 
   return (
     <div className="max-w-[600px]">
-      <div className="mb-6"><h1 className="page-title">Meu Perfil</h1></div>
+      <div className="mb-6">
+        <h1 className="page-title">Meu Perfil</h1>
+      </div>
 
       {user.must_change_password && (
         <div className="bg-amber-light text-amber text-sm px-4 py-3 rounded-[14px] border border-amber/10 mb-5 flex items-center gap-2">
           &#9888; Voce esta usando uma senha temporaria.
-          <button onClick={() => setTab("senha")} className="font-bold underline">Altere agora</button>.
+          <button onClick={() => setTab("senha")} className="font-bold underline">
+            Altere agora
+          </button>
+          .
         </div>
       )}
 
-      {/* Tabs */}
       <div className="flex gap-1 mb-5 bg-surface-alt rounded-[10px] p-0.5 w-fit">
-        <button onClick={() => setTab("perfil")} className={`px-4 py-1.5 rounded-lg text-[13px] font-medium ${tab === "perfil" ? "bg-surface text-ink font-semibold shadow-sm" : "text-ink-muted"}`}>Perfil</button>
-        <button onClick={() => setTab("senha")} className={`px-4 py-1.5 rounded-lg text-[13px] font-medium ${tab === "senha" ? "bg-surface text-ink font-semibold shadow-sm" : "text-ink-muted"}`}>Senha</button>
+        <button
+          onClick={() => setTab("perfil")}
+          className={`px-4 py-1.5 rounded-lg text-[13px] font-medium ${
+            tab === "perfil"
+              ? "bg-surface text-ink font-semibold shadow-sm"
+              : "text-ink-muted"
+          }`}
+        >
+          Perfil
+        </button>
+        <button
+          onClick={() => setTab("senha")}
+          className={`px-4 py-1.5 rounded-lg text-[13px] font-medium ${
+            tab === "senha"
+              ? "bg-surface text-ink font-semibold shadow-sm"
+              : "text-ink-muted"
+          }`}
+        >
+          Senha
+        </button>
       </div>
 
       {tab === "perfil" && (
         <div className="card p-6 space-y-5">
-          {/* Photo upload */}
           <div className="flex items-center gap-5">
             <div className="relative group">
               {photoUrl ? (
                 <img src={photoUrl} alt="Foto" className="w-20 h-20 rounded-full object-cover" />
               ) : (
-                <div className="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold" style={{ background: user.avatar_color }}>
-                  {getInitials(user.name)}
+                <div
+                  className="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold"
+                  style={{ background: user.avatar_color }}
+                >
+                  {getInitials(name || user.name)}
                 </div>
               )}
+
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="absolute inset-0 rounded-full bg-ink/0 group-hover:bg-ink/40 flex items-center justify-center transition-all cursor-pointer"
@@ -99,6 +190,7 @@ export default function PerfilPage() {
                   {photoUrl ? "Trocar" : "Adicionar"}
                 </span>
               </button>
+
               <input
                 ref={fileInputRef}
                 type="file"
@@ -107,40 +199,87 @@ export default function PerfilPage() {
                 onChange={handlePhotoUpload}
               />
             </div>
+
             <div>
               <div className="text-sm font-semibold">{user.email}</div>
               <div className="text-xs text-ink-faint capitalize mb-2">
-                {user.role === "admin" ? "Administrador" : user.role === "leader" ? "Lider" : "Membro"}
+                {user.role === "admin"
+                  ? "Administrador"
+                  : user.role === "leader"
+                  ? "Lider"
+                  : "Membro"}
               </div>
+
               <div className="flex gap-2">
                 <button onClick={() => fileInputRef.current?.click()} className="btn btn-secondary btn-sm">
                   {photoUrl ? "Trocar foto" : "Adicionar foto"}
                 </button>
+
                 {photoUrl && (
-                  <button onClick={removePhoto} className="btn btn-ghost btn-sm text-danger">Remover</button>
+                  <button onClick={removePhoto} className="btn btn-ghost btn-sm text-danger">
+                    Remover
+                  </button>
                 )}
               </div>
             </div>
           </div>
 
-          <div><label className="input-label">Nome</label><input className="input-field" value={name} onChange={e => setName(e.target.value)} /></div>
-          <div><label className="input-label">Telefone</label><input className="input-field" value={phone} onChange={e => setPhone(e.target.value)} /></div>
+          <div>
+            <label className="input-label">Nome</label>
+            <input className="input-field" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+
+          <div>
+            <label className="input-label">Telefone</label>
+            <input className="input-field" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
 
           <div>
             <label className="input-label">Disponibilidade semanal</label>
             <AvailabilityEditor availability={avail} onChange={setAvail} />
           </div>
 
-          <button onClick={saveProfile} className="btn btn-primary">Salvar perfil</button>
+          <button onClick={saveProfile} disabled={savingProfile} className="btn btn-primary">
+            {savingProfile ? "Salvando..." : "Salvar perfil"}
+          </button>
         </div>
       )}
 
       {tab === "senha" && (
         <div className="card p-6 space-y-4">
-          <div><label className="input-label">Senha atual</label><input type="password" className="input-field" value={curPw} onChange={e => setCurPw(e.target.value)} /></div>
-          <div><label className="input-label">Nova senha (min. 6 caracteres)</label><input type="password" className="input-field" value={newPw} onChange={e => setNewPw(e.target.value)} /></div>
-          <div><label className="input-label">Confirmar nova senha</label><input type="password" className="input-field" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} /></div>
-          <button onClick={changePassword} className="btn btn-primary">Alterar senha</button>
+          <div>
+            <label className="input-label">Senha atual</label>
+            <input
+              type="password"
+              className="input-field"
+              value={curPw}
+              onChange={(e) => setCurPw(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="input-label">Nova senha (min. 6 caracteres)</label>
+            <input
+              type="password"
+              className="input-field"
+              value={newPw}
+              onChange={(e) => setNewPw(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="input-label">Confirmar nova senha</label>
+            <input
+              type="password"
+              className="input-field"
+              value={confirmPw}
+              onChange={(e) => setConfirmPw(e.target.value)}
+            />
+          </div>
+
+          <button onClick={changePassword} disabled={savingPassword} className="btn btn-primary">
+            {savingPassword ? "Alterando..." : "Alterar senha"}
+          </button>
         </div>
       )}
     </div>
