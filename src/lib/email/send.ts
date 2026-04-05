@@ -1,5 +1,4 @@
-import "server-only";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
 type WelcomeEmailInput = {
   to: string;
@@ -17,7 +16,27 @@ type ScheduleReminderInput = {
   departmentName: string;
 };
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const host = process.env.BREVO_SMTP_HOST || "smtp-relay.brevo.com";
+const port = Number(process.env.BREVO_SMTP_PORT || 587);
+const user = process.env.BREVO_SMTP_USER;
+const pass = process.env.BREVO_SMTP_PASS;
+const from = process.env.EMAIL_FROM || "Servos <noreply@seudominio.com>";
+
+function getTransporter() {
+  if (!user || !pass) {
+    throw new Error("Brevo SMTP não configurado. Defina BREVO_SMTP_USER e BREVO_SMTP_PASS.");
+  }
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: {
+      user,
+      pass,
+    },
+  });
+}
 
 export async function sendWelcomeEmail({
   to,
@@ -25,12 +44,7 @@ export async function sendWelcomeEmail({
   churchName,
   tempPassword,
 }: WelcomeEmailInput) {
-  if (!process.env.RESEND_API_KEY) {
-    console.warn("RESEND_API_KEY não configurada. E-mail não enviado.");
-    return { data: null, error: "missing_api_key" };
-  }
-
-  const from = process.env.EMAIL_FROM || "Servos <onboarding@resend.dev>";
+  const transporter = getTransporter();
 
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
@@ -47,7 +61,7 @@ export async function sendWelcomeEmail({
     </div>
   `;
 
-  return resend.emails.send({
+  return transporter.sendMail({
     from,
     to,
     subject: "Seu acesso ao Servos",
@@ -63,32 +77,25 @@ export async function sendScheduleReminderEmail({
   time,
   departmentName,
 }: ScheduleReminderInput) {
-  if (!process.env.RESEND_API_KEY) {
-    console.warn("RESEND_API_KEY não configurada. E-mail não enviado.");
-    return { data: null, error: "missing_api_key" };
-  }
-
-  const from = process.env.EMAIL_FROM || "Servos <onboarding@resend.dev>";
+  const transporter = getTransporter();
 
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
       <h2>Lembrete de Escala</h2>
       <p>Olá, <strong>${memberName}</strong>!</p>
       <p>Você está escalado para servir:</p>
-
       <div style="background:#f3f4f6;padding:16px;border-radius:12px;">
         <p style="margin:0 0 8px;"><strong>Evento:</strong> ${eventName}</p>
         <p style="margin:0 0 8px;"><strong>Data:</strong> ${date}</p>
         <p style="margin:0 0 8px;"><strong>Horário:</strong> ${time}</p>
         <p style="margin:0;"><strong>Ministério:</strong> ${departmentName}</p>
       </div>
-
       <p style="margin-top:16px;">Confirme sua presença no app 🙏</p>
       <p>Que Deus abençoe seu servir!</p>
     </div>
   `;
 
-  return resend.emails.send({
+  return transporter.sendMail({
     from,
     to,
     subject: "Lembrete de escala - Servos",
