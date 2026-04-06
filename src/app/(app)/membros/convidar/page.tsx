@@ -222,6 +222,7 @@ export default function ConvidarMembroPage() {
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
         console.error("Erro ao enviar email de boas-vindas:", errorData || response.statusText);
+        toast("Membro criado, mas o email de boas-vindas falhou.");
       }
     } catch (err) {
       console.error("Erro ao enviar email de boas-vindas:", err);
