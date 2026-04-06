@@ -46,6 +46,10 @@ export default function NotificaçõesPage() {
     () => notifications.some((n) => !n.read),
     [notifications]
   );
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications]
+  );
 
   async function markAllRead() {
     if (!hasUnread) return;
@@ -115,7 +119,10 @@ export default function NotificaçõesPage() {
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 className="page-title">Notificações</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="page-title">Notificações</h1>
+          {unreadCount > 0 && <span className="badge badge-red">{unreadCount}</span>}
+        </div>
 
         {hasUnread && (
           <button

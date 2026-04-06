@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { getSession, clearSession } from "@/lib/auth/session";
@@ -36,6 +36,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [userDeptIds, setUserDeptIds] = useState<string[]>([]);
   const [toastMsg, setToastMsg] = useState("");
   const [loading, setLoading] = useState(true);
+  const unreadNotificationCountRef = useRef<number | null>(null);
+  const lastUnreadNotificationIdRef = useRef<string | null>(null);
 
   const toast = useCallback((msg: string) => {
     setToastMsg(msg);
@@ -148,6 +150,66 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    async function checkUnreadNotifications() {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("id, title, type, read, created_at")
+        .eq("user_id", user.id)
+        .eq("read", false)
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error("Erro ao verificar novas notificações:", error);
+        return;
+      }
+
+      if (cancelled) return;
+
+      const unread = data || [];
+      const unreadCount = unread.length;
+      const latestUnread = unread[0] as { id: string; title: string; type: string } | undefined;
+
+      if (unreadNotificationCountRef.current === null) {
+        unreadNotificationCountRef.current = unreadCount;
+        lastUnreadNotificationIdRef.current = latestUnread?.id || null;
+        return;
+      }
+
+      const hasNewUnread =
+        unreadCount > unreadNotificationCountRef.current &&
+        latestUnread?.id &&
+        latestUnread.id !== lastUnreadNotificationIdRef.current;
+
+      unreadNotificationCountRef.current = unreadCount;
+      lastUnreadNotificationIdRef.current = latestUnread?.id || null;
+
+      if (hasNewUnread && latestUnread) {
+        if (latestUnread.type === "info") {
+          toast(`Nova mensagem: ${latestUnread.title}`);
+        } else {
+          toast(`Novo alerta: ${latestUnread.title}`);
+        }
+      }
+    }
+
+    void checkUnreadNotifications();
+    interval = setInterval(() => {
+      void checkUnreadNotifications();
+    }, 10000);
+
+    return () => {
+      cancelled = true;
+      if (interval) clearInterval(interval);
+    };
+  }, [user, toast]);
 
   if (loading) {
     return (
