@@ -6,8 +6,8 @@ import Link from "next/link";
 import { AppProvider, useApp } from "@/hooks/use-app";
 import { Avatar } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
-import { getInitials, getIconEmoji } from "@/lib/utils/helpers";
-import type { Notification, User } from "@/types";
+import { getIconEmoji } from "@/lib/utils/helpers";
+import type { User } from "@/types";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -129,7 +129,9 @@ function UserAvatar({ user, size = 32 }: { user: User; size?: number }) {
 function Shell({ children }: { children: React.ReactNode }) {
   const { user, church, departments, canDo, logout } = useApp();
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  const [desktopCollapsed, setDesktopCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
 
   useEffect(() => {
@@ -150,6 +152,22 @@ function Shell({ children }: { children: React.ReactNode }) {
 
     loadUnreadNotifications();
   }, [user.id, pathname]);
+
+  useEffect(() => {
+    function syncViewport() {
+      setIsMobile(window.innerWidth < 1024);
+    }
+
+    syncViewport();
+    window.addEventListener("resize", syncViewport);
+    return () => window.removeEventListener("resize", syncViewport);
+  }, []);
+
+  useEffect(() => {
+    if (isMobile) {
+      setMobileNavOpen(false);
+    }
+  }, [pathname, isMobile]);
 
   const isAdmin = user.role === "admin";
   const isLeader = user.role === "leader";
@@ -177,12 +195,26 @@ function Shell({ children }: { children: React.ReactNode }) {
       ? { label: "Líder", cls: "bg-brand-light text-brand" }
       : { label: "Membro", cls: "bg-success-light text-success" };
 
+  const compactSidebar = !isMobile && desktopCollapsed;
+
   return (
-    <div className="flex h-screen bg-bg overflow-hidden">
+    <div className="flex min-h-screen bg-bg overflow-hidden">
+      {isMobile && mobileNavOpen && (
+        <button
+          aria-label="Fechar menu"
+          className="fixed inset-0 z-30 bg-ink/35 backdrop-blur-[2px]"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
       <aside
         className={`${
-          collapsed ? "w-0 overflow-hidden" : "w-[250px]"
-        } bg-white border-r border-border-soft flex flex-col flex-shrink-0 transition-all duration-300 z-10`}
+          isMobile
+            ? `fixed inset-y-0 left-0 z-40 w-[86vw] max-w-[320px] ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}`
+            : compactSidebar
+            ? "w-[88px]"
+            : "w-[250px]"
+        } bg-white border-r border-border-soft flex flex-col flex-shrink-0 transition-all duration-300 shadow-[0_24px_60px_rgba(15,23,42,0.08)] lg:shadow-none`}
       >
         <div className="flex items-center gap-2.5 px-5 py-4 border-b border-border-soft">
           <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center shadow-sm">
@@ -192,14 +224,18 @@ function Shell({ children }: { children: React.ReactNode }) {
             </svg>
           </div>
 
-          <span className="font-display text-[17px] font-bold tracking-tight">Servos</span>
-          <span className="ml-auto text-[9px] font-semibold text-ink-faint bg-surface-alt px-2 py-0.5 rounded-full">
-            {church.name
-              .split(" ")
-              .map((w) => w[0])
-              .join("")
-              .slice(0, 3)}
-          </span>
+          {!compactSidebar && (
+            <>
+              <span className="font-display text-[17px] font-bold tracking-tight">Servos</span>
+              <span className="ml-auto text-[9px] font-semibold text-ink-faint bg-surface-alt px-2 py-0.5 rounded-full">
+                {church.name
+                  .split(" ")
+                  .map((w) => w[0])
+                  .join("")
+                  .slice(0, 3)}
+              </span>
+            </>
+          )}
         </div>
 
         <nav className="flex-1 overflow-y-auto py-2 px-3 space-y-0.5">
@@ -209,10 +245,15 @@ function Shell({ children }: { children: React.ReactNode }) {
               (item.href !== "/dashboard" && pathname.startsWith(item.href));
 
             return (
-              <Link key={item.href} href={item.href} className={`sidebar-item ${active ? "active" : ""}`}>
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`sidebar-item ${active ? "active" : ""} ${compactSidebar ? "justify-center px-2.5" : ""}`}
+                title={compactSidebar ? item.label : undefined}
+              >
                 <SvgIcon name={item.icon} size={18} />
-                <span className="flex-1">{item.label}</span>
-                {item.badge && (
+                {!compactSidebar && <span className="flex-1">{item.label}</span>}
+                {item.badge && !compactSidebar && (
                   <span className="text-[10px] font-bold bg-danger text-white px-1.5 py-px rounded-full min-w-[18px] text-center">
                     {item.badge}
                   </span>
@@ -223,18 +264,21 @@ function Shell({ children }: { children: React.ReactNode }) {
 
           {(isAdmin || isLeader) && departments.length > 0 && (
             <>
-              <div className="text-[9px] font-bold tracking-widest uppercase text-ink-faint px-3 pt-4 pb-1">
-                Ministérios
-              </div>
+              {!compactSidebar && (
+                <div className="text-[9px] font-bold tracking-widest uppercase text-ink-faint px-3 pt-4 pb-1">
+                  Ministérios
+                </div>
+              )}
 
               {departments.map((d) => (
                 <Link
                   key={d.id}
                   href={`/ministerios/${d.id}`}
-                  className={`sidebar-item pl-4 ${pathname === `/ministerios/${d.id}` ? "active" : ""}`}
+                  className={`sidebar-item ${compactSidebar ? "justify-center px-2.5" : "pl-4"} ${pathname === `/ministerios/${d.id}` ? "active" : ""}`}
+                  title={compactSidebar ? d.name : undefined}
                 >
                   <span className="text-sm">{getIconEmoji(d.icon)}</span>
-                  <span>{d.name}</span>
+                  {!compactSidebar && <span>{d.name}</span>}
                 </Link>
               ))}
             </>
@@ -244,10 +288,12 @@ function Shell({ children }: { children: React.ReactNode }) {
         <div className="px-4 py-3 border-t border-border-soft">
           <div className="flex items-center gap-2.5">
             <UserAvatar user={user} size={32} />
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-semibold truncate">{user.name}</div>
-              <div className="text-[10px] text-ink-faint">{roleBadge.label}</div>
-            </div>
+            {!compactSidebar && (
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-semibold truncate">{user.name}</div>
+                <div className="text-[10px] text-ink-faint">{roleBadge.label}</div>
+              </div>
+            )}
             <button
               onClick={logout}
               className="text-ink-faint hover:text-danger transition-colors p-1"
@@ -260,10 +306,20 @@ function Shell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-14 bg-bg/90 backdrop-blur-xl border-b border-border-soft flex items-center px-6 gap-4 flex-shrink-0">
-          <button onClick={() => setCollapsed(!collapsed)} className="text-ink-muted hover:text-ink p-1 -ml-1">
+        <header className="h-14 sm:h-16 bg-bg/90 backdrop-blur-xl border-b border-border-soft flex items-center px-4 sm:px-6 gap-3 sm:gap-4 flex-shrink-0">
+          <button
+            onClick={() => (isMobile ? setMobileNavOpen(true) : setDesktopCollapsed(!desktopCollapsed))}
+            className="text-ink-muted hover:text-ink p-1 -ml-1"
+            aria-label="Abrir menu"
+          >
             <SvgIcon name="menu" size={20} />
           </button>
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-faint hidden sm:block">
+              {church.name}
+            </div>
+            <div className="text-sm font-semibold text-ink-soft truncate sm:hidden">{church.name}</div>
+          </div>
           <div className="flex-1" />
           <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${roleBadge.cls}`}>
             {roleBadge.label}
@@ -273,7 +329,9 @@ function Shell({ children }: { children: React.ReactNode }) {
           </Link>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+          <div className="mx-auto w-full max-w-[1400px]">{children}</div>
+        </main>
       </div>
     </div>
   );

@@ -48,6 +48,7 @@ export default function EventosPage() {
     () => events.filter((e) => e.type === "special"),
     [events]
   );
+  const withTime = useMemo(() => events.filter((e) => Boolean(e.base_time)).length, [events]);
 
   async function deleteEvent(ev: Event) {
     try {
@@ -79,9 +80,12 @@ export default function EventosPage() {
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
+        <div className="max-w-2xl">
           <h1 className="page-title">Eventos</h1>
-          <p className="page-subtitle">Cultos e eventos especiais</p>
+          <p className="page-subtitle">
+            Organize a agenda da igreja com uma leitura mais clara entre bases recorrentes e
+            programações especiais.
+          </p>
         </div>
         {canDo("event.create") && (
           <button onClick={() => setModal({ type: "form" })} className="btn btn-primary self-start sm:self-auto">
@@ -90,12 +94,54 @@ export default function EventosPage() {
         )}
       </div>
 
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-6">
+        <div className="rounded-[18px] border border-border-soft bg-[linear-gradient(180deg,rgba(236,245,238,0.9),rgba(255,255,255,0.96))] px-4 py-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
+            Recorrentes
+          </div>
+          <div className="mt-2 font-display text-[28px] leading-none text-success">{recurring.length}</div>
+          <div className="mt-1 text-xs text-ink-muted leading-relaxed">
+            Bases semanais que sustentam as escalas.
+          </div>
+        </div>
+
+        <div className="rounded-[18px] border border-border-soft bg-[linear-gradient(180deg,rgba(255,241,230,0.9),rgba(255,255,255,0.96))] px-4 py-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
+            Especiais
+          </div>
+          <div className="mt-2 font-display text-[28px] leading-none text-brand">{special.length}</div>
+          <div className="mt-1 text-xs text-ink-muted leading-relaxed">
+            Eventos únicos ou fora do ritmo semanal.
+          </div>
+        </div>
+
+        <div className="rounded-[18px] border border-border-soft bg-[linear-gradient(180deg,rgba(240,246,255,0.9),rgba(255,255,255,0.96))] px-4 py-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
+            Com horário base
+          </div>
+          <div className="mt-2 font-display text-[28px] leading-none text-info">{withTime}</div>
+          <div className="mt-1 text-xs text-ink-muted leading-relaxed">
+            Prontos para agilizar a criação de escala.
+          </div>
+        </div>
+      </div>
+
       {[{ title: "Cultos Recorrentes", list: recurring }, { title: "Eventos Especiais", list: special }].map(
         (section) => (
           <div key={section.title} className="mb-8">
-            <h3 className="font-display text-lg mb-3">{section.title}</h3>
+            <div className="flex items-end justify-between gap-3 mb-3">
+              <div>
+                <h3 className="font-display text-lg">{section.title}</h3>
+                <p className="text-xs text-ink-muted mt-1">
+                  {section.title === "Cultos Recorrentes"
+                    ? "Eventos base para a rotina semanal dos ministérios."
+                    : "Programações pontuais que merecem destaque próprio no calendário."}
+                </p>
+              </div>
+              <span className="badge badge-secondary">{section.list.length}</span>
+            </div>
 
-            <div className="card">
+            <div className="card overflow-hidden">
               {loading ? (
                 <div className="px-5 py-8 text-center text-sm text-ink-faint">Carregando eventos...</div>
               ) : section.list.length === 0 ? (
@@ -104,20 +150,33 @@ export default function EventosPage() {
                 section.list.map((e) => (
                   <div
                     key={e.id}
-                    className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-3 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors group"
+                    className="flex flex-col gap-3 px-5 py-4 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors group"
                   >
-                    <span className="text-xl">{getIconEmoji(e.icon)}</span>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-border-soft bg-surface-alt text-2xl">
+                        {getIconEmoji(e.icon)}
+                      </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium break-words">{e.name}</div>
-                      {e.description && <div className="text-[11px] text-ink-faint break-words">{e.description}</div>}
-                      {e.location && <div className="text-[11px] text-ink-faint break-words">{e.location}</div>}
-                    </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                          <div className="text-sm font-semibold break-words">{e.name}</div>
+                          <span className={`badge ${e.type === "recurring" ? "badge-green" : "badge-brand"}`}>
+                            {e.type === "recurring" ? "Recorrente" : "Especial"}
+                          </span>
+                          {e.base_time && <span className="badge badge-secondary">{e.base_time}</span>}
+                        </div>
 
-                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                      <span className={`badge ${e.type === "recurring" ? "badge-green" : "badge-brand"}`}>
-                        {e.type === "recurring" ? "Recorrente" : "Especial"}
-                      </span>
+                        {e.description && (
+                          <div className="text-[12px] text-ink-muted break-words leading-relaxed">
+                            {e.description}
+                          </div>
+                        )}
+
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-faint leading-relaxed">
+                          {e.location && <span>Local: {e.location}</span>}
+                          {e.instructions && <span>Instruções disponíveis</span>}
+                        </div>
+                      </div>
 
                       {canDo("event.edit") && (
                         <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
@@ -136,6 +195,12 @@ export default function EventosPage() {
                         </div>
                       )}
                     </div>
+
+                    {e.instructions && (
+                      <div className="rounded-[14px] border border-border-soft bg-surface-alt/60 px-3 py-2 text-[11px] text-ink-muted leading-relaxed">
+                        {e.instructions}
+                      </div>
+                    )}
                   </div>
                 ))
               )}

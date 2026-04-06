@@ -94,6 +94,40 @@ export default function CalendarioPage() {
     return schedules.filter((s) => s.date === selectedDateStr);
   }, [selectedDateStr, schedules]);
 
+  const myScheduleIds = useMemo(
+    () => new Set(allSM.filter((item) => item.user_id === user.id).map((item) => item.schedule_id)),
+    [allSM, user.id]
+  );
+
+  const monthStats = useMemo(() => {
+    let recurringDays = 0;
+    let specialDays = 0;
+    let myDays = 0;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dailySchedules = getSchedulesForDay(day);
+      if (dailySchedules.length === 0) continue;
+
+      const hasRecurring = dailySchedules.some((schedule) => {
+        const event = events.find((item) => item.id === schedule.event_id);
+        return event?.type === "recurring";
+      });
+
+      const hasSpecial = dailySchedules.some((schedule) => {
+        const event = events.find((item) => item.id === schedule.event_id);
+        return event?.type === "special";
+      });
+
+      const hasMine = dailySchedules.some((schedule) => myScheduleIds.has(schedule.id));
+
+      if (hasRecurring) recurringDays += 1;
+      if (hasSpecial) specialDays += 1;
+      if (hasMine) myDays += 1;
+    }
+
+    return { recurringDays, specialDays, myDays };
+  }, [daysInMonth, schedules, events, myScheduleIds, year, month]);
+
   function getSchedulesForDay(day: number) {
     const ds = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     return schedules.filter((s) => s.date === ds);
@@ -103,10 +137,11 @@ export default function CalendarioPage() {
     <div>
       <div className="mb-6">
         <h1 className="page-title">Calendário</h1>
-        <p className="page-subtitle">Veja escalas do mês e abra os detalhes por dia</p>
+        <p className="page-subtitle">Acompanhe dias com eventos recorrentes, especiais e as escalas em que você está incluído.</p>
       </div>
 
-      <div className="card p-4 sm:p-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
+        <div className="card p-4 sm:p-5">
         <div className="flex items-center justify-between gap-2 sm:gap-3 mb-4">
           <button onClick={() => setMonthOffset((m) => m - 1)} className="btn btn-ghost btn-sm">
             &larr;
@@ -130,6 +165,12 @@ export default function CalendarioPage() {
             if (!day) return <div key={i} />;
 
             const dayScheds = getSchedulesForDay(day);
+            const eventTypes = dayScheds.map((schedule) =>
+              events.find((event) => event.id === schedule.event_id)?.type
+            );
+            const hasRecurring = eventTypes.includes("recurring");
+            const hasSpecial = eventTypes.includes("special");
+            const hasMine = dayScheds.some((schedule) => myScheduleIds.has(schedule.id));
             const isToday =
               day === now.getDate() &&
               month === now.getMonth() &&
@@ -140,34 +181,141 @@ export default function CalendarioPage() {
               <button
                 key={i}
                 onClick={() => setSelectedDay(day === selectedDay ? null : day)}
-                className={`relative aspect-square min-h-[46px] rounded-lg flex flex-col items-center justify-center text-sm transition-all ${
+                className={`relative aspect-square min-h-[62px] rounded-2xl border text-sm transition-all overflow-hidden ${
                   isSelected
-                    ? "bg-brand text-white"
+                    ? "bg-brand text-white border-brand shadow-lg shadow-brand/20 scale-[1.02]"
                     : isToday
-                    ? "bg-brand-light text-brand font-bold"
-                    : "hover:bg-surface-alt"
+                    ? "bg-brand-light text-brand border-brand/20 font-bold"
+                    : hasMine
+                    ? "bg-[#fff4dc] border-[#f1c46a] text-[#7b4c00] hover:bg-[#ffefcc]"
+                    : hasSpecial
+                    ? "bg-[#ffe8e3] border-[#f2b6a6] text-[#8f3b22] hover:bg-[#ffdcd2]"
+                    : hasRecurring
+                    ? "bg-[#edf6ef] border-[#b8d8bf] text-[#285e34] hover:bg-[#e4f1e7]"
+                    : "bg-white border-border-soft hover:bg-surface-alt"
                 }`}
               >
-                {day}
-                {dayScheds.length > 0 && (
-                  <div className="absolute bottom-1 flex gap-0.5">
-                    {dayScheds.slice(0, 3).map((_, j) => (
-                      <div
-                        key={j}
-                        className={`w-1 h-1 rounded-full ${isSelected ? "bg-white" : "bg-brand"}`}
-                      />
-                    ))}
+                <div className="absolute inset-x-0 top-0 h-1.5">
+                  <div
+                    className={`h-full ${
+                      isSelected
+                        ? "bg-white/35"
+                        : hasMine
+                        ? "bg-[#f0aa00]"
+                        : hasSpecial
+                        ? "bg-[#e46b42]"
+                        : hasRecurring
+                        ? "bg-[#4d9c62]"
+                        : "bg-transparent"
+                    }`}
+                  />
+                </div>
+
+                <div className="h-full w-full flex flex-col items-center justify-between px-1.5 py-2">
+                  <div className="text-[15px] font-semibold leading-none">{day}</div>
+
+                  <div className="flex flex-wrap items-center justify-center gap-1 min-h-[20px]">
+                    {hasMine && (
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-white/80 text-[#7b4c00]"}`}>
+                        Minha
+                      </span>
+                    )}
+                    {hasSpecial && (
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-white/80 text-[#8f3b22]"}`}>
+                        Especial
+                      </span>
+                    )}
+                    {!hasSpecial && hasRecurring && (
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-white/80 text-[#285e34]"}`}>
+                        Recorrente
+                      </span>
+                    )}
                   </div>
-                )}
+
+                  {dayScheds.length > 0 ? (
+                    <div className="flex items-center gap-1">
+                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white" : hasMine ? "bg-[#f0aa00]" : hasSpecial ? "bg-[#e46b42]" : "bg-brand"}`} />
+                      <span className={`text-[10px] ${isSelected ? "text-white/90" : "text-ink-faint"}`}>
+                        {dayScheds.length}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="h-[12px]" />
+                  )}
+                </div>
               </button>
             );
           })}
+        </div>
+        </div>
+
+        <div className="card p-5 space-y-4">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink-faint mb-2">
+              Leitura Rápida
+            </div>
+            <h2 className="font-display text-xl leading-tight">Panorama do mês</h2>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            <div className="rounded-2xl border border-[#f1c46a] bg-[#fff4dc] px-4 py-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[#7b4c00]">Minhas escalas</div>
+              <div className="text-2xl font-display text-[#7b4c00] mt-1">{monthStats.myDays}</div>
+              <div className="text-xs text-[#8f6b1d] mt-1">Dias do mês em que você está escalado.</div>
+            </div>
+
+            <div className="rounded-2xl border border-[#b8d8bf] bg-[#edf6ef] px-4 py-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[#285e34]">Recorrentes</div>
+              <div className="text-2xl font-display text-[#285e34] mt-1">{monthStats.recurringDays}</div>
+              <div className="text-xs text-[#467451] mt-1">Dias com cultos e eventos recorrentes.</div>
+            </div>
+
+            <div className="rounded-2xl border border-[#f2b6a6] bg-[#ffe8e3] px-4 py-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[#8f3b22]">Especiais</div>
+              <div className="text-2xl font-display text-[#8f3b22] mt-1">{monthStats.specialDays}</div>
+              <div className="text-xs text-[#a35840] mt-1">Dias com eventos especiais ou fora da rotina.</div>
+            </div>
+          </div>
+
+          <div className="border-t border-border-soft pt-4 space-y-2 text-xs text-ink-muted">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-[#f0aa00]" />
+              <span>Dia em que você está escalado</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-[#4d9c62]" />
+              <span>Evento recorrente</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-[#e46b42]" />
+              <span>Evento especial</span>
+            </div>
+          </div>
         </div>
       </div>
 
       {selectedDay && (
         <div className="mt-5">
-          <h3 className="font-display text-lg mb-3 break-words">Escalas em {selectedDay}/{month + 1}</h3>
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-3">
+            <div>
+              <h3 className="font-display text-lg break-words">Agenda de {selectedDay}/{month + 1}</h3>
+              <p className="text-sm text-ink-muted">
+                {daySchedules.length} {daySchedules.length === 1 ? "escala encontrada" : "escalas encontradas"} neste dia.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {daySchedules.some((schedule) => myScheduleIds.has(schedule.id)) && (
+                <span className="badge" style={{ background: "#fff4dc", color: "#7b4c00" }}>
+                  Você está escalado
+                </span>
+              )}
+              {daySchedules.some((schedule) => events.find((event) => event.id === schedule.event_id)?.type === "special") && (
+                <span className="badge" style={{ background: "#ffe8e3", color: "#8f3b22" }}>
+                  Especial
+                </span>
+              )}
+            </div>
+          </div>
 
           {loading ? (
             <div className="card px-5 py-8 text-center text-sm text-ink-faint">Carregando...</div>
@@ -181,20 +329,45 @@ export default function CalendarioPage() {
                 const ev = events.find((e) => e.id === s.event_id);
                 const dept = departments.find((d) => d.id === s.department_id);
                 const sm = allSM.filter((m) => m.schedule_id === s.id);
+                const isMine = myScheduleIds.has(s.id);
+                const eventType = ev?.type === "special" ? "Especial" : "Recorrente";
 
                 return (
                   <Link
                     key={s.id}
                     href={`/escalas/${s.id}`}
-                    className="flex items-start sm:items-center gap-3 px-5 py-3 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors"
+                    className={`flex items-start sm:items-center gap-3 px-5 py-4 border-t border-border-soft first:border-t-0 transition-colors ${
+                      isMine ? "hover:bg-[#fff8ea] bg-[#fffdfa]" : "hover:bg-brand-glow"
+                    }`}
                   >
-                    <span className="text-lg">{ev ? getIconEmoji(ev.icon) : ""}</span>
+                    <div
+                      className={`w-11 h-11 rounded-2xl flex items-center justify-center text-lg shrink-0 ${
+                        ev?.type === "special" ? "bg-[#ffe8e3]" : "bg-[#edf6ef]"
+                      }`}
+                    >
+                      {ev ? getIconEmoji(ev.icon) : ""}
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium break-words">{ev?.name}</div>
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <div className="text-sm font-medium break-words">{ev?.name}</div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          ev?.type === "special"
+                            ? "bg-[#ffe8e3] text-[#8f3b22]"
+                            : "bg-[#edf6ef] text-[#285e34]"
+                        }`}>
+                          {eventType}
+                        </span>
+                        {isMine && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#fff4dc] text-[#7b4c00]">
+                            Minha escala
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[11px] text-ink-faint break-words leading-relaxed">
-                        {s.time} - {dept?.name} - {sm.length} escalados
+                        {s.time} · {dept?.name} · {sm.length} escalados
                       </div>
                     </div>
+                    <div className="text-brand text-sm font-semibold shrink-0">&rarr;</div>
                   </Link>
                 );
               })}

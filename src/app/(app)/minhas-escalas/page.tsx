@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { Avatar } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
-import { formatDate, getDayName, getInitials } from "@/lib/utils/helpers";
+import { formatDate, getDayName } from "@/lib/utils/helpers";
 import Link from "next/link";
 import type { Schedule, ScheduleMember, Event, User } from "@/types";
 
@@ -104,6 +104,9 @@ export default function MinhasEscalasPage() {
   const upcoming = mySchedules.filter((s) => s.schedule.date >= today);
   const past = mySchedules.filter((s) => s.schedule.date < today);
   const list = tab === "upcoming" ? upcoming : past;
+  const confirmedCount = upcoming.filter((item) => item.sm.status === "confirmed").length;
+  const pendingCount = upcoming.filter((item) => item.sm.status === "pending").length;
+  const nextSchedule = upcoming[0];
 
   async function confirm(smId: string) {
     try {
@@ -166,12 +169,91 @@ export default function MinhasEscalasPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="page-title">Minhas Escalas</h1>
-        <p className="page-subtitle">Suas escalas e confirmações</p>
+      <div className="mb-6 rounded-[24px] border border-border-soft bg-[linear-gradient(135deg,rgba(189,149,90,0.14),rgba(255,255,255,0.96))] p-5 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <h1 className="page-title mb-2">Minhas Escalas</h1>
+            <p className="page-subtitle">
+              Acompanhe seus compromissos, confirme presença e veja rapidamente onde sua atenção é
+              mais importante nesta semana.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:min-w-[430px]">
+            <div className="rounded-[18px] border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
+                Próximas
+              </div>
+              <div className="mt-2 font-display text-[28px] leading-none text-brand">
+                {upcoming.length}
+              </div>
+              <div className="mt-1 text-xs leading-relaxed text-ink-muted">
+                Escalas ativas no seu radar.
+              </div>
+            </div>
+
+            <div className="rounded-[18px] border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
+                Pendentes
+              </div>
+              <div className="mt-2 font-display text-[28px] leading-none text-amber">
+                {pendingCount}
+              </div>
+              <div className="mt-1 text-xs leading-relaxed text-ink-muted">
+                Confirmações aguardando resposta.
+              </div>
+            </div>
+
+            <div className="rounded-[18px] border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
+                Confirmadas
+              </div>
+              <div className="mt-2 font-display text-[28px] leading-none text-success">
+                {confirmedCount}
+              </div>
+              <div className="mt-1 text-xs leading-relaxed text-ink-muted">
+                Você já respondeu com tranquilidade.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {nextSchedule && (
+          <div className="mt-5 rounded-[18px] border border-brand/10 bg-white/70 px-4 py-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand">
+              Próxima escala
+            </div>
+            <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-ink-soft break-words">
+                  {nextSchedule.event?.name || "Escala"}
+                </div>
+                <div className="text-xs text-ink-muted break-words leading-relaxed">
+                  {formatDate(nextSchedule.schedule.date)} às {nextSchedule.schedule.time}
+                  {nextSchedule.department ? ` • ${nextSchedule.department.name}` : ""}
+                </div>
+              </div>
+              <span
+                className={`badge self-start sm:self-auto ${
+                  nextSchedule.sm.status === "confirmed"
+                    ? "badge-green"
+                    : nextSchedule.sm.status === "pending"
+                    ? "badge-amber"
+                    : "badge-red"
+                }`}
+              >
+                {nextSchedule.sm.status === "confirmed"
+                  ? "Confirmada"
+                  : nextSchedule.sm.status === "pending"
+                  ? "Aguardando resposta"
+                  : "Recusada"}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="flex flex-wrap gap-1 mb-5 bg-surface-alt rounded-[10px] p-0.5 w-fit max-w-full">
+      <div className="mb-5 flex flex-wrap gap-1 rounded-[14px] border border-border-soft bg-surface-alt p-1 w-fit max-w-full">
         <button
           onClick={() => setTab("upcoming")}
           className={`px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
@@ -216,10 +298,10 @@ export default function MinhasEscalasPage() {
             const isResponding = responding === sm.id;
 
             return (
-              <div key={sm.id} className="card">
+              <div key={sm.id} className="card overflow-hidden">
                 <div className="p-5">
                   <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                    <div className="w-14 h-14 rounded-[14px] bg-surface-alt flex flex-col items-center justify-center flex-shrink-0">
+                    <div className="w-14 h-14 rounded-[16px] bg-[linear-gradient(180deg,rgba(189,149,90,0.12),rgba(243,238,230,0.82))] border border-brand/10 flex flex-col items-center justify-center flex-shrink-0">
                       <span className="text-[10px] font-bold uppercase text-brand">
                         {getDayName(schedule.date)}
                       </span>
@@ -229,7 +311,12 @@ export default function MinhasEscalasPage() {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="text-base font-semibold break-words">{ev?.name}</div>
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                        <div className="text-base font-semibold break-words">{ev?.name}</div>
+                        {sm.status === "pending" && tab === "upcoming" && (
+                          <span className="badge badge-amber">Ação necessária</span>
+                        )}
+                      </div>
                       <div className="text-[13px] text-ink-muted break-words leading-relaxed">
                         {formatDate(schedule.date)} &middot; {schedule.time} &middot; {dept?.name}
                       </div>
@@ -266,9 +353,9 @@ export default function MinhasEscalasPage() {
                   </div>
 
                   {team.length > 0 && (
-                    <div className="mt-4 pt-3 border-t border-border-soft">
+                    <div className="mt-4 rounded-[16px] border border-border-soft bg-surface-alt/60 px-4 py-3">
                       <div className="text-[10px] font-bold text-ink-faint uppercase tracking-wider mb-2">
-                        Quem mais servira
+                        Quem mais servirá
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {team.slice(0, 6).map((t) => {
@@ -297,7 +384,7 @@ export default function MinhasEscalasPage() {
                   )}
 
                   {sm.status === "pending" && tab === "upcoming" && !isResponding && (
-                    <div className="mt-4 pt-3 border-t border-border-soft flex flex-col lg:flex-row gap-2">
+                    <div className="mt-4 pt-4 border-t border-border-soft flex flex-col lg:flex-row gap-2">
                       <Link href={`/escalas/${schedule.id}`} className="btn btn-secondary">
                         Abrir escala
                       </Link>
@@ -343,7 +430,7 @@ export default function MinhasEscalasPage() {
                   )}
 
                   {sm.status !== "pending" && (
-                    <div className="mt-4 pt-3 border-t border-border-soft">
+                    <div className="mt-4 pt-4 border-t border-border-soft">
                       <Link href={`/escalas/${schedule.id}`} className="btn btn-secondary w-full">
                         Abrir escala e chat
                       </Link>

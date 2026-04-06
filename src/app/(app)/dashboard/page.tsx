@@ -127,33 +127,49 @@ export default function DashboardPage() {
   }, [mySchedules]);
 
   const isMember = user.role === "member";
+  const confirmedRate =
+    !isMember && allSM.length > 0
+      ? Math.round((allSM.filter((scheduleMember) => scheduleMember.status === "confirmed").length / allSM.length) * 100)
+      : null;
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="page-title">{getGreeting()}, {user.name.split(" ")[0]}</h1>
-          <p className="page-subtitle capitalize">{todayLabel}</p>
-        </div>
+      <div className="mb-6 rounded-[24px] border border-border-soft bg-[linear-gradient(135deg,rgba(189,149,90,0.16),rgba(255,255,255,0.96))] p-5 sm:p-6">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-2xl">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand mb-2">
+              Visão geral de hoje
+            </div>
+            <h1 className="page-title mb-2">{getGreeting()}, {user.name.split(" ")[0]}</h1>
+            <p className="page-subtitle capitalize">{todayLabel}</p>
+            <p className="mt-3 text-sm leading-relaxed text-ink-muted">
+              {isMember
+                ? "Veja suas próximas escalas, pendências de confirmação e os recados que merecem sua atenção agora."
+                : "Acompanhe a saúde das escalas, respostas pendentes e a movimentação dos ministérios em um só lugar."}
+            </p>
+          </div>
 
-        {!isMember && canDo("schedule.create") && (
           <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
-            <Link href="/escalas/nova" className="btn btn-primary btn-sm">
-              + Nova Escala
-            </Link>
-            {canDo("member.invite") && (
-              <Link href="/membros/convidar" className="btn btn-secondary btn-sm">
-                Convidar Membro
+            {!isMember && canDo("schedule.create") && (
+              <>
+                <Link href="/escalas/nova" className="btn btn-primary btn-sm">
+                  + Nova Escala
+                </Link>
+                {canDo("member.invite") && (
+                  <Link href="/membros/convidar" className="btn btn-secondary btn-sm">
+                    Convidar Membro
+                  </Link>
+                )}
+              </>
+            )}
+
+            {isMember && (
+              <Link href="/perfil" className="btn btn-secondary btn-sm self-start sm:self-auto">
+                Editar perfil
               </Link>
             )}
           </div>
-        )}
-
-        {isMember && (
-          <Link href="/perfil" className="btn btn-secondary btn-sm self-start sm:self-auto">
-            Editar perfil
-          </Link>
-        )}
+        </div>
       </div>
 
       <div className={`grid ${isMember ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"} gap-3 mb-6`}>
@@ -199,9 +215,17 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
         <div className="space-y-5">
-          <div className="card">
-            <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3">
-              <span className="font-display text-[17px] break-words">
+          <div className="card overflow-hidden">
+            <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3 border-b border-border-soft bg-surface-alt/40">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint mb-1">
+                  Agenda
+                </div>
+                <span className="font-display text-[17px] break-words">
+                  {isMember ? "Minhas próximas escalas" : "Próximas escalas"}
+                </span>
+              </div>
+              <span className="badge badge-secondary">
                 {isMember ? "Minhas próximas escalas" : "Próximas escalas"}
               </span>
             </div>
@@ -230,7 +254,7 @@ export default function DashboardPage() {
                     href={isMember ? "/minhas-escalas" : `/escalas/${sched.id}`}
                     className="flex items-start sm:items-center gap-3.5 px-5 py-3 border-t border-border-soft hover:bg-brand-glow transition-colors"
                   >
-                    <div className="w-12 h-[50px] rounded-[10px] bg-surface-alt flex flex-col items-center justify-center flex-shrink-0">
+                    <div className="w-12 h-[50px] rounded-[12px] border border-brand/10 bg-[linear-gradient(180deg,rgba(189,149,90,0.12),rgba(243,238,230,0.82))] flex flex-col items-center justify-center flex-shrink-0">
                       <span className="text-[9px] font-bold uppercase text-brand tracking-wide">
                         {getDayName(sched.date)}
                       </span>
@@ -274,8 +298,11 @@ export default function DashboardPage() {
           </div>
 
           {!isMember && pendingTotal > 0 && (
-            <div className="card">
-              <div className="px-5 pt-4 pb-3">
+            <div className="card overflow-hidden">
+              <div className="px-5 pt-4 pb-3 border-b border-border-soft bg-surface-alt/40">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint mb-1">
+                  Atenção
+                </div>
                 <span className="font-display text-[17px] break-words">Aguardando confirmação</span>
               </div>
 
@@ -320,10 +347,46 @@ export default function DashboardPage() {
             <p className="text-[11px] text-brand font-semibold">{verse.ref}</p>
           </div>
 
+          {!isMember && (
+            <div className="card p-5">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint mb-2">
+                Panorama rápido
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-ink-soft">Respostas confirmadas</div>
+                    <div className="text-xs text-ink-muted leading-relaxed">
+                      Percentual das respostas já confirmadas nas escalas visíveis.
+                    </div>
+                  </div>
+                  <div className="font-display text-2xl text-success leading-none">
+                    {confirmedRate !== null ? `${confirmedRate}%` : "-"}
+                  </div>
+                </div>
+
+                <div className="flex items-start justify-between gap-3 border-t border-border-soft pt-3">
+                  <div>
+                    <div className="text-sm font-semibold text-ink-soft">Eventos cadastrados</div>
+                    <div className="text-xs text-ink-muted leading-relaxed">
+                      Agenda base disponível para montar as próximas escalas.
+                    </div>
+                  </div>
+                  <div className="font-display text-2xl text-info leading-none">{events.length}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {notifications.length > 0 && (
-            <div className="card">
-              <div className="px-5 pt-4 pb-3 flex items-center justify-between gap-3">
-                <span className="font-display text-[17px]">Notificações</span>
+            <div className="card overflow-hidden">
+              <div className="px-5 pt-4 pb-3 flex items-center justify-between gap-3 border-b border-border-soft bg-surface-alt/40">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint mb-1">
+                    Avisos
+                  </div>
+                  <span className="font-display text-[17px]">Notificações</span>
+                </div>
                 <span className="badge badge-red">{notifications.length}</span>
               </div>
 
@@ -350,7 +413,7 @@ export default function DashboardPage() {
 
 function Stat({ value, label, color }: { value: number | string; label: string; color: string }) {
   return (
-    <div className="bg-surface border border-border-soft rounded-[14px] px-5 py-4 min-w-0">
+    <div className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,245,239,0.9))] border border-border-soft rounded-[16px] px-5 py-4 min-w-0 shadow-sm">
       <div className={`font-display text-[28px] tracking-tight leading-none ${color}`}>{value}</div>
       <div className="text-xs text-ink-muted font-medium mt-1 break-words">{label}</div>
     </div>
