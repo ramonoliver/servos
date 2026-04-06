@@ -56,6 +56,8 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   const [allSM, setAllSM] = useState<ScheduleMember[]>([]);
   const [chatMessages, setChatMessages] = useState<ScheduleChat[]>([]);
   const [chatAvailable, setChatAvailable] = useState(true);
+  const [chatInfrastructureMissing, setChatInfrastructureMissing] = useState(false);
+  const [chatErrorMessage, setChatErrorMessage] = useState<string | null>(null);
   const [sendingChat, setSendingChat] = useState(false);
   const [chatSyncMode, setChatSyncMode] = useState<"idle" | "realtime" | "polling">("idle");
   const [responding, setResponding] = useState(false);
@@ -74,21 +76,51 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
 
       if (!response.ok) {
         console.error("Erro ao carregar chat da escala:", payload || response.statusText);
-        setChatAvailable(false);
+        const errorMessage = payload?.error || null;
+        const infraMissing = isChatInfrastructureError(errorMessage);
+
+        setChatInfrastructureMissing(infraMissing);
+        setChatAvailable(!infraMissing);
         setChatMessages([]);
-        if (!silent && !isChatInfrastructureError(payload?.error)) {
+
+        if (response.status === 403) {
+          setChatErrorMessage("O chat desta escala esta disponivel apenas para participantes e lideres.");
+          return false;
+        }
+
+        if (response.status === 401) {
+          setChatErrorMessage("Sua sessao expirou. Entre novamente.");
+          if (!silent) {
+            toast("Sua sessao expirou. Entre novamente.");
+          }
+          return false;
+        }
+
+        if (infraMissing) {
+          setChatErrorMessage(
+            "O chat desta escala ainda nao esta habilitado neste ambiente. Aplique o script sql/communications.sql no Supabase."
+          );
+          return false;
+        }
+
+        setChatErrorMessage("Nao foi possivel carregar o chat desta escala.");
+        if (!silent) {
           toast("Nao foi possivel carregar o chat desta escala.");
         }
         return false;
       }
 
+      setChatInfrastructureMissing(false);
       setChatAvailable(true);
+      setChatErrorMessage(null);
       setChatMessages(sortChatMessages(payload?.messages || []));
       return true;
     } catch (error) {
       console.error("Erro ao carregar chat da escala:", error);
-      setChatAvailable(false);
+      setChatInfrastructureMissing(false);
+      setChatAvailable(true);
       setChatMessages([]);
+      setChatErrorMessage("Nao foi possivel carregar o chat desta escala.");
       if (!silent) {
         toast("Nao foi possivel carregar o chat desta escala.");
       }
@@ -828,10 +860,12 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3" style={{ maxHeight: 360 }}>
-            {!chatAvailable ? (
+            {chatInfrastructureMissing ? (
               <div className="text-center text-sm text-ink-faint py-8">
                 O chat desta escala ainda nao esta habilitado neste ambiente. Aplique o script <code>sql/communications.sql</code> no Supabase.
               </div>
+            ) : chatErrorMessage ? (
+              <div className="text-center text-sm text-ink-faint py-8">{chatErrorMessage}</div>
             ) : !canAccessScheduleChat ? (
               <div className="text-center text-sm text-ink-faint py-8">
                 O chat desta escala esta disponivel apenas para participantes e lideres.
