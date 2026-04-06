@@ -42,6 +42,8 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   const [allSchedules, setAllSchedules] = useState<Schedule[]>([]);
   const [allSM, setAllSM] = useState<ScheduleMember[]>([]);
   const [chatMessages, setChatMessages] = useState<ScheduleChat[]>([]);
+  const [chatAvailable, setChatAvailable] = useState(true);
+  const [sendingChat, setSendingChat] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -68,7 +70,6 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
       { data: unavailableData, error: unavailableError },
       { data: allSchedulesData, error: allSchedulesError },
       { data: allSMData, error: allSMError },
-      { data: chatsData, error: chatsError },
     ] = await Promise.all([
       supabase.from("events").select("*").eq("id", scheduleData.event_id).maybeSingle(),
       supabase.from("schedule_members").select("*").eq("schedule_id", scheduleData.id),
@@ -77,11 +78,6 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
       supabase.from("unavailable_dates").select("*"),
       supabase.from("schedules").select("*"),
       supabase.from("schedule_members").select("*"),
-      supabase
-        .from("schedule_chats")
-        .select("*")
-        .eq("schedule_id", scheduleData.id)
-        .order("created_at", { ascending: true }),
     ]);
 
     if (
@@ -91,8 +87,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
       deptMembersError ||
       unavailableError ||
       allSchedulesError ||
-      allSMError ||
-      chatsError
+      allSMError
     ) {
       console.error({
         eventError,
@@ -102,12 +97,17 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
         unavailableError,
         allSchedulesError,
         allSMError,
-        chatsError,
       });
       toast("Erro ao carregar detalhes da escala.");
       setLoading(false);
       return;
     }
+
+    const { data: chatsData, error: chatsError } = await supabase
+      .from("schedule_chats")
+      .select("*")
+      .eq("schedule_id", scheduleData.id)
+      .order("created_at", { ascending: true });
 
     setSchedule(scheduleData as Schedule);
     setEv((eventData || null) as Event | null);
@@ -117,7 +117,14 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
     setAllUD((unavailableData || []) as UnavailableDate[]);
     setAllSchedules((allSchedulesData || []) as Schedule[]);
     setAllSM((allSMData || []) as ScheduleMember[]);
-    setChatMessages((chatsData || []) as ScheduleChat[]);
+    if (chatsError) {
+      console.error("Erro ao carregar chat da escala:", chatsError);
+      setChatAvailable(false);
+      setChatMessages([]);
+    } else {
+      setChatAvailable(true);
+      setChatMessages((chatsData || []) as ScheduleChat[]);
+    }
     setLoading(false);
   }
 
@@ -255,7 +262,9 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
 
   async function sendChat() {
     const text = chatMsg.trim();
-    if (!text) return;
+    if (!text || !chatAvailable || sendingChat) return;
+
+    setSendingChat(true);
 
     const { error } = await supabase.from("schedule_chats").insert({
       id: genId(),
@@ -267,11 +276,14 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
 
     if (error) {
       console.error("Erro ao enviar mensagem:", error);
-      toast("Erro ao enviar mensagem.");
+      setChatAvailable(false);
+      toast("Chat indisponivel no momento.");
+      setSendingChat(false);
       return;
     }
 
     setChatMsg("");
+    setSendingChat(false);
     await loadData();
   }
 
@@ -552,7 +564,11 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3" style={{ maxHeight: 360 }}>
-            {chatMessages.length === 0 ? (
+            {!chatAvailable ? (
+              <div className="text-center text-sm text-ink-faint py-8">
+                O chat desta escala ainda nao esta disponivel. Verifique se a tabela <code>schedule_chats</code> existe no banco.
+              </div>
+            ) : chatMessages.length === 0 ? (
               <div className="text-center text-sm text-ink-faint py-8">Nenhuma mensagem. Seja o primeiro!</div>
             ) : (
               chatMessages.map((msg) => {
@@ -607,9 +623,14 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
               placeholder="Mensagem para a equipe..."
               className="input-field flex-1 py-2"
               maxLength={500}
+              disabled={!chatAvailable || sendingChat}
             />
 
-            <button onClick={sendChat} disabled={!chatMsg.trim()} className="btn btn-primary px-4 py-2">
+            <button
+              onClick={sendChat}
+              disabled={!chatMsg.trim() || !chatAvailable || sendingChat}
+              className="btn btn-primary px-4 py-2"
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="22" y1="2" x2="11" y2="13" />
                 <polygon points="22 2 15 22 11 13 2 9 22 2" />
