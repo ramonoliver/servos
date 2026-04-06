@@ -22,6 +22,22 @@ Abra http://localhost:3000
 
 > **Importante:** Se estiver atualizando de uma versão anterior, limpe o localStorage no navegador (DevTools → Application → Local Storage → limpar `servos_db`) ou acesse Configurações → Resetar dados.
 
+## SQL de infraestrutura
+
+Para ambientes novos no Supabase, aplique o script consolidado abaixo no SQL Editor:
+
+- [sql/communications.sql](/Users/ramonoliveira/Downloads/Servosapp/servos/sql/communications.sql)
+
+Esse script configura:
+
+- `schedule_chats`
+- `member_invitations`
+- índices
+- constraints básicas
+- permissões compatíveis com a arquitetura atual do app
+
+Os arquivos [sql/schedule_chats.sql](/Users/ramonoliveira/Downloads/Servosapp/servos/sql/schedule_chats.sql) e [sql/member_invitations.sql](/Users/ramonoliveira/Downloads/Servosapp/servos/sql/member_invitations.sql) continuam disponíveis como versões separadas por tabela.
+
 ## Stack
 
 - **Next.js 14** — App Router + TypeScript
