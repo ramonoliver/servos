@@ -24,6 +24,15 @@ type ScheduleChat = {
   created_at: string;
 };
 
+function isMissingRelationError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const maybeError = error as { code?: string; message?: string };
+  return (
+    maybeError.code === "42P01" ||
+    maybeError.message?.toLowerCase().includes("schedule_chats") === true
+  );
+}
+
 export default function EscalaDetailPage({ params }: { params: { id: string } }) {
   const { user, toast, canDo, departments } = useApp();
 
@@ -121,6 +130,9 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
       console.error("Erro ao carregar chat da escala:", chatsError);
       setChatAvailable(false);
       setChatMessages([]);
+      if (!isMissingRelationError(chatsError)) {
+        toast("Nao foi possivel carregar o chat desta escala.");
+      }
     } else {
       setChatAvailable(true);
       setChatMessages((chatsData || []) as ScheduleChat[]);
@@ -276,8 +288,12 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
 
     if (error) {
       console.error("Erro ao enviar mensagem:", error);
-      setChatAvailable(false);
-      toast("Chat indisponivel no momento.");
+      if (isMissingRelationError(error)) {
+        setChatAvailable(false);
+        toast("O chat desta escala ainda nao foi habilitado no banco.");
+      } else {
+        toast("Erro ao enviar mensagem no chat.");
+      }
       setSendingChat(false);
       return;
     }
@@ -566,7 +582,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3" style={{ maxHeight: 360 }}>
             {!chatAvailable ? (
               <div className="text-center text-sm text-ink-faint py-8">
-                O chat desta escala ainda nao esta disponivel. Verifique se a tabela <code>schedule_chats</code> existe no banco.
+                O chat desta escala ainda nao esta habilitado neste ambiente. Aplique o script <code>sql/communications.sql</code> no Supabase.
               </div>
             ) : chatMessages.length === 0 ? (
               <div className="text-center text-sm text-ink-faint py-8">Nenhuma mensagem. Seja o primeiro!</div>

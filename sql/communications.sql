@@ -1,3 +1,21 @@
+begin;
+
+create table if not exists public.schedule_chats (
+  id text primary key,
+  schedule_id text not null,
+  sender_id text not null,
+  content text not null check (length(trim(content)) > 0 and length(content) <= 2000),
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists schedule_chats_schedule_id_created_at_idx
+  on public.schedule_chats (schedule_id, created_at asc);
+
+alter table public.schedule_chats disable row level security;
+
+grant select, insert, update, delete on public.schedule_chats to anon;
+grant select, insert, update, delete on public.schedule_chats to authenticated;
+
 create table if not exists public.member_invitations (
   id text primary key,
   church_id text not null,
@@ -15,10 +33,6 @@ create table if not exists public.member_invitations (
   sent_at timestamptz,
   created_at timestamptz not null default timezone('utc', now())
 );
-
-alter table public.member_invitations
-  alter column email_status set default 'pending',
-  alter column whatsapp_status set default 'skipped';
 
 do $$
 begin
@@ -53,3 +67,5 @@ alter table public.member_invitations disable row level security;
 
 grant select, insert, update, delete on public.member_invitations to anon;
 grant select, insert, update, delete on public.member_invitations to authenticated;
+
+commit;

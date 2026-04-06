@@ -2,7 +2,7 @@ create table if not exists public.schedule_chats (
   id text primary key,
   schedule_id text not null,
   sender_id text not null,
-  content text not null,
+  content text not null check (length(trim(content)) > 0 and length(content) <= 2000),
   created_at timestamptz not null default timezone('utc', now())
 );
 
