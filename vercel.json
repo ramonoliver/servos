@@ -1,5 +1,15 @@
+// {
+//   "cron": [
+//     {
+//       "path": "/api/send-schedule-reminders",
+//       "schedule": "0 9 * * *"
+//     }
+//   ]
+// }
+
 {
-  "cron": [
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
     {
       "path": "/api/send-schedule-reminders",
       "schedule": "0 9 * * *"
