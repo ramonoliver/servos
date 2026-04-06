@@ -53,39 +53,61 @@ export default function NotificacoesPage() {
       return;
     }
 
-    const { error } = await supabase
-      .from("notifications")
-      .update({ read: true })
-      .in("id", unreadIds);
+    try {
+      const response = await fetch("/api/notifications/read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actorId: user.id,
+          churchId: user.church_id,
+          notificationIds: unreadIds,
+        }),
+      });
 
-    if (error) {
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao marcar todas como lidas:", data);
+        toast(data?.error || "Erro ao marcar notificacoes.");
+        setMarkingAll(false);
+        return;
+      }
+
+      toast("Marcadas como lidas.");
+      setMarkingAll(false);
+      await loadData();
+    } catch (error) {
       console.error("Erro ao marcar todas como lidas:", error);
       toast("Erro ao marcar notificacoes.");
       setMarkingAll(false);
-      return;
     }
-
-    toast("Marcadas como lidas.");
-    setMarkingAll(false);
-    await loadData();
   }
 
   async function markRead(id: string, alreadyRead: boolean) {
     if (alreadyRead) return;
 
-    const { error } = await supabase
-      .from("notifications")
-      .update({ read: true })
-      .eq("id", id);
+    try {
+      const response = await fetch("/api/notifications/read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actorId: user.id,
+          churchId: user.church_id,
+          notificationIds: [id],
+        }),
+      });
 
-    if (error) {
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        console.error("Erro ao marcar notificação como lida:", data);
+        return;
+      }
+
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+    } catch (error) {
       console.error("Erro ao marcar notificação como lida:", error);
-      return;
     }
-
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
   }
 
   return (

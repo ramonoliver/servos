@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
-import { genId } from "@/lib/utils/helpers";
 
 export type Song = {
   id: string;
@@ -121,53 +120,75 @@ export default function RepertorioPage() {
 
     setSaving(true);
 
-    const { error } = await supabase.from("songs").insert({
-      id: genId(),
-      church_id: user.church_id,
-      department_id: deptId || null,
-      title: title.trim(),
-      artist: artist.trim(),
-      key,
-      bpm: bpm ? parseInt(bpm, 10) : null,
-      theme,
-      lyrics_url: lyricsUrl.trim(),
-      chords_url: chordsUrl.trim(),
-      video_url: videoUrl.trim(),
-      audio_url: "",
-      notes: notes.trim(),
-      last_used: null,
-      times_used: 0,
-      created_by: user.id,
-      created_at: new Date().toISOString(),
-    });
+    try {
+      const response = await fetch("/api/songs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actorId: user.id,
+          churchId: user.church_id,
+          song: {
+            department_id: deptId || null,
+            title: title.trim(),
+            artist: artist.trim(),
+            key,
+            bpm: bpm ? parseInt(bpm, 10) : null,
+            theme,
+            lyrics_url: lyricsUrl.trim(),
+            chords_url: chordsUrl.trim(),
+            video_url: videoUrl.trim(),
+            notes: notes.trim(),
+          },
+        }),
+      });
 
-    if (error) {
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao salvar música:", data);
+        toast(data?.error || "Erro ao salvar música.");
+        setSaving(false);
+        return;
+      }
+
+      toast(`"${title}" adicionada ao repertório!`);
+      resetForm();
+      setShowForm(false);
+      setSaving(false);
+      await loadData();
+    } catch (error) {
       console.error("Erro ao salvar música:", error);
       toast("Erro ao salvar música.");
       setSaving(false);
-      return;
     }
-
-    toast(`"${title}" adicionada ao repertório!`);
-    resetForm();
-    setShowForm(false);
-    setSaving(false);
-    await loadData();
   }
 
   async function removeSong(id: string, songTitle: string) {
     if (!confirm(`Remover "${songTitle}" do repertório?`)) return;
 
-    const { error } = await supabase.from("songs").delete().eq("id", id);
+    try {
+      const params = new URLSearchParams({
+        actorId: user.id,
+        churchId: user.church_id,
+        songId: id,
+      });
 
-    if (error) {
+      const response = await fetch(`/api/songs?${params.toString()}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao remover música:", data);
+        toast(data?.error || "Erro ao remover música.");
+        return;
+      }
+
+      toast("Música removida.");
+      await loadData();
+    } catch (error) {
       console.error("Erro ao remover música:", error);
       toast("Erro ao remover música.");
-      return;
     }
-
-    toast("Música removida.");
-    await loadData();
   }
 
   const themes = ["all", ...THEMES];

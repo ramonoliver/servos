@@ -38,6 +38,7 @@ export function getSession(): Session | null {
 export function clearSession(): void {
   if (typeof window !== "undefined") {
     localStorage.removeItem(SESSION_KEY);
+    void fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
   }
 }
 

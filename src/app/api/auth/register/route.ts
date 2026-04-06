@@ -1,0 +1,156 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { hashPassword } from "@/lib/auth/password";
+import { createSessionPayload, encodeSessionToken, buildSessionCookie } from "@/lib/auth/server-session";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { genId } from "@/lib/utils/helpers";
+import type { User } from "@/types";
+
+const bodySchema = z.object({
+  name: z.string().trim().min(1),
+  email: z.string().trim().email(),
+  phone: z.string().default(""),
+  password: z.string().min(6),
+  churchName: z.string().trim().min(1),
+});
+
+export async function POST(req: Request) {
+  try {
+    const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Dados invalidos para criar conta." }, { status: 400 });
+    }
+
+    const { name, email, phone, password, churchName } = parsed.data;
+    const supabase = getSupabaseServerClient();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const { data: existingUser, error: existingUserError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+
+    if (existingUserError) throw existingUserError;
+    if (existingUser) {
+      return NextResponse.json({ error: "Email ja cadastrado." }, { status: 409 });
+    }
+
+    const now = new Date().toISOString();
+    const churchId = genId();
+    const userId = genId();
+
+    const { data: church, error: churchError } = await supabase
+      .from("churches")
+      .insert({
+        id: churchId,
+        name: churchName,
+        city: "",
+        state: "",
+        created_at: now,
+      })
+      .select()
+      .single();
+
+    if (churchError || !church) {
+      throw churchError || new Error("Falha ao criar igreja.");
+    }
+
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .insert({
+        id: userId,
+        church_id: church.id,
+        email: normalizedEmail,
+        password_hash: hashPassword(password),
+        name: name.trim(),
+        phone: phone.trim(),
+        role: "admin",
+        status: "active",
+        avatar_color: `hsl(${Math.floor(Math.random() * 360)}, 40%, 55%)`,
+        photo_url: null,
+        spouse_id: null,
+        availability: [true, true, true, true, true, true, true],
+        total_schedules: 0,
+        confirm_rate: 100,
+        must_change_password: false,
+        last_served_at: null,
+        notes: "",
+        active: true,
+        joined_at: now,
+        created_at: now,
+      })
+      .select()
+      .single();
+
+    if (userError || !user) {
+      throw userError || new Error("Falha ao criar usuario.");
+    }
+
+    const initialEvents = [
+      {
+        id: genId(),
+        church_id: church.id,
+        name: "Culto de Domingo",
+        description: "",
+        type: "recurring",
+        icon: "church",
+        location: "",
+        base_time: "18:00",
+        instructions: "",
+        recurrence: "weekly",
+        active: true,
+        created_at: now,
+      },
+      {
+        id: genId(),
+        church_id: church.id,
+        name: "Culto de Quarta",
+        description: "",
+        type: "recurring",
+        icon: "church",
+        location: "",
+        base_time: "19:30",
+        instructions: "",
+        recurrence: "weekly",
+        active: true,
+        created_at: now,
+      },
+    ];
+
+    const { error: eventsError } = await supabase.from("events").insert(initialEvents);
+    if (eventsError) throw eventsError;
+
+    const { error: onboardingError } = await supabase
+      .from("onboarding_progress")
+      .insert({
+        id: genId(),
+        church_id: church.id,
+        completed_steps: ["church"],
+        completed: false,
+        created_at: now,
+      });
+
+    if (onboardingError) throw onboardingError;
+
+    const session = createSessionPayload(user);
+    const token = encodeSessionToken(session);
+    const clientUser = {
+      id: user.id,
+      church_id: user.church_id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      avatar_color: user.avatar_color,
+    } satisfies Pick<User, "id" | "church_id" | "email" | "name" | "role" | "avatar_color">;
+    const response = NextResponse.json({ success: true, session, user: clientUser });
+    response.headers.append("Set-Cookie", buildSessionCookie(token));
+    return response;
+  } catch (error) {
+    console.error("API auth/register error:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Falha ao criar conta." },
+      { status: 500 }
+    );
+  }
+}

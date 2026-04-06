@@ -64,7 +64,8 @@ export default function MembrosPage() {
 
     const { data: dmData, error: dmError } = await supabase
       .from("department_members")
-      .select("*");
+      .select("*")
+      .in("department_id", departments.map((dept) => dept.id));
 
     const { data: inviteData, error: inviteError } = await supabase
       .from("member_invitations")
@@ -126,39 +127,33 @@ export default function MembrosPage() {
   async function removeMember(m: User) {
     if (!confirm(`Remover ${m.name}?`)) return;
 
-    const { error: updateError } = await supabase
-      .from("users")
-      .update({ active: false })
-      .eq("id", m.id);
+    try {
+      const response = await fetch("/api/members/deactivate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          actorId: user.id,
+          targetUserId: m.id,
+          churchId: user.church_id,
+        }),
+      });
 
-    if (updateError) {
-      console.error("Erro ao desativar membro:", updateError);
-      toast("Erro ao remover membro.");
-      return;
-    }
+      const data = await response.json().catch(() => null);
 
-    if (m.spouse_id) {
-      const { error: spouseError } = await supabase
-        .from("users")
-        .update({ spouse_id: null })
-        .eq("id", m.spouse_id);
-
-      if (spouseError) {
-        console.error("Erro ao limpar cônjuge:", spouseError);
+      if (!response.ok) {
+        console.error("Erro ao remover membro:", data);
+        toast(data?.error || "Erro ao remover membro.");
+        return;
       }
+
+      toast(m.name + " removido.");
+      await loadData();
+    } catch (error) {
+      console.error("Erro ao remover membro:", error);
+      toast("Erro ao remover membro.");
     }
-
-    const { error: deleteDmError } = await supabase
-      .from("department_members")
-      .delete()
-      .eq("user_id", m.id);
-
-    if (deleteDmError) {
-      console.error("Erro ao remover vínculos do departamento:", deleteDmError);
-    }
-
-    toast(m.name + " removido.");
-    await loadData();
   }
 
   async function resendInvite(member: User) {

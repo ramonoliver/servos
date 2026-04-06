@@ -2,8 +2,6 @@
 
 import { useState, useRef } from "react";
 import { useApp } from "@/hooks/use-app";
-import { supabase } from "@/lib/supabase/client";
-import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { updateSession } from "@/lib/auth/session";
 import { getInitials } from "@/lib/utils/helpers";
 import { AvailabilityEditor } from "@/components/ui";
@@ -57,27 +55,39 @@ export default function PerfilPage() {
 
     setSavingProfile(true);
 
-    const { error } = await supabase
-      .from("users")
-      .update({
-        name: name.trim(),
-        phone: phone.trim(),
-        availability: avail,
-        photo_url: photoUrl || null,
-      })
-      .eq("id", user.id);
+    try {
+      const response = await fetch("/api/profile/update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          churchId: user.church_id,
+          name: name.trim(),
+          phone: phone.trim(),
+          availability: avail,
+          photoUrl: photoUrl || null,
+        }),
+      });
 
-    if (error) {
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        console.error("Erro ao atualizar perfil:", data);
+        toast("Erro ao atualizar perfil.");
+        return;
+      }
+
+      updateSession({ name: name.trim() });
+      await refresh();
+      toast("Perfil atualizado!");
+    } catch (error) {
       console.error("Erro ao atualizar perfil:", error);
       toast("Erro ao atualizar perfil.");
+    } finally {
       setSavingProfile(false);
-      return;
     }
-
-    updateSession({ name: name.trim() });
-    await refresh();
-    toast("Perfil atualizado!");
-    setSavingProfile(false);
   }
 
   async function changePassword() {
@@ -96,36 +106,41 @@ export default function PerfilPage() {
       return;
     }
 
-    if (!verifyPassword(curPw, user.password_hash)) {
-      toast("Senha atual incorreta.");
-      return;
-    }
-
     setSavingPassword(true);
 
-    const hash = hashPassword(newPw);
+    try {
+      const response = await fetch("/api/profile/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          churchId: user.church_id,
+          currentPassword: curPw,
+          newPassword: newPw,
+          confirmPassword: confirmPw,
+        }),
+      });
 
-    const { error } = await supabase
-      .from("users")
-      .update({
-        password_hash: hash,
-        must_change_password: false,
-      })
-      .eq("id", user.id);
+      const data = await response.json().catch(() => null);
 
-    if (error) {
+      if (!response.ok) {
+        toast(data?.error || "Erro ao alterar senha.");
+        return;
+      }
+
+      setCurPw("");
+      setNewPw("");
+      setConfirmPw("");
+      await refresh();
+      toast("Senha alterada com sucesso!");
+    } catch (error) {
       console.error("Erro ao alterar senha:", error);
       toast("Erro ao alterar senha.");
+    } finally {
       setSavingPassword(false);
-      return;
     }
-
-    setCurPw("");
-    setNewPw("");
-    setConfirmPw("");
-    await refresh();
-    toast("Senha alterada com sucesso!");
-    setSavingPassword(false);
   }
 
   return (

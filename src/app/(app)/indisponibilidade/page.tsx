@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
-import { formatDate, getInitials, genId } from "@/lib/utils/helpers";
+import { formatDate, getInitials } from "@/lib/utils/helpers";
 import type { UnavailableDate, User } from "@/types";
 
 export default function IndisponibilidadePage() {
@@ -27,16 +27,28 @@ export default function IndisponibilidadePage() {
   async function loadData() {
     setLoading(true);
 
-    const [
-      { data: usersData, error: usersError },
-      { data: udData, error: udError },
-    ] = await Promise.all([
-      supabase.from("users").select("*").eq("church_id", user.church_id).eq("active", true),
-      supabase.from("unavailable_dates").select("*"),
+    const { data: usersData, error: usersError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("church_id", user.church_id)
+      .eq("active", true);
+
+    if (usersError) {
+      console.error({ usersError });
+      toast("Erro ao carregar indisponibilidades.");
+      setLoading(false);
+      return;
+    }
+
+    const memberIds = ((usersData || []) as User[]).map((member) => member.id);
+    const [{ data: udData, error: udError }] = await Promise.all([
+      memberIds.length
+        ? supabase.from("unavailable_dates").select("*").in("user_id", memberIds)
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
-    if (usersError || udError) {
-      console.error({ usersError, udError });
+    if (udError) {
+      console.error({ udError });
       toast("Erro ao carregar indisponibilidades.");
       setLoading(false);
       return;
@@ -87,50 +99,70 @@ export default function IndisponibilidadePage() {
 
     setSaving(true);
 
-    const { error } = await supabase.from("unavailable_dates").insert({
-      id: genId(),
-      user_id: user.id,
-      church_id: user.church_id,
-      date,
-      end_date: type !== "single" ? endDate : null,
-      reason,
-      type,
-      created_at: new Date().toISOString(),
-    });
+    try {
+      const response = await fetch("/api/unavailable-dates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actorId: user.id,
+          churchId: user.church_id,
+          type,
+          date,
+          endDate,
+          reason,
+        }),
+      });
 
-    if (error) {
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao registrar indisponibilidade:", data);
+        toast(data?.error || "Erro ao registrar indisponibilidade.");
+        setSaving(false);
+        return;
+      }
+
+      toast("Indisponibilidade registrada!");
+      setShowForm(false);
+      setDate("");
+      setEndDate("");
+      setReason("");
+      setType("single");
+      setSaving(false);
+      await loadData();
+    } catch (error) {
       console.error("Erro ao registrar indisponibilidade:", error);
       toast("Erro ao registrar indisponibilidade.");
       setSaving(false);
-      return;
     }
-
-    toast("Indisponibilidade registrada!");
-    setShowForm(false);
-    setDate("");
-    setEndDate("");
-    setReason("");
-    setType("single");
-    setSaving(false);
-    await loadData();
   }
 
   async function remove(id: string) {
     if (!confirm("Remover esta indisponibilidade?")) return;
 
-    const { error } = await supabase
-      .from("unavailable_dates")
-      .delete()
-      .eq("id", id);
+    try {
+      const params = new URLSearchParams({
+        actorId: user.id,
+        churchId: user.church_id,
+        unavailableDateId: id,
+      });
 
-    if (error) {
+      const response = await fetch(`/api/unavailable-dates?${params.toString()}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao remover indisponibilidade:", data);
+        toast(data?.error || "Erro ao remover indisponibilidade.");
+        return;
+      }
+
+      toast("Removida.");
+      await loadData();
+    } catch (error) {
       console.error("Erro ao remover indisponibilidade:", error);
       toast("Erro ao remover indisponibilidade.");
-      return;
     }
-
-    toast("Removida.");
-    await loadData();
   }
 
   const typeLabel = (t: string) =>

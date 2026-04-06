@@ -32,7 +32,6 @@ export default function CalendarioPage() {
     const [
       { data: schedulesData, error: schedulesError },
       { data: eventsData, error: eventsError },
-      { data: smData, error: smError },
     ] = await Promise.all([
       supabase
         .from("schedules")
@@ -40,11 +39,21 @@ export default function CalendarioPage() {
         .eq("church_id", user.church_id)
         .neq("status", "cancelled"),
       supabase.from("events").select("*").eq("church_id", user.church_id),
-      supabase.from("schedule_members").select("*"),
     ]);
 
-    if (schedulesError || eventsError || smError) {
-      console.error({ schedulesError, eventsError, smError });
+    if (schedulesError || eventsError) {
+      console.error({ schedulesError, eventsError });
+      setLoading(false);
+      return;
+    }
+
+    const scheduleIds = ((schedulesData || []) as Schedule[]).map((schedule) => schedule.id);
+    const { data: smData, error: smError } = scheduleIds.length
+      ? await supabase.from("schedule_members").select("*").in("schedule_id", scheduleIds)
+      : { data: [], error: null };
+
+    if (smError) {
+      console.error({ smError });
       setLoading(false);
       return;
     }

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { getSession } from "@/lib/auth/session";
-import { generateTempPassword, hashPassword } from "@/lib/auth/password";
 import { getIconEmoji, genId } from "@/lib/utils/helpers";
 import type { Church, User, Department, Event } from "@/types";
 
@@ -192,62 +191,39 @@ export default function OnboardingPage() {
       }
 
       if (!existingUser) {
-        const pw = generateTempPassword();
-        const pwHash = hashPassword(pw);
-
-        const { error: inviteError } = await supabase
-          .from("users")
-          .insert({
-            id: genId(),
-            church_id: church.id,
-            email: normalizedEmail,
-            password_hash: pwHash,
-            name: inviteName.trim(),
-            phone: "",
-            role: "member",
-            status: "active",
-            avatar_color: `hsl(${Math.floor(Math.random() * 360)},40%,55%)`,
-            photo_url: null,
-            spouse_id: null,
-            availability: [true, true, true, true, true, true, true],
-            total_schedules: 0,
-            confirm_rate: 100,
-            must_change_password: true,
-            last_served_at: null,
-            notes: "",
-            active: true,
-            joined_at: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-          });
-
-        if (inviteError) {
-          console.error("Erro ao convidar usuário:", inviteError);
-          return;
-        }
-
         try {
-          const response = await fetch("/api/send-welcome-email", {
+          const response = await fetch("/api/member-invitations/create", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              to: normalizedEmail,
-              memberName: inviteName.trim(),
+              churchId: church.id,
               churchName: church.name,
-              tempPassword: pw,
+              invitedByUserId: user.id,
+              name: inviteName.trim(),
+              email: normalizedEmail,
+              phone: "",
+              role: "member",
+              spouseId: "",
+              selectedDepartments: [],
             }),
           });
 
           if (!response.ok) {
             const errorData = await response.json().catch(() => null);
-            console.error("Erro ao enviar e-mail de boas-vindas:", errorData || response.statusText);
+            console.error("Erro ao convidar usuario:", errorData || response.statusText);
+            return;
           }
-        } catch (error) {
-          console.error("Erro ao enviar e-mail de boas-vindas:", error);
-        }
 
-        setTempPw(pw);
+          const payload = (await response.json().catch(() => null)) as
+            | { tempPassword?: string }
+            | null;
+          setTempPw(payload?.tempPassword || null);
+        } catch (error) {
+          console.error("Erro ao convidar usuario:", error);
+          return;
+        }
       }
     }
 

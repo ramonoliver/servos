@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
-import { getIconEmoji, getInitials, genId } from "@/lib/utils/helpers";
+import { getIconEmoji, getInitials } from "@/lib/utils/helpers";
 import { Modal } from "@/components/ui";
 import Link from "next/link";
 import type { Department, User, DepartmentMember } from "@/types";
@@ -47,32 +47,33 @@ export default function MinisteriosPage() {
   }, [user.church_id]);
 
   async function deleteDept(d: Department) {
-    const { error: deleteDMError } = await supabase
-      .from("department_members")
-      .delete()
-      .eq("department_id", d.id);
+    try {
+      const response = await fetch("/api/departments/manage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "delete",
+          actorId: user.id,
+          churchId: user.church_id,
+          departmentId: d.id,
+        }),
+      });
 
-    if (deleteDMError) {
-      console.error("Erro ao excluir vínculos:", deleteDMError);
-      toast("Erro ao excluir vinculos do ministerio.");
-      return;
-    }
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao excluir ministerio:", data);
+        toast(data?.error || "Erro ao excluir ministerio.");
+        return;
+      }
 
-    const { error: deleteDeptError } = await supabase
-      .from("departments")
-      .delete()
-      .eq("id", d.id);
-
-    if (deleteDeptError) {
-      console.error("Erro ao excluir ministério:", deleteDeptError);
+      toast(d.name + " excluido.");
+      setModal(null);
+      await refresh();
+      await loadData();
+    } catch (error) {
+      console.error("Erro ao excluir ministerio:", error);
       toast("Erro ao excluir ministerio.");
-      return;
     }
-
-    toast(d.name + " excluido.");
-    setModal(null);
-    await refresh();
-    await loadData();
   }
 
   return (
@@ -209,35 +210,32 @@ function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
       co_leader_ids: coLeaderIds,
     };
 
-    if (isEdit) {
-      const { error } = await supabase.from("departments").update(data).eq("id", dept.id);
-
-      if (error) {
-        console.error("Erro ao atualizar ministério:", error);
-        toast("Erro ao atualizar ministerio.");
-        return;
-      }
-
-      toast("Atualizado!");
-    } else {
-      const { error } = await supabase.from("departments").insert({
-        id: genId(),
-        church_id: user.church_id,
-        ...data,
-        active: true,
-        created_at: new Date().toISOString(),
+    try {
+      const response = await fetch("/api/departments/manage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: isEdit ? "update" : "create",
+          actorId: user.id,
+          churchId: user.church_id,
+          departmentId: dept?.id,
+          data,
+        }),
       });
 
-      if (error) {
-        console.error("Erro ao criar ministério:", error);
-        toast("Erro ao criar ministerio.");
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao salvar ministerio:", payload);
+        toast(payload?.error || "Erro ao salvar ministerio.");
         return;
       }
 
-      toast("Criado!");
+      toast(isEdit ? "Atualizado!" : "Criado!");
+      onSaved();
+    } catch (error) {
+      console.error("Erro ao salvar ministerio:", error);
+      toast("Erro ao salvar ministerio.");
     }
-
-    onSaved();
   }
 
   const eligibleLeaders = members.filter((m: User) => m.role === "admin" || m.role === "leader");

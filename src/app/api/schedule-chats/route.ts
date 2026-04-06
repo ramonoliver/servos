@@ -6,6 +6,7 @@ import { genId } from "@/lib/utils/helpers";
 const getSchema = z.object({
   scheduleId: z.string().min(1),
   churchId: z.string().min(1),
+  viewerId: z.string().min(1),
 });
 
 const postSchema = z.object({
@@ -28,24 +29,59 @@ async function ensureScheduleBelongsToChurch(scheduleId: string, churchId: strin
   return Boolean(data);
 }
 
+async function canAccessScheduleChat(params: {
+  scheduleId: string;
+  churchId: string;
+  userId: string;
+}) {
+  const { scheduleId, churchId, userId } = params;
+  const supabase = getSupabaseServerClient();
+
+  const [{ data: member }, { data: scheduleMember }] = await Promise.all([
+    supabase
+      .from("users")
+      .select("id, role, church_id, active")
+      .eq("id", userId)
+      .eq("church_id", churchId)
+      .maybeSingle(),
+    supabase
+      .from("schedule_members")
+      .select("id")
+      .eq("schedule_id", scheduleId)
+      .eq("user_id", userId)
+      .maybeSingle(),
+  ]);
+
+  if (!member?.active) return false;
+  if (member.role === "admin" || member.role === "leader") return true;
+
+  return Boolean(scheduleMember);
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const parsed = getSchema.safeParse({
       scheduleId: url.searchParams.get("scheduleId"),
       churchId: url.searchParams.get("churchId"),
+      viewerId: url.searchParams.get("viewerId"),
     });
 
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid query params." }, { status: 400 });
     }
 
-    const { scheduleId, churchId } = parsed.data;
+    const { scheduleId, churchId, viewerId } = parsed.data;
     const supabase = getSupabaseServerClient();
 
     const allowed = await ensureScheduleBelongsToChurch(scheduleId, churchId);
     if (!allowed) {
       return NextResponse.json({ error: "Schedule not found." }, { status: 404 });
+    }
+
+    const canAccess = await canAccessScheduleChat({ scheduleId, churchId, userId: viewerId });
+    if (!canAccess) {
+      return NextResponse.json({ error: "Forbidden." }, { status: 403 });
     }
 
     const { data, error } = await supabase
@@ -102,6 +138,16 @@ export async function POST(req: Request) {
 
     if (!senderResult.data?.active) {
       return NextResponse.json({ error: "Sender not allowed." }, { status: 403 });
+    }
+
+    const canAccess = await canAccessScheduleChat({
+      scheduleId,
+      churchId,
+      userId: senderId,
+    });
+
+    if (!canAccess) {
+      return NextResponse.json({ error: "Forbidden." }, { status: 403 });
     }
 
     const message = {

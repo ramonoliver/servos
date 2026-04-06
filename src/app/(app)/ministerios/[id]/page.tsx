@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
-import { getInitials, getIconEmoji, genId } from "@/lib/utils/helpers";
+import { getInitials, getIconEmoji } from "@/lib/utils/helpers";
 import { Modal } from "@/components/ui";
 import Link from "next/link";
 import type { User, DepartmentMember, Schedule, Event } from "@/types";
@@ -89,41 +89,67 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
   async function addMemberToDept(userId: string, funcName: string) {
     if (!dept) return;
 
-    const { error } = await supabase.from("department_members").insert({
-      id: genId(),
-      department_id: dept.id,
-      user_id: userId,
-      function_name: funcName,
-      joined_at: new Date().toISOString(),
-    });
+    try {
+      const response = await fetch("/api/department-members", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          actorId: user.id,
+          churchId: user.church_id,
+          departmentId: dept.id,
+          userId,
+          functionName: funcName,
+        }),
+      });
 
-    if (error) {
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        console.error("Erro ao adicionar membro:", data);
+        toast(data?.error || "Erro ao adicionar membro ao ministerio.");
+        return;
+      }
+
+      toast("Membro adicionado ao ministerio!");
+      setShowAddMember(false);
+      await loadData();
+    } catch (error) {
       console.error("Erro ao adicionar membro:", error);
       toast("Erro ao adicionar membro ao ministerio.");
-      return;
     }
-
-    toast("Membro adicionado ao ministerio!");
-    setShowAddMember(false);
-    await loadData();
   }
 
   async function removeMemberFromDept(dmId: string, memberName: string) {
     if (!confirm(`Remover ${memberName} deste ministerio?`)) return;
 
-    const { error } = await supabase
-      .from("department_members")
-      .delete()
-      .eq("id", dmId);
+    try {
+      const params = new URLSearchParams({
+        actorId: user.id,
+        churchId: user.church_id,
+        departmentId: dept.id,
+        departmentMemberId: dmId,
+      });
 
-    if (error) {
+      const response = await fetch(`/api/department-members?${params.toString()}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        console.error("Erro ao remover membro:", data);
+        toast(data?.error || "Erro ao remover membro do ministerio.");
+        return;
+      }
+
+      toast(memberName + " removido do ministerio.");
+      await loadData();
+    } catch (error) {
       console.error("Erro ao remover membro:", error);
       toast("Erro ao remover membro do ministerio.");
-      return;
     }
-
-    toast(memberName + " removido do ministerio.");
-    await loadData();
   }
 
   if (!dept) {

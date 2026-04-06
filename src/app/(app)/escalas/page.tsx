@@ -54,41 +54,33 @@ export default function EscalasPage() {
   async function deleteSchedule(id: string) {
     if (!confirm("Excluir esta escala?")) return;
 
-    const { error: deleteMembersError } = await supabase
-      .from("schedule_members")
-      .delete()
-      .eq("schedule_id", id);
+    try {
+      const response = await fetch("/api/schedules/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          actorId: user.id,
+          scheduleId: id,
+          churchId: user.church_id,
+        }),
+      });
 
-    if (deleteMembersError) {
-      console.error("Erro ao excluir membros da escala:", deleteMembersError);
-      toast("Erro ao excluir membros da escala.");
-      return;
-    }
+      const data = await response.json().catch(() => null);
 
-    const { error: deleteSlotsError } = await supabase
-      .from("schedule_slots")
-      .delete()
-      .eq("schedule_id", id);
+      if (!response.ok) {
+        console.error("Erro ao excluir escala:", data);
+        toast(data?.error || "Erro ao excluir escala.");
+        return;
+      }
 
-    if (deleteSlotsError) {
-      console.error("Erro ao excluir vagas da escala:", deleteSlotsError);
-      toast("Erro ao excluir vagas da escala.");
-      return;
-    }
-
-    const { error: deleteScheduleError } = await supabase
-      .from("schedules")
-      .delete()
-      .eq("id", id);
-
-    if (deleteScheduleError) {
-      console.error("Erro ao excluir escala:", deleteScheduleError);
+      toast("Escala excluida.");
+      await loadData();
+    } catch (error) {
+      console.error("Erro ao excluir escala:", error);
       toast("Erro ao excluir escala.");
-      return;
     }
-
-    toast("Escala excluida.");
-    await loadData();
   }
 
   return (

@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import { useApp } from "@/hooks/use-app";
-import { supabase } from "@/lib/supabase/client";
 
 export default function ConfiguracoesPage() {
-  const { toast, church, refresh } = useApp();
+  const { toast, church, refresh, user } = useApp();
   const [churchName, setChurchName] = useState(church.name);
   const [churchCity, setChurchCity] = useState(church.city || "");
   const [saving, setSaving] = useState(false);
@@ -18,24 +17,34 @@ export default function ConfiguracoesPage() {
 
     setSaving(true);
 
-    const { error } = await supabase
-      .from("churches")
-      .update({
-        name: churchName.trim(),
-        city: churchCity.trim(),
-      })
-      .eq("id", church.id);
+    try {
+      const response = await fetch("/api/church/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actorId: user.id,
+          churchId: church.id,
+          name: churchName.trim(),
+          city: churchCity.trim(),
+        }),
+      });
 
-    if (error) {
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao salvar igreja:", data);
+        toast(data?.error || "Erro ao salvar.");
+        setSaving(false);
+        return;
+      }
+
+      await refresh();
+      toast("Salvo!");
+      setSaving(false);
+    } catch (error) {
       console.error("Erro ao salvar igreja:", error);
       toast("Erro ao salvar.");
       setSaving(false);
-      return;
     }
-
-    await refresh();
-    toast("Salvo!");
-    setSaving(false);
   }
 
   return (

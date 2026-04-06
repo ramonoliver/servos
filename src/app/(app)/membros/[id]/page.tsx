@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { formatInviteDate, formatInviteOpenedAt } from "@/lib/invitations";
 import { supabase } from "@/lib/supabase/client";
-import { getInitials, formatShortDate, genId } from "@/lib/utils/helpers";
+import { getInitials, formatShortDate } from "@/lib/utils/helpers";
 import { MemberEditModal } from "@/components/shared/member-edit-modal";
 import { AvailabilityGrid } from "@/components/ui";
 import Link from "next/link";
@@ -401,73 +401,37 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
           allMembers={members}
           onClose={() => setShowEdit(false)}
           onSave={async (updates, selectedDepartments, spouseId) => {
-            const { error: updateUserError } = await supabase
-              .from("users")
-              .update(updates)
-              .eq("id", member.id);
+            try {
+              const response = await fetch("/api/members/update", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  actorId: user.id,
+                  churchId: user.church_id,
+                  memberId: member.id,
+                  updates,
+                  selectedDepartments,
+                  spouseId,
+                }),
+              });
 
-            if (updateUserError) {
-              console.error("Erro ao atualizar membro:", updateUserError);
-              toast("Erro ao atualizar membro.");
-              return;
-            }
+              const data = await response.json().catch(() => null);
 
-            const { error: deleteDMError } = await supabase
-              .from("department_members")
-              .delete()
-              .eq("user_id", member.id);
-
-            if (deleteDMError) {
-              console.error("Erro ao limpar ministerios atuais:", deleteDMError);
-              toast("Erro ao atualizar ministerios.");
-              return;
-            }
-
-            if (selectedDepartments.length > 0) {
-              const payload = selectedDepartments.map((dept: SelectedDepartment) => ({
-                id: genId(),
-                department_id: dept.department_id,
-                user_id: member.id,
-                function_name: dept.function_name,
-                joined_at: new Date().toISOString(),
-              }));
-
-              const { error: insertDMError } = await supabase
-                .from("department_members")
-                .insert(payload);
-
-              if (insertDMError) {
-                console.error("Erro ao salvar ministerios:", insertDMError);
-                toast("Erro ao atualizar ministerios.");
+              if (!response.ok) {
+                console.error("Erro ao atualizar membro:", data);
+                toast(data?.error || "Erro ao atualizar membro.");
                 return;
               }
+
+              toast("Membro atualizado!");
+              setShowEdit(false);
+              await loadData();
+            } catch (error) {
+              console.error("Erro ao atualizar membro:", error);
+              toast("Erro ao atualizar membro.");
             }
-
-            if (spouseId && spouseId !== member.spouse_id) {
-              const { error: spouseSetError } = await supabase
-                .from("users")
-                .update({ spouse_id: member.id })
-                .eq("id", spouseId);
-
-              if (spouseSetError) {
-                console.error("Erro ao vincular conjuge:", spouseSetError);
-              }
-            }
-
-            if (!spouseId && member.spouse_id) {
-              const { error: spouseClearError } = await supabase
-                .from("users")
-                .update({ spouse_id: null })
-                .eq("id", member.spouse_id);
-
-              if (spouseClearError) {
-                console.error("Erro ao desvincular conjuge:", spouseClearError);
-              }
-            }
-
-            toast("Membro atualizado!");
-            setShowEdit(false);
-            await loadData();
           }}
         />
       )}

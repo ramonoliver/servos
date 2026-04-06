@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
-import { getIconEmoji, genId } from "@/lib/utils/helpers";
+import { getIconEmoji } from "@/lib/utils/helpers";
 import type { Event } from "@/types";
 
 const ICONS = ["church", "cross", "flower", "flame", "star", "music", "heart", "book"] as const;
@@ -50,20 +50,32 @@ export default function EventosPage() {
   );
 
   async function deleteEvent(ev: Event) {
-    const { error } = await supabase
-      .from("events")
-      .update({ active: false })
-      .eq("id", ev.id);
+    try {
+      const response = await fetch("/api/events/manage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "delete",
+          actorId: user.id,
+          churchId: user.church_id,
+          eventId: ev.id,
+        }),
+      });
 
-    if (error) {
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao remover evento:", data);
+        toast(data?.error || "Erro ao remover evento.");
+        return;
+      }
+
+      toast(ev.name + " removido.");
+      setModal(null);
+      await loadData();
+    } catch (error) {
       console.error("Erro ao remover evento:", error);
       toast("Erro ao remover evento.");
-      return;
     }
-
-    toast(ev.name + " removido.");
-    setModal(null);
-    await loadData();
   }
 
   return (
@@ -214,43 +226,35 @@ function EventForm({
       recurrence: type === "recurring" ? "weekly" : "once",
     };
 
-    if (isEdit) {
-      const { error } = await supabase
-        .from("events")
-        .update(data)
-        .eq("id", ev!.id);
+    try {
+      const response = await fetch("/api/events/manage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: isEdit ? "update" : "create",
+          actorId: userId,
+          churchId,
+          eventId: ev?.id,
+          data,
+        }),
+      });
 
-      if (error) {
-        console.error("Erro ao atualizar evento:", error);
-        toast("Erro ao atualizar evento.");
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao salvar evento:", payload);
+        toast(payload?.error || "Erro ao salvar evento.");
         setSaving(false);
         return;
       }
 
-      toast("Atualizado!");
-    } else {
-      const { error } = await supabase
-        .from("events")
-        .insert({
-          id: genId(),
-          church_id: churchId,
-          ...data,
-          active: true,
-          created_at: new Date().toISOString(),
-        });
-
-      if (error) {
-        console.error("Erro ao criar evento:", error);
-        toast("Erro ao criar evento.");
-        setSaving(false);
-        return;
-      }
-
-      toast("Evento criado!");
+      toast(isEdit ? "Atualizado!" : "Evento criado!");
+      setSaving(false);
+      await onSaved();
+    } catch (error) {
+      console.error("Erro ao salvar evento:", error);
+      toast("Erro ao salvar evento.");
+      setSaving(false);
     }
-
-    setSaving(false);
-    await onSaved();
   }
 
   return (

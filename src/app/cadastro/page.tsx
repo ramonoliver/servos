@@ -2,12 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
 import { createSession } from "@/lib/auth/session";
-import { hashPassword } from "@/lib/auth/password";
-import { genId } from "@/lib/utils/helpers";
 import Link from "next/link";
-import type { User } from "@/types";
 
 export default function CadastroPage() {
   const [f, setF] = useState({
@@ -29,151 +25,32 @@ export default function CadastroPage() {
     setLoading(true);
 
     try {
-      const normalizedEmail = f.email.trim().toLowerCase();
-
       if (f.password.length < 6) {
         setError("Senha deve ter pelo menos 6 caracteres.");
         setLoading(false);
         return;
       }
 
-      const { data: existingUser, error: existingUserError } = await supabase
-        .from("users")
-        .select("id, email")
-        .eq("email", normalizedEmail)
-        .maybeSingle();
-
-      if (existingUserError) {
-        setError("Erro ao verificar email.");
-        setLoading(false);
-        return;
-      }
-
-      if (existingUser) {
-        setError("Email ja cadastrado.");
-        setLoading(false);
-        return;
-      }
-
-      const now = new Date().toISOString();
-      const churchId = genId();
-      const userId = genId();
-      const event1Id = genId();
-      const event2Id = genId();
-      const onboardingId = genId();
-
-      const { data: church, error: churchError } = await supabase
-        .from("churches")
-        .insert({
-          id: churchId,
-          name: f.churchName || "Minha Igreja",
-          city: "",
-          state: "",
-          created_at: now,
-        })
-        .select()
-        .single();
-
-      if (churchError || !church) {
-        setError("Erro ao criar igreja.");
-        setLoading(false);
-        return;
-      }
-
-      const pw = hashPassword(f.password);
-
-      const { data: user, error: userError } = await supabase
-        .from("users")
-        .insert({
-          id: userId,
-          church_id: church.id,
-          email: normalizedEmail,
-          password_hash: pw,
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           name: f.name,
-          phone: f.phone || "",
-          role: "admin",
-          status: "active",
-          avatar_color: `hsl(${Math.floor(Math.random() * 360)}, 40%, 55%)`,
-          photo_url: null,
-          spouse_id: null,
-          availability: [true, true, true, true, true, true, true],
-          total_schedules: 0,
-          confirm_rate: 100,
-          must_change_password: false,
-          last_served_at: null,
-          notes: "",
-          active: true,
-          joined_at: now,
-          created_at: now,
-        })
-        .select()
-        .single();
-
-      if (userError || !user) {
-        setError("Erro ao criar usuario.");
-        setLoading(false);
-        return;
-      }
-
-      const { error: event1Error } = await supabase.from("events").insert({
-        id: event1Id,
-        church_id: church.id,
-        name: "Culto de Domingo",
-        description: "",
-        type: "recurring",
-        icon: "church",
-        location: "",
-        base_time: "18:00",
-        instructions: "",
-        recurrence: "weekly",
-        active: true,
-        created_at: now,
+          email: f.email.trim().toLowerCase(),
+          phone: f.phone,
+          password: f.password,
+          churchName: f.churchName || "Minha Igreja",
+        }),
       });
 
-      if (event1Error) {
-        setError("Erro ao criar evento inicial.");
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.user) {
+        setError(data?.error || "Erro ao criar conta.");
         setLoading(false);
         return;
       }
 
-      const { error: event2Error } = await supabase.from("events").insert({
-        id: event2Id,
-        church_id: church.id,
-        name: "Culto de Quarta",
-        description: "",
-        type: "recurring",
-        icon: "church",
-        location: "",
-        base_time: "19:30",
-        instructions: "",
-        recurrence: "weekly",
-        active: true,
-        created_at: now,
-      });
-
-      if (event2Error) {
-        setError("Erro ao criar evento inicial.");
-        setLoading(false);
-        return;
-      }
-
-      const { error: onboardingError } = await supabase
-        .from("onboarding_progress")
-        .insert({
-          id: onboardingId,
-          church_id: church.id,
-          completed_steps: ["church"],
-          completed: false,
-          created_at: now,
-        });
-
-      if (onboardingError) {
-        setError("Erro ao iniciar onboarding.");
-        setLoading(false);
-        return;
-      }
-
-      createSession(user as User);
+      createSession(data.user);
       router.push("/onboarding");
     } catch (err: any) {
       setError(err?.message || "Erro ao criar conta.");

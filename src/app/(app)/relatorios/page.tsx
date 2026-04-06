@@ -20,15 +20,24 @@ export default function RelatoriosPage() {
     const [
       { data: usersData, error: usersError },
       { data: schedulesData, error: schedulesError },
-      { data: smData, error: smError },
     ] = await Promise.all([
       supabase.from("users").select("*").eq("church_id", user.church_id).eq("active", true),
       supabase.from("schedules").select("*").eq("church_id", user.church_id),
-      supabase.from("schedule_members").select("*"),
     ]);
 
-    if (usersError || schedulesError || smError) {
-      console.error({ usersError, schedulesError, smError });
+    if (usersError || schedulesError) {
+      console.error({ usersError, schedulesError });
+      setLoading(false);
+      return;
+    }
+
+    const scheduleIds = ((schedulesData || []) as Schedule[]).map((schedule) => schedule.id);
+    const { data: smData, error: smError } = scheduleIds.length
+      ? await supabase.from("schedule_members").select("*").in("schedule_id", scheduleIds)
+      : { data: [], error: null };
+
+    if (smError) {
+      console.error({ smError });
       setLoading(false);
       return;
     }

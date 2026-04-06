@@ -2,11 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
 import { createSession } from "@/lib/auth/session";
-import { verifyPassword } from "@/lib/auth/password";
 import Link from "next/link";
-import type { User } from "@/types";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -21,29 +18,23 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const normalizedEmail = email.trim().toLowerCase();
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+        }),
+      });
 
-      const { data: user, error: userError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("email", normalizedEmail)
-        .single();
-
-      if (userError || !user) {
-        setError("Email ou senha incorretos.");
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.user) {
+        setError(data?.error || "Email ou senha incorretos.");
         setLoading(false);
         return;
       }
 
-      const isValidPassword = verifyPassword(password, user.password_hash);
-
-      if (!isValidPassword) {
-        setError("Email ou senha incorretos.");
-        setLoading(false);
-        return;
-      }
-
-      createSession(user as User);
+      createSession(data.user);
       router.push("/dashboard");
     } catch (err: any) {
       setError(err?.message || "Erro ao entrar.");

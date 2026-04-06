@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { suggestMembers, autoSelectWithCouples } from "@/lib/ai/engine";
-import { getDayOfWeek, getInitials, getIconEmoji, genId } from "@/lib/utils/helpers";
+import { getDayOfWeek, getInitials, getIconEmoji } from "@/lib/utils/helpers";
 import type {
   Event,
   User,
@@ -42,27 +42,18 @@ export default function NovaEscalaPage() {
     const [
       { data: eventsData, error: eventsError },
       { data: membersData, error: membersError },
-      { data: dmData, error: dmError },
       { data: schedulesData, error: schedulesError },
-      { data: smData, error: smError },
-      { data: udData, error: udError },
     ] = await Promise.all([
       supabase.from("events").select("*").eq("church_id", user.church_id).eq("active", true),
       supabase.from("users").select("*").eq("church_id", user.church_id).eq("active", true),
-      supabase.from("department_members").select("*"),
-      supabase.from("schedules").select("*"),
-      supabase.from("schedule_members").select("*"),
-      supabase.from("unavailable_dates").select("*"),
+      supabase.from("schedules").select("*").eq("church_id", user.church_id),
     ]);
 
-    if (eventsError || membersError || dmError || schedulesError || smError || udError) {
+    if (eventsError || membersError || schedulesError) {
       console.error({
         eventsError,
         membersError,
-        dmError,
         schedulesError,
-        smError,
-        udError,
       });
       toast("Erro ao carregar dados da escala.");
       setLoading(false);
@@ -70,11 +61,38 @@ export default function NovaEscalaPage() {
     }
 
     const loadedEvents = (eventsData || []) as Event[];
+    const loadedMembers = (membersData || []) as User[];
+    const loadedSchedules = (schedulesData || []) as Schedule[];
+    const memberIds = loadedMembers.map((member) => member.id);
+    const scheduleIds = loadedSchedules.map((schedule) => schedule.id);
+
+    const [
+      { data: dmData, error: dmError },
+      { data: smData, error: smError },
+      { data: udData, error: udError },
+    ] = await Promise.all([
+      departments.length
+        ? supabase.from("department_members").select("*").in("department_id", departments.map((dept) => dept.id))
+        : Promise.resolve({ data: [], error: null }),
+      scheduleIds.length
+        ? supabase.from("schedule_members").select("*").in("schedule_id", scheduleIds)
+        : Promise.resolve({ data: [], error: null }),
+      memberIds.length
+        ? supabase.from("unavailable_dates").select("*").in("user_id", memberIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (dmError || smError || udError) {
+      console.error({ dmError, smError, udError });
+      toast("Erro ao carregar dados da escala.");
+      setLoading(false);
+      return;
+    }
 
     setEvents(loadedEvents);
-    setMembers((membersData || []) as User[]);
+    setMembers(loadedMembers);
     setAllDM((dmData || []) as DepartmentMember[]);
-    setAllSchedules((schedulesData || []) as Schedule[]);
+    setAllSchedules(loadedSchedules);
     setAllSM((smData || []) as ScheduleMember[]);
     setAllUD((udData || []) as UnavailableDate[]);
 
@@ -148,67 +166,37 @@ export default function NovaEscalaPage() {
       return;
     }
 
-    const now = new Date().toISOString();
-    const scheduleId = genId();
-
-    const { data: sched, error: scheduleError } = await supabase
-      .from("schedules")
-      .insert({
-        id: scheduleId,
-        church_id: user.church_id,
-        event_id: eventId,
-        department_id: deptId,
-        date,
-        time,
-        arrival_time: arrivalTime || "",
-        status: publish ? "active" : "draft",
-        instructions,
-        notes: "",
-        published: publish,
-        created_by: user.id,
-        created_at: now,
-      })
-      .select()
-      .single();
-
-    if (scheduleError || !sched) {
-      console.error("Erro ao criar escala:", scheduleError);
-      toast("Erro ao criar escala.");
-      return;
-    }
-
-    if (selectedIds.length > 0) {
-      const payload = selectedIds.map((uid) => {
-        const dm = deptMembers.find((d) => d.user_id === uid);
-
-        return {
-          id: genId(),
-          schedule_id: sched.id,
-          user_id: uid,
-          function_name: dm?.function_name || "",
-          status: "pending",
-          decline_reason: "",
-          substitute_id: null,
-          substitute_for: null,
-          is_reserve: false,
-          responded_at: null,
-          notified_at: now,
-        };
+    try {
+      const response = await fetch("/api/schedules/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actorId: user.id,
+          churchId: user.church_id,
+          eventId,
+          departmentId: deptId,
+          date,
+          time,
+          arrivalTime: arrivalTime || "",
+          instructions,
+          publish,
+          selectedIds,
+        }),
       });
 
-      const { error: smError } = await supabase
-        .from("schedule_members")
-        .insert(payload);
-
-      if (smError) {
-        console.error("Erro ao adicionar membros à escala:", smError);
-        toast("Escala criada, mas houve erro ao adicionar membros.");
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao criar escala:", data);
+        toast(data?.error || "Erro ao criar escala.");
         return;
       }
-    }
 
-    toast(publish ? `Escala publicada com ${selectedIds.length} membros!` : "Rascunho salvo.");
-    router.push("/escalas");
+      toast(publish ? `Escala publicada com ${selectedIds.length} membros!` : "Rascunho salvo.");
+      router.push("/escalas");
+    } catch (error) {
+      console.error("Erro ao criar escala:", error);
+      toast("Erro ao criar escala.");
+    }
   }
 
   if (loading) {

@@ -27,29 +27,36 @@ export default function DashboardPage() {
 
   async function loadData() {
     setLoading(true);
-
     const [
       { data: membersData, error: membersError },
       { data: schedulesData, error: schedulesError },
-      { data: smData, error: smError },
       { data: eventsData, error: eventsError },
       { data: notificationsData, error: notificationsError },
     ] = await Promise.all([
       supabase.from("users").select("*").eq("church_id", user.church_id).eq("active", true),
       supabase.from("schedules").select("*").eq("church_id", user.church_id).neq("status", "cancelled"),
-      supabase.from("schedule_members").select("*"),
       supabase.from("events").select("*").eq("church_id", user.church_id),
       supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false),
     ]);
 
-    if (membersError || schedulesError || smError || eventsError || notificationsError) {
+    if (membersError || schedulesError || eventsError || notificationsError) {
       console.error({
         membersError,
         schedulesError,
-        smError,
         eventsError,
         notificationsError,
       });
+      setLoading(false);
+      return;
+    }
+
+    const scheduleIds = ((schedulesData || []) as Schedule[]).map((schedule) => schedule.id);
+    const { data: smData, error: smError } = scheduleIds.length
+      ? await supabase.from("schedule_members").select("*").in("schedule_id", scheduleIds)
+      : { data: [], error: null };
+
+    if (smError) {
+      console.error({ smError });
       setLoading(false);
       return;
     }

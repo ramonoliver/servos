@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { suggestSubstitute } from "@/lib/ai/engine";
-import { formatDate, getDayOfWeek, getInitials, getIconEmoji, genId } from "@/lib/utils/helpers";
+import { formatDate, getDayOfWeek, getInitials, getIconEmoji } from "@/lib/utils/helpers";
 import { Modal } from "@/components/ui";
 import Link from "next/link";
 import type {
@@ -30,6 +31,12 @@ function isChatInfrastructureError(errorMessage?: string | null) {
   return normalized.includes("schedule_chats") || normalized.includes("relation");
 }
 
+function sortChatMessages(messages: ScheduleChat[]) {
+  return [...messages].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+}
+
 export default function EscalaDetailPage({ params }: { params: { id: string } }) {
   const { user, toast, canDo, departments } = useApp();
 
@@ -50,8 +57,42 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   const [chatMessages, setChatMessages] = useState<ScheduleChat[]>([]);
   const [chatAvailable, setChatAvailable] = useState(true);
   const [sendingChat, setSendingChat] = useState(false);
+  const [chatSyncMode, setChatSyncMode] = useState<"idle" | "realtime" | "polling">("idle");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  async function loadChatMessages(scheduleId: string, silent = false) {
+    try {
+      const response = await fetch(
+        `/api/schedule-chats?scheduleId=${encodeURIComponent(scheduleId)}&churchId=${encodeURIComponent(user.church_id)}&viewerId=${encodeURIComponent(user.id)}`
+      );
+      const payload = (await response.json().catch(() => null)) as
+        | { messages?: ScheduleChat[]; error?: string }
+        | null;
+
+      if (!response.ok) {
+        console.error("Erro ao carregar chat da escala:", payload || response.statusText);
+        setChatAvailable(false);
+        setChatMessages([]);
+        if (!silent && !isChatInfrastructureError(payload?.error)) {
+          toast("Nao foi possivel carregar o chat desta escala.");
+        }
+        return false;
+      }
+
+      setChatAvailable(true);
+      setChatMessages(sortChatMessages(payload?.messages || []));
+      return true;
+    } catch (error) {
+      console.error("Erro ao carregar chat da escala:", error);
+      setChatAvailable(false);
+      setChatMessages([]);
+      if (!silent) {
+        toast("Nao foi possivel carregar o chat desta escala.");
+      }
+      return false;
+    }
+  }
 
   async function loadData() {
     setLoading(true);
@@ -117,31 +158,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
     setAllUD((unavailableData || []) as UnavailableDate[]);
     setAllSchedules((allSchedulesData || []) as Schedule[]);
     setAllSM((allSMData || []) as ScheduleMember[]);
-    try {
-      const response = await fetch(
-        `/api/schedule-chats?scheduleId=${encodeURIComponent(scheduleData.id)}&churchId=${encodeURIComponent(user.church_id)}`
-      );
-      const payload = (await response.json().catch(() => null)) as
-        | { messages?: ScheduleChat[]; error?: string }
-        | null;
-
-      if (!response.ok) {
-        console.error("Erro ao carregar chat da escala:", payload || response.statusText);
-        setChatAvailable(false);
-        setChatMessages([]);
-        if (!isChatInfrastructureError(payload?.error)) {
-          toast("Nao foi possivel carregar o chat desta escala.");
-        }
-      } else {
-        setChatAvailable(true);
-        setChatMessages(payload?.messages || []);
-      }
-    } catch (error) {
-      console.error("Erro ao carregar chat da escala:", error);
-      setChatAvailable(false);
-      setChatMessages([]);
-      toast("Nao foi possivel carregar o chat desta escala.");
-    }
+    await loadChatMessages(scheduleData.id);
     setLoading(false);
   }
 
@@ -152,6 +169,67 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, activeTab]);
+
+  useEffect(() => {
+    if (!schedule?.id || !chatAvailable) {
+      setChatSyncMode("idle");
+      return;
+    }
+
+    let isMounted = true;
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+    const channelName = `schedule-chat-${schedule.id}`;
+    const channel: RealtimeChannel = supabase.channel(channelName);
+
+    const enablePollingFallback = () => {
+      if (!isMounted || pollInterval) return;
+      setChatSyncMode("polling");
+      pollInterval = setInterval(() => {
+        void loadChatMessages(schedule.id, true);
+      }, 12000);
+    };
+
+    channel
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "schedule_chats",
+          filter: `schedule_id=eq.${schedule.id}`,
+        },
+        (payload) => {
+          const incoming = payload.new as ScheduleChat;
+          setChatAvailable(true);
+          setChatMessages((current) => {
+            if (current.some((item) => item.id === incoming.id)) {
+              return current;
+            }
+            return sortChatMessages([...current, incoming]);
+          });
+        }
+      )
+      .subscribe((status) => {
+        if (!isMounted) return;
+        if (status === "SUBSCRIBED") {
+          setChatSyncMode("realtime");
+          if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+          }
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          enablePollingFallback();
+        }
+      });
+
+    return () => {
+      isMounted = false;
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [schedule?.id, chatAvailable, user.church_id]);
 
   if (loading) {
     return <div className="py-20 text-center text-ink-faint">Carregando escala...</div>;
@@ -173,6 +251,12 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
     : 0;
 
   const scheduledUserIds = sm.map((s) => s.user_id);
+  const isParticipant = scheduledUserIds.includes(user.id);
+  const canAccessScheduleChat = user.role === "admin" || user.role === "leader" || isParticipant;
+
+  if (user.role === "member" && !isParticipant) {
+    return <div className="py-20 text-center text-ink-faint">Voce nao participa desta escala.</div>;
+  }
 
   const availableToAdd = deptMembers
     .filter((dm) => !scheduledUserIds.includes(dm.user_id))
@@ -190,96 +274,101 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   });
 
   async function addMemberToSchedule(userId: string) {
-    const dm = deptMembers.find((d) => d.user_id === userId);
+    try {
+      const response = await fetch("/api/schedule-members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actorId: user.id,
+          churchId: user.church_id,
+          scheduleId: schedule.id,
+          userId,
+        }),
+      });
 
-    const { error } = await supabase.from("schedule_members").insert({
-      id: genId(),
-      schedule_id: schedule.id,
-      user_id: userId,
-      function_name: dm?.function_name || "",
-      status: "pending",
-      decline_reason: "",
-      substitute_id: null,
-      substitute_for: null,
-      is_reserve: false,
-      responded_at: null,
-      notified_at: new Date().toISOString(),
-    });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao adicionar membro à escala:", data);
+        toast(data?.error || "Erro ao adicionar membro.");
+        return;
+      }
 
-    if (error) {
+      toast("Membro adicionado a escala!");
+      setShowAddMember(false);
+      await loadData();
+    } catch (error) {
       console.error("Erro ao adicionar membro à escala:", error);
       toast("Erro ao adicionar membro.");
-      return;
     }
-
-    toast("Membro adicionado a escala!");
-    setShowAddMember(false);
-    await loadData();
   }
 
   async function removeMemberFromSchedule(smItem: ScheduleMember) {
     const m = members.find((u) => u.id === smItem.user_id);
     if (!confirm(`Remover ${m?.name || "este membro"} da escala?`)) return;
 
-    const { error } = await supabase
-      .from("schedule_members")
-      .delete()
-      .eq("id", smItem.id);
+    try {
+      const params = new URLSearchParams({
+        actorId: user.id,
+        churchId: user.church_id,
+        scheduleId: schedule.id,
+        scheduleMemberId: smItem.id,
+      });
 
-    if (error) {
+      const response = await fetch(`/api/schedule-members?${params.toString()}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao remover membro:", data);
+        toast(data?.error || "Erro ao remover membro da escala.");
+        return;
+      }
+
+      toast((m?.name || "Membro") + " removido da escala.");
+      await loadData();
+    } catch (error) {
       console.error("Erro ao remover membro:", error);
       toast("Erro ao remover membro da escala.");
-      return;
     }
-
-    toast((m?.name || "Membro") + " removido da escala.");
-    await loadData();
   }
 
   async function acceptSubstitute(declinedSM: ScheduleMember, substituteId: string) {
     const sub = members.find((m) => m.id === substituteId);
     if (!sub) return;
 
-    const dm = deptMembers.find((d) => d.user_id === substituteId);
+    try {
+      const response = await fetch("/api/schedule-members", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "substitute",
+          actorId: user.id,
+          churchId: user.church_id,
+          scheduleId: schedule.id,
+          declinedScheduleMemberId: declinedSM.id,
+          substituteId,
+        }),
+      });
 
-    const { error: insertError } = await supabase.from("schedule_members").insert({
-      id: genId(),
-      schedule_id: schedule.id,
-      user_id: substituteId,
-      function_name: dm?.function_name || declinedSM.function_name,
-      status: "pending",
-      decline_reason: "",
-      substitute_id: null,
-      substitute_for: declinedSM.user_id,
-      is_reserve: false,
-      responded_at: null,
-      notified_at: new Date().toISOString(),
-    });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao adicionar substituto:", data);
+        toast(data?.error || "Erro ao adicionar substituto.");
+        return;
+      }
 
-    if (insertError) {
-      console.error("Erro ao adicionar substituto:", insertError);
+      toast(`${sub.name} adicionado como substituto!`);
+      await loadData();
+    } catch (error) {
+      console.error("Erro ao adicionar substituto:", error);
       toast("Erro ao adicionar substituto.");
-      return;
     }
-
-    const { error: updateError } = await supabase
-      .from("schedule_members")
-      .update({ substitute_id: substituteId })
-      .eq("id", declinedSM.id);
-
-    if (updateError) {
-      console.error("Erro ao marcar substituição:", updateError);
-      toast("Erro ao registrar substituição.");
-      return;
-    }
-
-    toast(`${sub.name} adicionado como substituto!`);
-    await loadData();
   }
 
   async function sendChat() {
     const text = chatMsg.trim();
-    if (!text || !chatAvailable || sendingChat) return;
+    if (!text || !chatAvailable || sendingChat || !canAccessScheduleChat) return;
 
     setSendingChat(true);
 
@@ -298,7 +387,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { error?: string }
+        | { error?: string; message?: ScheduleChat }
         | null;
 
       if (!response.ok) {
@@ -311,6 +400,15 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
         }
         setSendingChat(false);
         return;
+      }
+
+      if (payload?.message) {
+        setChatMessages((current) => {
+          if (current.some((item) => item.id === payload.message?.id)) {
+            return current;
+          }
+          return sortChatMessages([...current, payload.message]);
+        });
       }
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
@@ -326,7 +424,6 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
 
     setChatMsg("");
     setSendingChat(false);
-    await loadData();
   }
 
   function MemberRow({ item, showFn = true }: { item: ScheduleMember; showFn?: boolean }) {
@@ -601,7 +698,26 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
       {activeTab === "chat" && (
         <div className="card mb-5 flex flex-col" style={{ minHeight: 320 }}>
           <div className="px-5 pt-4 pb-3 border-b border-border-soft">
-            <span className="font-display text-[15px]">Chat da escala</span>
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-display text-[15px]">Chat da escala</span>
+              {chatAvailable && (
+                <span
+                  className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${
+                    chatSyncMode === "realtime"
+                      ? "bg-success-light text-success"
+                      : chatSyncMode === "polling"
+                      ? "bg-amber-light text-amber"
+                      : "bg-surface-alt text-ink-faint"
+                  }`}
+                >
+                  {chatSyncMode === "realtime"
+                    ? "Ao vivo"
+                    : chatSyncMode === "polling"
+                    ? "Atualizacao automatica"
+                    : "Sincronizando"}
+                </span>
+              )}
+            </div>
             <p className="text-[11px] text-ink-faint mt-0.5">Visível apenas para escalados e líderes</p>
           </div>
 
@@ -609,6 +725,10 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
             {!chatAvailable ? (
               <div className="text-center text-sm text-ink-faint py-8">
                 O chat desta escala ainda nao esta habilitado neste ambiente. Aplique o script <code>sql/communications.sql</code> no Supabase.
+              </div>
+            ) : !canAccessScheduleChat ? (
+              <div className="text-center text-sm text-ink-faint py-8">
+                O chat desta escala esta disponivel apenas para participantes e lideres.
               </div>
             ) : chatMessages.length === 0 ? (
               <div className="text-center text-sm text-ink-faint py-8">Nenhuma mensagem. Seja o primeiro!</div>
@@ -665,12 +785,12 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
               placeholder="Mensagem para a equipe..."
               className="input-field flex-1 py-2"
               maxLength={500}
-              disabled={!chatAvailable || sendingChat}
+              disabled={!chatAvailable || sendingChat || !canAccessScheduleChat}
             />
 
             <button
               onClick={sendChat}
-              disabled={!chatMsg.trim() || !chatAvailable || sendingChat}
+              disabled={!chatMsg.trim() || !chatAvailable || sendingChat || !canAccessScheduleChat}
               className="btn btn-primary px-4 py-2"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

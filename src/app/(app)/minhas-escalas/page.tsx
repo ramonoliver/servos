@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { formatDate, getDayName, getInitials } from "@/lib/utils/helpers";
+import Link from "next/link";
 import type { Schedule, ScheduleMember, Event, User } from "@/types";
 
 type MyScheduleItem = {
@@ -29,10 +30,8 @@ export default function MinhasEscalasPage() {
 
   async function loadData() {
     setLoading(true);
-
     const [
       { data: schedulesData, error: schedulesError },
-      { data: smData, error: smError },
       { data: eventsData, error: eventsError },
       { data: usersData, error: usersError },
     ] = await Promise.all([
@@ -41,13 +40,24 @@ export default function MinhasEscalasPage() {
         .select("*")
         .eq("church_id", user.church_id)
         .eq("status", "active"),
-      supabase.from("schedule_members").select("*"),
       supabase.from("events").select("*").eq("church_id", user.church_id),
       supabase.from("users").select("*").eq("church_id", user.church_id),
     ]);
 
-    if (schedulesError || smError || eventsError || usersError) {
-      console.error({ schedulesError, smError, eventsError, usersError });
+    if (schedulesError || eventsError || usersError) {
+      console.error({ schedulesError, eventsError, usersError });
+      toast("Erro ao carregar suas escalas.");
+      setLoading(false);
+      return;
+    }
+
+    const scheduleIds = ((schedulesData || []) as Schedule[]).map((schedule) => schedule.id);
+    const { data: smData, error: smError } = scheduleIds.length
+      ? await supabase.from("schedule_members").select("*").in("schedule_id", scheduleIds)
+      : { data: [], error: null };
+
+    if (smError) {
+      console.error({ smError });
       toast("Erro ao carregar suas escalas.");
       setLoading(false);
       return;
@@ -95,45 +105,66 @@ export default function MinhasEscalasPage() {
   const list = tab === "upcoming" ? upcoming : past;
 
   async function confirm(smId: string) {
-    const { error } = await supabase
-      .from("schedule_members")
-      .update({
-        status: "confirmed",
-        responded_at: new Date().toISOString(),
-      })
-      .eq("id", smId);
+    try {
+      const response = await fetch("/api/schedule-members", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "respond",
+          actorId: user.id,
+          churchId: user.church_id,
+          scheduleMemberId: smId,
+          status: "confirmed",
+          declineReason: "",
+        }),
+      });
 
-    if (error) {
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao confirmar presença:", data);
+        toast(data?.error || "Erro ao confirmar presença.");
+        return;
+      }
+
+      toast("Presenca confirmada! Obrigado por servir.");
+      setResponding(null);
+      await loadData();
+    } catch (error) {
       console.error("Erro ao confirmar presença:", error);
       toast("Erro ao confirmar presença.");
-      return;
     }
-
-    toast("Presenca confirmada! Obrigado por servir.");
-    setResponding(null);
-    await loadData();
   }
 
   async function decline(smId: string) {
-    const { error } = await supabase
-      .from("schedule_members")
-      .update({
-        status: "declined",
-        decline_reason: declineReason,
-        responded_at: new Date().toISOString(),
-      })
-      .eq("id", smId);
+    try {
+      const response = await fetch("/api/schedule-members", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "respond",
+          actorId: user.id,
+          churchId: user.church_id,
+          scheduleMemberId: smId,
+          status: "declined",
+          declineReason,
+        }),
+      });
 
-    if (error) {
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao registrar ausência:", data);
+        toast(data?.error || "Erro ao registrar ausência.");
+        return;
+      }
+
+      toast("Ausencia registrada. O lider sera notificado.");
+      setResponding(null);
+      setDeclineReason("");
+      await loadData();
+    } catch (error) {
       console.error("Erro ao registrar ausência:", error);
       toast("Erro ao registrar ausência.");
-      return;
     }
-
-    toast("Ausencia registrada. O lider sera notificado.");
-    setResponding(null);
-    setDeclineReason("");
-    await loadData();
   }
 
   return (
@@ -275,6 +306,9 @@ export default function MinhasEscalasPage() {
 
                   {sm.status === "pending" && tab === "upcoming" && !isResponding && (
                     <div className="mt-4 pt-3 border-t border-border-soft flex gap-2">
+                      <Link href={`/escalas/${schedule.id}`} className="btn btn-secondary">
+                        Abrir escala
+                      </Link>
                       <button onClick={() => confirm(sm.id)} className="btn btn-green flex-1">
                         &#10003; Confirmar presenca
                       </button>
@@ -313,6 +347,14 @@ export default function MinhasEscalasPage() {
                           Confirmar ausencia
                         </button>
                       </div>
+                    </div>
+                  )}
+
+                  {sm.status !== "pending" && (
+                    <div className="mt-4 pt-3 border-t border-border-soft">
+                      <Link href={`/escalas/${schedule.id}`} className="btn btn-secondary w-full">
+                        Abrir escala e chat
+                      </Link>
                     </div>
                   )}
                 </div>
