@@ -135,6 +135,9 @@ function Shell({ children }: { children: React.ReactNode }) {
   const [unreadNotifs, setUnreadNotifs] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | null = null;
+
     async function loadUnreadNotifications() {
       const { count, error } = await supabase
         .from("notifications")
@@ -147,10 +150,21 @@ function Shell({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      setUnreadNotifs(count || 0);
+      if (!cancelled) {
+        setUnreadNotifs(count || 0);
+      }
     }
 
     loadUnreadNotifications();
+
+    interval = setInterval(() => {
+      void loadUnreadNotifications();
+    }, 12000);
+
+    return () => {
+      cancelled = true;
+      if (interval) clearInterval(interval);
+    };
   }, [user.id, pathname]);
 
   useEffect(() => {

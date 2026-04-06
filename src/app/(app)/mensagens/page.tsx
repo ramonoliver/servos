@@ -5,6 +5,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useApp } from "@/hooks/use-app";
 import { Avatar } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
+import { useSearchParams } from "next/navigation";
 import type { Message, User } from "@/types";
 
 function sortMessages(messages: Message[]) {
@@ -15,8 +16,10 @@ function sortMessages(messages: Message[]) {
 
 export default function MensagensPage() {
   const { user, toast, departments } = useApp();
+  const searchParams = useSearchParams();
 
-  const [selectedDept, setSelectedDept] = useState(departments[0]?.id || "");
+  const requestedDepartmentId = searchParams.get("departmentId") || "";
+  const [selectedDept, setSelectedDept] = useState(requestedDepartmentId || departments[0]?.id || "");
   const [newMsg, setNewMsg] = useState("");
   const [allMessages, setAllMessages] = useState<Message[]>([]);
   const [members, setMembers] = useState<User[]>([]);
@@ -50,6 +53,11 @@ export default function MensagensPage() {
   const visibleDepartments = useMemo(() => departments, [departments]);
 
   useEffect(() => {
+    if (requestedDepartmentId && visibleDepartments.some((dept) => dept.id === requestedDepartmentId)) {
+      setSelectedDept(requestedDepartmentId);
+      return;
+    }
+
     if (!selectedDept && visibleDepartments.length > 0) {
       setSelectedDept(visibleDepartments[0].id);
     }
@@ -57,7 +65,7 @@ export default function MensagensPage() {
     if (selectedDept && !visibleDepartments.some((dept) => dept.id === selectedDept)) {
       setSelectedDept(visibleDepartments[0]?.id || "");
     }
-  }, [visibleDepartments, selectedDept]);
+  }, [visibleDepartments, selectedDept, requestedDepartmentId]);
 
   useEffect(() => {
     if (!selectedDept) {

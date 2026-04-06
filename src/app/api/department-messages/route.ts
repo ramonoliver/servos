@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiSession } from "@/lib/auth/api-session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { notifyDepartmentChatMessage } from "@/lib/server/chat-notifications";
 import { genId } from "@/lib/utils/helpers";
 
 const getSchema = z.object({
@@ -138,6 +139,25 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (error) throw error;
+
+    try {
+      const { data: sender } = await supabase
+        .from("users")
+        .select("name")
+        .eq("id", senderId)
+        .eq("church_id", churchId)
+        .maybeSingle();
+
+      await notifyDepartmentChatMessage({
+        churchId,
+        departmentId,
+        senderId,
+        senderName: sender?.name || "Alguém do time",
+        content,
+      });
+    } catch (notificationError) {
+      console.error("API department-messages notification error:", notificationError);
+    }
 
     return NextResponse.json({ success: true, message: data || message });
   } catch (error) {

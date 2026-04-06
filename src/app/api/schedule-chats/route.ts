@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiSession } from "@/lib/auth/api-session";
+import { notifyScheduleChatMessage } from "@/lib/server/chat-notifications";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { genId } from "@/lib/utils/helpers";
 
@@ -192,6 +193,25 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (error) throw error;
+
+    try {
+      const { data: sender } = await supabase
+        .from("users")
+        .select("name")
+        .eq("id", senderId)
+        .eq("church_id", churchId)
+        .maybeSingle();
+
+      await notifyScheduleChatMessage({
+        churchId,
+        scheduleId,
+        senderId,
+        senderName: sender?.name || "Alguém da equipe",
+        content,
+      });
+    } catch (notificationError) {
+      console.error("API schedule-chats notification error:", notificationError);
+    }
 
     return NextResponse.json({ success: true, message: data || message });
   } catch (error) {

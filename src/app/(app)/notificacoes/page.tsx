@@ -34,6 +34,12 @@ export default function NotificaçõesPage() {
 
   useEffect(() => {
     loadData();
+
+    const interval = setInterval(() => {
+      void loadData();
+    }, 12000);
+
+    return () => clearInterval(interval);
   }, [user.id]);
 
   const hasUnread = useMemo(
