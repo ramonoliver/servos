@@ -137,6 +137,24 @@ export interface Notification {
   created_at: string;
 }
 
+export interface MemberInvitation {
+  id: string;
+  church_id: string;
+  user_id: string;
+  invited_by_user_id: string | null;
+  email: string;
+  phone: string | null;
+  tracking_token: string | null;
+  email_status: "pending" | "sent" | "failed";
+  whatsapp_status: "pending" | "sent" | "failed" | "skipped";
+  email_error: string | null;
+  whatsapp_error: string | null;
+  opened_at: string | null;
+  open_count: number;
+  sent_at: string | null;
+  created_at: string;
+}
+
 export interface Message {
   id: string;
   department_id: string;

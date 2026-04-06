@@ -15,6 +15,19 @@ type SelectedDepartment = {
   function_name: string;
 };
 
+type InviteDeliveryResult = {
+  trackingEnabled?: boolean;
+  email?: {
+    status: "sent" | "failed";
+    error: string | null;
+  };
+  whatsapp?: {
+    status: "sent" | "failed" | "skipped";
+    error: string | null;
+    preview?: string | null;
+  };
+};
+
 export default function ConvidarMembroPage() {
   const { user, toast, departments, church } = useApp();
   const router = useRouter();
@@ -34,6 +47,7 @@ export default function ConvidarMembroPage() {
   const [tempPw, setTempPw] = useState<string | null>(null);
   const [createdName, setCreatedName] = useState("");
   const [createdEmail, setCreatedEmail] = useState("");
+  const [inviteDelivery, setInviteDelivery] = useState<InviteDeliveryResult | null>(null);
 
   const u = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
 
@@ -213,9 +227,13 @@ export default function ConvidarMembroPage() {
         },
         body: JSON.stringify({
           to: normalizedEmail,
+          phone: f.phone.trim(),
           memberName: f.name.trim(),
           churchName: church?.name || "Sua Igreja",
           tempPassword: pw,
+          userId: newUser.id,
+          churchId: user.church_id,
+          invitedByUserId: user.id,
         }),
       });
 
@@ -223,6 +241,15 @@ export default function ConvidarMembroPage() {
         const errorData = await response.json().catch(() => null);
         console.error("Erro ao enviar email de boas-vindas:", errorData || response.statusText);
         toast("Membro criado, mas o email de boas-vindas falhou.");
+      } else {
+        const delivery = (await response.json()) as InviteDeliveryResult;
+        setInviteDelivery(delivery);
+
+        if (delivery.whatsapp?.status === "failed") {
+          toast("Convite enviado por email, mas o WhatsApp falhou.");
+        } else if (delivery.whatsapp?.status === "skipped") {
+          toast("Email enviado. WhatsApp aguardando configuracao.");
+        }
       }
     } catch (err) {
       console.error("Erro ao enviar email de boas-vindas:", err);
@@ -256,6 +283,47 @@ export default function ConvidarMembroPage() {
 
           <div className="bg-amber-light rounded-[10px] p-3 text-xs text-amber border border-amber/10 mb-5">
             O membro devera alterar a senha no primeiro acesso.
+          </div>
+
+          <div className="bg-white border border-border-soft rounded-[14px] p-4 text-left mb-5 space-y-2">
+            <div className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">
+              Entrega do convite
+            </div>
+            <div className="text-sm flex items-center justify-between gap-3">
+              <span>Email</span>
+              <strong className={inviteDelivery?.email?.status === "sent" ? "text-success" : "text-danger"}>
+                {inviteDelivery?.email?.status === "sent" ? "Enviado" : "Falhou"}
+              </strong>
+            </div>
+            <div className="text-sm flex items-center justify-between gap-3">
+              <span>WhatsApp</span>
+              <strong
+                className={
+                  inviteDelivery?.whatsapp?.status === "sent"
+                    ? "text-success"
+                    : inviteDelivery?.whatsapp?.status === "skipped"
+                    ? "text-amber"
+                    : "text-danger"
+                }
+              >
+                {inviteDelivery?.whatsapp?.status === "sent"
+                  ? "Enviado"
+                  : inviteDelivery?.whatsapp?.status === "skipped"
+                  ? "Nao configurado"
+                  : "Falhou"}
+              </strong>
+            </div>
+            <div className="text-xs text-ink-faint">
+              Tracking de abertura:{" "}
+              <strong className="text-ink">
+                {inviteDelivery?.trackingEnabled ? "ativo" : "indisponivel"}
+              </strong>
+            </div>
+            {inviteDelivery?.whatsapp?.preview && (
+              <div className="rounded-xl bg-surface-alt p-3 text-xs text-ink-muted whitespace-pre-line">
+                {inviteDelivery.whatsapp.preview}
+              </div>
+            )}
           </div>
 
           <button

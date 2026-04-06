@@ -3,18 +3,55 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
+import { formatInviteOpenedAt } from "@/lib/invitations";
 import { getInitials } from "@/lib/utils/helpers";
 import Link from "next/link";
-import type { User, DepartmentMember } from "@/types";
+import type { User, DepartmentMember, MemberInvitation } from "@/types";
+
+function getLatestInvitesMap(invites: MemberInvitation[]) {
+  return invites.reduce<Record<string, MemberInvitation>>((acc, invite) => {
+    if (!acc[invite.user_id]) {
+      acc[invite.user_id] = invite;
+    }
+    return acc;
+  }, {});
+}
+
+function getInviteBadge(invite?: MemberInvitation) {
+  if (!invite) {
+    return null;
+  }
+
+  if (invite.opened_at) {
+    return {
+      label: `Email aberto ${formatInviteOpenedAt(invite.opened_at)}`,
+      cls: "bg-success-light text-success",
+    };
+  }
+
+  if (invite.email_status === "failed") {
+    return {
+      label: "Email falhou",
+      cls: "bg-danger-light text-danger",
+    };
+  }
+
+  return {
+    label: "Email enviado",
+    cls: "bg-amber-light text-amber",
+  };
+}
 
 export default function MembrosPage() {
-  const { user, toast, canDo, departments } = useApp();
+  const { user, church, toast, canDo, departments } = useApp();
 
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<string>("all");
   const [members, setMembers] = useState<User[]>([]);
   const [allDM, setAllDM] = useState<DepartmentMember[]>([]);
+  const [latestInvites, setLatestInvites] = useState<Record<string, MemberInvitation>>({});
   const [loading, setLoading] = useState(true);
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -28,6 +65,12 @@ export default function MembrosPage() {
     const { data: dmData, error: dmError } = await supabase
       .from("department_members")
       .select("*");
+
+    const { data: inviteData, error: inviteError } = await supabase
+      .from("member_invitations")
+      .select("*")
+      .eq("church_id", user.church_id)
+      .order("created_at", { ascending: false });
 
     if (usersError) {
       console.error("Erro ao buscar membros:", usersError);
@@ -43,8 +86,13 @@ export default function MembrosPage() {
       return;
     }
 
+    if (inviteError) {
+      console.error("Erro ao buscar convites dos membros:", inviteError);
+    }
+
     setMembers((usersData || []) as User[]);
     setAllDM((dmData || []) as DepartmentMember[]);
+    setLatestInvites(getLatestInvitesMap((inviteData || []) as MemberInvitation[]));
     setLoading(false);
   }
 
@@ -111,6 +159,49 @@ export default function MembrosPage() {
 
     toast(m.name + " removido.");
     await loadData();
+  }
+
+  async function resendInvite(member: User) {
+    setResendingId(member.id);
+
+    try {
+      const response = await fetch("/api/member-invitations/resend", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: member.id,
+          churchId: user.church_id,
+          churchName: church.name,
+          invitedByUserId: user.id,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        console.error("Erro ao reenviar convite:", data);
+        toast("Nao foi possivel reenviar o convite.");
+        return;
+      }
+
+      const emailSent = data?.email?.status === "sent";
+      const whatsappSent = data?.whatsapp?.status === "sent";
+
+      if (emailSent || whatsappSent) {
+        toast(`Convite reenviado para ${member.name}.`);
+      } else {
+        toast("O convite foi recriado, mas os envios falharam.");
+      }
+
+      await loadData();
+    } catch (error) {
+      console.error("Erro ao reenviar convite:", error);
+      toast("Nao foi possivel reenviar o convite.");
+    } finally {
+      setResendingId(null);
+    }
   }
 
   return (
@@ -180,6 +271,8 @@ export default function MembrosPage() {
 
             const func = mDepts[0]?.function_name || "";
             const spouse = m.spouse_id ? members.find((s) => s.id === m.spouse_id) : null;
+            const latestInvite = latestInvites[m.id];
+            const inviteBadge = getInviteBadge(latestInvite);
 
             const roleCls =
               m.role === "admin"
@@ -231,7 +324,23 @@ export default function MembrosPage() {
                       &#128145; {spouse.name.split(" ")[0]}
                     </span>
                   )}
+
+                  {inviteBadge && (
+                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${inviteBadge.cls}`}>
+                      {inviteBadge.label}
+                    </span>
+                  )}
                 </Link>
+
+                {canDo("member.invite") && m.must_change_password && (
+                  <button
+                    onClick={() => resendInvite(m)}
+                    disabled={resendingId === m.id}
+                    className="btn btn-secondary btn-sm whitespace-nowrap"
+                  >
+                    {resendingId === m.id ? "Reenviando..." : "Reenviar convite"}
+                  </button>
+                )}
 
                 {canDo("member.remove") && m.id !== user.id && (
                   <button

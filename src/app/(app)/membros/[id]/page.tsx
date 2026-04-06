@@ -2,12 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { useApp } from "@/hooks/use-app";
+import { formatInviteOpenedAt } from "@/lib/invitations";
 import { supabase } from "@/lib/supabase/client";
 import { getInitials, formatShortDate, genId } from "@/lib/utils/helpers";
 import { MemberEditModal } from "@/components/shared/member-edit-modal";
 import { AvailabilityGrid } from "@/components/ui";
 import Link from "next/link";
-import type { User, DepartmentMember, Schedule, ScheduleMember, Event } from "@/types";
+import type {
+  User,
+  DepartmentMember,
+  Schedule,
+  ScheduleMember,
+  Event,
+  MemberInvitation,
+} from "@/types";
 
 type SelectedDepartment = {
   department_id: string;
@@ -15,7 +23,7 @@ type SelectedDepartment = {
 };
 
 export default function MembroDetailPage({ params }: { params: { id: string } }) {
-  const { user, departments, canDo, toast } = useApp();
+  const { user, church, departments, canDo, toast } = useApp();
 
   const [showEdit, setShowEdit] = useState(false);
   const [member, setMember] = useState<User | null>(null);
@@ -24,7 +32,9 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [allSM, setAllSM] = useState<ScheduleMember[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
+  const [latestInvite, setLatestInvite] = useState<MemberInvitation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [resendingInvite, setResendingInvite] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -36,6 +46,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
       { data: schedulesData, error: schedulesError },
       { data: smData, error: smError },
       { data: eventsData, error: eventsError },
+      { data: inviteData, error: inviteError },
     ] = await Promise.all([
       supabase.from("users").select("*").eq("id", params.id).maybeSingle(),
       supabase.from("users").select("*").eq("church_id", user.church_id),
@@ -43,6 +54,13 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
       supabase.from("schedules").select("*").eq("church_id", user.church_id),
       supabase.from("schedule_members").select("*").eq("user_id", params.id),
       supabase.from("events").select("*").eq("church_id", user.church_id),
+      supabase
+        .from("member_invitations")
+        .select("*")
+        .eq("user_id", params.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
     if (memberError || membersError || dmsError || schedulesError || smError || eventsError) {
@@ -53,6 +71,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
         schedulesError,
         smError,
         eventsError,
+        inviteError,
       });
       toast("Erro ao carregar dados do membro.");
       setLoading(false);
@@ -65,6 +84,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
     setSchedules((schedulesData || []) as Schedule[]);
     setAllSM((smData || []) as ScheduleMember[]);
     setEvents((eventsData || []) as Event[]);
+    setLatestInvite((inviteData || null) as MemberInvitation | null);
     setLoading(false);
   }
 
@@ -87,6 +107,41 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
       : member.role === "leader"
       ? "bg-brand-light text-brand"
       : "bg-success-light text-success";
+
+  async function resendInvite() {
+    setResendingInvite(true);
+
+    try {
+      const response = await fetch("/api/member-invitations/resend", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: member.id,
+          churchId: user.church_id,
+          churchName: church.name,
+          invitedByUserId: user.id,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        console.error("Erro ao reenviar convite:", data);
+        toast("Nao foi possivel reenviar o convite.");
+        return;
+      }
+
+      toast(`Convite reenviado para ${member.name}.`);
+      await loadData();
+    } catch (error) {
+      console.error("Erro ao reenviar convite:", error);
+      toast("Nao foi possivel reenviar o convite.");
+    } finally {
+      setResendingInvite(false);
+    }
+  }
 
   return (
     <div>
@@ -195,6 +250,74 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
               ))}
             </div>
           </div>
+
+          {member.must_change_password && (
+            <div className="card p-5">
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div>
+                  <div className="font-display text-lg">Convite</div>
+                  <p className="text-sm text-ink-muted">
+                    Status do ultimo envio para este membro.
+                  </p>
+                </div>
+
+                {canDo("member.invite") && (
+                  <button
+                    onClick={resendInvite}
+                    disabled={resendingInvite}
+                    className="btn btn-secondary btn-sm"
+                  >
+                    {resendingInvite ? "Reenviando..." : "Reenviar convite"}
+                  </button>
+                )}
+              </div>
+
+              {latestInvite ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-ink-muted">Email</span>
+                    <strong className={latestInvite.email_status === "sent" ? "text-success" : "text-danger"}>
+                      {latestInvite.email_status === "sent" ? "Enviado" : "Falhou"}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-ink-muted">WhatsApp</span>
+                    <strong
+                      className={
+                        latestInvite.whatsapp_status === "sent"
+                          ? "text-success"
+                          : latestInvite.whatsapp_status === "skipped"
+                          ? "text-amber"
+                          : latestInvite.whatsapp_status === "failed"
+                          ? "text-danger"
+                          : "text-ink"
+                      }
+                    >
+                      {latestInvite.whatsapp_status === "sent"
+                        ? "Enviado"
+                        : latestInvite.whatsapp_status === "skipped"
+                        ? "Nao configurado"
+                        : latestInvite.whatsapp_status === "failed"
+                        ? "Falhou"
+                        : "Pendente"}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-ink-muted">Abertura do email</span>
+                    <strong className="text-ink">
+                      {latestInvite.opened_at
+                        ? `${formatInviteOpenedAt(latestInvite.opened_at)} (${latestInvite.open_count}x)`
+                        : "Ainda nao abriu"}
+                    </strong>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-ink-faint">
+                  Nenhum historico de convite encontrado.
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="card p-5">
             <div className="font-display text-lg mb-3">Ministerios</div>
