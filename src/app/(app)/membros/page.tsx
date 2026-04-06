@@ -172,7 +172,7 @@ export default function MembrosPage() {
 
       if (!response.ok) {
         console.error("Erro ao reenviar convite:", data);
-        toast("Nao foi possivel reenviar o convite.");
+        toast("Não foi possível reenviar o convite.");
         return;
       }
 
@@ -188,7 +188,7 @@ export default function MembrosPage() {
       await loadData();
     } catch (error) {
       console.error("Erro ao reenviar convite:", error);
-      toast("Nao foi possivel reenviar o convite.");
+      toast("Não foi possível reenviar o convite.");
     } finally {
       setResendingId(null);
     }
@@ -222,7 +222,7 @@ export default function MembrosPage() {
           value={deptFilter}
           onChange={(e) => setDeptFilter(e.target.value)}
         >
-          <option value="all">Todos os ministerios</option>
+          <option value="all">Todos os ministérios</option>
           {departments.map((d) => (
             <option key={d.id} value={d.id}>
               {d.name}
@@ -276,7 +276,7 @@ export default function MembrosPage() {
                 key={m.id}
                 className="flex flex-col sm:flex-row sm:items-center gap-3.5 px-5 py-3 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors group"
               >
-                <Link href={`/membros/${m.id}`} className="flex items-center gap-3.5 flex-1 min-w-0">
+                <Link href={`/membros/${m.id}`} className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
                   {m.photo_url ? (
                     <img
                       src={m.photo_url}
@@ -293,11 +293,11 @@ export default function MembrosPage() {
                   )}
 
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">
+                    <div className="text-sm font-medium break-words sm:truncate">
                       {m.name}
                       {m.must_change_password ? " *" : ""}
                     </div>
-                    <div className="text-[11px] text-ink-faint break-words">
+                    <div className="text-[11px] text-ink-faint break-words leading-relaxed">
                       {func}
                       {deptNames.length ? " · " + deptNames.join(", ") : ""}
                       {" · "}
@@ -307,7 +307,7 @@ export default function MembrosPage() {
 
                   <div className="hidden sm:flex items-center gap-2">
                     <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${roleCls}`}>
-                      {m.role === "admin" ? "Admin" : m.role === "leader" ? "Lider" : "Membro"}
+                      {m.role === "admin" ? "Admin" : m.role === "leader" ? "Líder" : "Membro"}
                     </span>
 
                     {spouse && (
@@ -327,7 +327,7 @@ export default function MembrosPage() {
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                   <div className="flex sm:hidden flex-wrap items-center gap-2">
                     <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${roleCls}`}>
-                      {m.role === "admin" ? "Admin" : m.role === "leader" ? "Lider" : "Membro"}
+                      {m.role === "admin" ? "Admin" : m.role === "leader" ? "Líder" : "Membro"}
                     </span>
                     {spouse && (
                       <span className="text-[9px] font-semibold text-brand bg-brand-light px-1.5 py-0.5 rounded-full">
@@ -354,7 +354,7 @@ export default function MembrosPage() {
                   {canDo("member.remove") && m.id !== user.id && (
                     <button
                       onClick={() => removeMember(m)}
-                      className="btn btn-ghost btn-sm text-danger sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                      className="btn btn-ghost btn-sm text-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                     >
                       &#10005;
                     </button>

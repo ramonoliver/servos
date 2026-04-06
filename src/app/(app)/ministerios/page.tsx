@@ -32,7 +32,7 @@ export default function MinisteriosPage() {
 
     if (usersError || dmError) {
       console.error({ usersError, dmError });
-      toast("Erro ao carregar ministerios.");
+      toast("Erro ao carregar ministérios.");
       setLoading(false);
       return;
     }
@@ -59,8 +59,8 @@ export default function MinisteriosPage() {
 
       const data = await response.json().catch(() => null);
       if (!response.ok) {
-        console.error("Erro ao excluir ministerio:", data);
-        toast(data?.error || "Erro ao excluir ministerio.");
+        console.error("Erro ao excluir ministério:", data);
+        toast(data?.error || "Erro ao excluir ministério.");
         return;
       }
 
@@ -69,8 +69,8 @@ export default function MinisteriosPage() {
       await refresh();
       await loadData();
     } catch (error) {
-      console.error("Erro ao excluir ministerio:", error);
-      toast("Erro ao excluir ministerio.");
+      console.error("Erro ao excluir ministério:", error);
+      toast("Erro ao excluir ministério.");
     }
   }
 
@@ -78,7 +78,7 @@ export default function MinisteriosPage() {
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="page-title">Ministerios</h1>
+          <h1 className="page-title">Ministérios</h1>
           <p className="page-subtitle">{departments.length} departamentos</p>
         </div>
 
@@ -90,7 +90,7 @@ export default function MinisteriosPage() {
       </div>
 
       {loading ? (
-        <div className="card p-8 text-center text-sm text-ink-faint">Carregando ministerios...</div>
+        <div className="card p-8 text-center text-sm text-ink-faint">Carregando ministérios...</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {departments.map((d) => {
@@ -118,20 +118,20 @@ export default function MinisteriosPage() {
                         e.stopPropagation();
                         setModal({ type: "delete", dept: d });
                       }}
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/80 shadow-sm flex items-center justify-center text-xs text-danger opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 shadow-sm flex items-center justify-center text-xs text-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                     >
                       &#10005;
                     </button>
                   )}
                 </div>
 
-                <div className="p-4">
-                  <div className="font-display text-[17px] mb-0.5 break-words">{d.name}</div>
-                  <div className="text-xs text-ink-muted break-words">
+                <div className="p-4 space-y-1">
+                  <div className="font-display text-[17px] leading-snug break-words">{d.name}</div>
+                  <div className="text-xs text-ink-muted break-words leading-relaxed">
                     {count} membros{leaderNames.length ? " · " + leaderNames.join(", ") : ""}
                   </div>
                   {d.description && (
-                    <div className="text-xs text-ink-faint mt-1 line-clamp-2">{d.description}</div>
+                    <div className="text-xs text-ink-faint leading-relaxed line-clamp-2 break-words">{d.description}</div>
                   )}
                 </div>
               </Link>
@@ -157,7 +157,7 @@ export default function MinisteriosPage() {
 
       {modal?.type === "delete" && (
         <Modal
-          title="Excluir Ministerio"
+          title="Excluir Ministério"
           close={() => setModal(null)}
           width={420}
           footer={
@@ -221,16 +221,16 @@ function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
 
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        console.error("Erro ao salvar ministerio:", payload);
-        toast(payload?.error || "Erro ao salvar ministerio.");
+        console.error("Erro ao salvar ministério:", payload);
+        toast(payload?.error || "Erro ao salvar ministério.");
         return;
       }
 
       toast(isEdit ? "Atualizado!" : "Criado!");
       onSaved();
     } catch (error) {
-      console.error("Erro ao salvar ministerio:", error);
-      toast("Erro ao salvar ministerio.");
+      console.error("Erro ao salvar ministério:", error);
+      toast("Erro ao salvar ministério.");
     }
   }
 
@@ -238,7 +238,7 @@ function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
 
   return (
     <Modal
-      title={isEdit ? "Editar Ministerio" : "Novo Ministerio"}
+      title={isEdit ? "Editar Ministério" : "Novo Ministério"}
       close={close}
       width={520}
       footer={
@@ -259,7 +259,7 @@ function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
         </div>
 
         <div>
-          <label className="input-label">Descricao</label>
+          <label className="input-label">Descrição</label>
           <textarea className="input-field min-h-[60px]" value={desc} onChange={(e) => setDesc(e.target.value)} />
         </div>
 
@@ -319,7 +319,7 @@ function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
                 </div>
                 <span className="text-sm font-medium">{m.name}</span>
                 <span className="text-[10px] text-ink-faint ml-auto">
-                  {m.role === "admin" ? "Admin" : "Lider"}
+                  {m.role === "admin" ? "Admin" : "Líder"}
                 </span>
               </label>
             ))}

@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { getInitials } from "@/lib/utils/helpers";
 import type { User, Schedule, ScheduleMember } from "@/types";
 
-export default function RelatoriosPage() {
+export default function RelatóriosPage() {
   const { user } = useApp();
 
   const [members, setMembers] = useState<User[]>([]);
@@ -77,8 +77,8 @@ export default function RelatoriosPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="page-title">Relatorios</h1>
-        <p className="page-subtitle">Insights do seu ministerio</p>
+        <h1 className="page-title">Relatórios</h1>
+        <p className="page-subtitle">Insights do seu ministério</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
@@ -93,7 +93,7 @@ export default function RelatoriosPage() {
           <div className="font-display text-[28px] text-success">
             {loading ? "..." : `${confirmRate}%`}
           </div>
-          <div className="text-xs text-ink-muted">Taxa de confirmacao</div>
+          <div className="text-xs text-ink-muted">Taxa de confirmação</div>
         </div>
 
         <div className="bg-surface border border-border-soft rounded-[14px] px-5 py-4">
@@ -133,7 +133,7 @@ export default function RelatoriosPage() {
 
         <div className="card">
           <div className="px-5 pt-4 pb-3">
-            <span className="font-display text-[17px]">Menor confirmacao</span>
+            <span className="font-display text-[17px]">Menor confirmação</span>
           </div>
 
           {loading ? (

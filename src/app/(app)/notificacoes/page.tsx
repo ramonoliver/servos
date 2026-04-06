@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import Link from "next/link";
 import type { Notification } from "@/types";
 
-export default function NotificacoesPage() {
+export default function NotificaçõesPage() {
   const { user, toast } = useApp();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +23,7 @@ export default function NotificacoesPage() {
 
     if (error) {
       console.error("Erro ao carregar notificações:", error);
-      toast("Erro ao carregar notificacoes.");
+      toast("Erro ao carregar notificações.");
       setLoading(false);
       return;
     }
@@ -65,7 +65,7 @@ export default function NotificacoesPage() {
       const data = await response.json().catch(() => null);
       if (!response.ok) {
         console.error("Erro ao marcar todas como lidas:", data);
-        toast(data?.error || "Erro ao marcar notificacoes.");
+        toast(data?.error || "Erro ao marcar notificações.");
         setMarkingAll(false);
         return;
       }
@@ -75,7 +75,7 @@ export default function NotificacoesPage() {
       await loadData();
     } catch (error) {
       console.error("Erro ao marcar todas como lidas:", error);
-      toast("Erro ao marcar notificacoes.");
+      toast("Erro ao marcar notificações.");
       setMarkingAll(false);
     }
   }
@@ -109,7 +109,7 @@ export default function NotificacoesPage() {
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 className="page-title">Notificacoes</h1>
+        <h1 className="page-title">Notificações</h1>
 
         {hasUnread && (
           <button
@@ -125,7 +125,7 @@ export default function NotificacoesPage() {
       {loading ? (
         <div className="card px-5 py-16 text-center">
           <div className="text-4xl mb-3 opacity-40">&#128276;</div>
-          <p className="text-sm text-ink-muted">Carregando notificacoes...</p>
+          <p className="text-sm text-ink-muted">Carregando notificações...</p>
         </div>
       ) : notifications.length === 0 ? (
         <div className="card px-5 py-16 text-center">

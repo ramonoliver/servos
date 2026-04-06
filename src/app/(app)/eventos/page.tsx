@@ -277,7 +277,7 @@ function EventForm({
           </div>
 
           <div>
-            <label className="input-label">Descricao</label>
+            <label className="input-label">Descrição</label>
             <textarea className="input-field min-h-[60px]" value={desc} onChange={(e) => setDesc(e.target.value)} />
           </div>
 

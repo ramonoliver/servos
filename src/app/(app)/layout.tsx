@@ -178,17 +178,17 @@ function Shell({ children }: { children: React.ReactNode }) {
   const isMember = user.role === "member";
 
   const nav = [
-    { href: "/dashboard", label: "Inicio", icon: "home", show: true },
+    { href: "/dashboard", label: "Início", icon: "home", show: true },
     { href: "/escalas", label: "Escalas", icon: "calendar", show: isAdmin || isLeader },
     { href: "/minhas-escalas", label: "Minhas Escalas", icon: "check-square", show: isMember },
-    { href: "/ministerios", label: "Ministerios", icon: "users", show: canDo("department.view") && !isMember },
+    { href: "/ministerios", label: "Ministérios", icon: "users", show: canDo("department.view") && !isMember },
     { href: "/membros", label: "Membros", icon: "user", show: canDo("member.view") && !isMember },
     { href: "/eventos", label: "Eventos", icon: "star", show: canDo("event.view") && !isMember },
-    { href: "/calendario", label: "Calendario", icon: "calendar-days", show: true },
-    { href: "/notificacoes", label: "Notificacoes", icon: "bell", show: true, badge: unreadNotifs || undefined },
+    { href: "/calendario", label: "Calendário", icon: "calendar-days", show: true },
+    { href: "/notificacoes", label: "Notificações", icon: "bell", show: true, badge: unreadNotifs || undefined },
     { href: "/mensagens", label: "Mensagens", icon: "message-circle", show: canDo("message.send") },
-    { href: "/relatorios", label: "Relatorios", icon: "bar-chart", show: canDo("report.view") },
-    { href: "/configuracoes", label: "Configuracoes", icon: "settings", show: isAdmin },
+    { href: "/relatorios", label: "Relatórios", icon: "bar-chart", show: canDo("report.view") },
+    { href: "/configuracoes", label: "Configurações", icon: "settings", show: isAdmin },
     { href: "/perfil", label: "Meu Perfil", icon: "user", show: isMember },
   ].filter((n) => n.show);
 
@@ -196,7 +196,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     user.role === "admin"
       ? { label: "Admin", cls: "bg-purple-50 text-purple-600" }
       : user.role === "leader"
-      ? { label: "Lider", cls: "bg-brand-light text-brand" }
+      ? { label: "Líder", cls: "bg-brand-light text-brand" }
       : { label: "Membro", cls: "bg-success-light text-success" };
 
   return (
@@ -246,7 +246,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           {(isAdmin || isLeader) && departments.length > 0 && (
             <>
               <div className="text-[9px] font-bold tracking-widest uppercase text-ink-faint px-3 pt-4 pb-1">
-                Ministerios
+                Ministérios
               </div>
 
               {departments.map((d) => (

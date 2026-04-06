@@ -209,7 +209,7 @@ export default function RepertorioPage() {
       {showForm && (
         <div className="card mb-6">
           <div className="px-5 pt-4 pb-3 border-b border-border-soft">
-            <span className="font-display text-[17px]">Nova música</span>
+            <span className="font-display text-[17px] break-words">Nova música</span>
           </div>
 
           <div className="px-5 py-4 space-y-4">
@@ -397,7 +397,7 @@ export default function RepertorioPage() {
 
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold break-words">{song.title}</div>
-                <div className="text-[11px] text-ink-faint break-words">
+                <div className="text-[11px] text-ink-faint break-words leading-relaxed">
                   {song.artist || "—"}
                   {song.bpm ? ` · ${song.bpm} BPM` : ""}
                   {song.times_used > 0 ? ` · Usada ${song.times_used}×` : ""}
@@ -405,7 +405,7 @@ export default function RepertorioPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                <span className="badge badge-brand">{song.theme}</span>
+                <span className="badge badge-brand break-words max-w-full">{song.theme}</span>
 
                 <div className="flex items-center gap-1.5">
                 {song.chords_url && (
@@ -456,7 +456,7 @@ export default function RepertorioPage() {
                 {canDo("schedule.create") && (
                   <button
                     onClick={() => removeSong(song.id, song.title)}
-                    className="text-ink-ghost hover:text-danger transition-colors p-1"
+                    className="text-ink-ghost hover:text-danger transition-colors p-1 self-start sm:self-auto"
                     title="Remover"
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -84,28 +84,28 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
         setChatMessages([]);
 
         if (response.status === 403) {
-          setChatErrorMessage("O chat desta escala esta disponivel apenas para participantes e lideres.");
+          setChatErrorMessage("O chat desta escala está disponível apenas para participantes e líderes.");
           return false;
         }
 
         if (response.status === 401) {
-          setChatErrorMessage("Sua sessao expirou. Entre novamente.");
+          setChatErrorMessage("Sua sessão expirou. Entre novamente.");
           if (!silent) {
-            toast("Sua sessao expirou. Entre novamente.");
+            toast("Sua sessão expirou. Entre novamente.");
           }
           return false;
         }
 
         if (infraMissing) {
           setChatErrorMessage(
-            "O chat desta escala ainda nao esta habilitado neste ambiente. Aplique o script sql/communications.sql no Supabase."
+            "O chat desta escala ainda não está habilitado neste ambiente. Aplique o script sql/communications.sql no Supabase."
           );
           return false;
         }
 
-        setChatErrorMessage("Nao foi possivel carregar o chat desta escala.");
+        setChatErrorMessage("Não foi possível carregar o chat desta escala.");
         if (!silent) {
-          toast("Nao foi possivel carregar o chat desta escala.");
+          toast("Não foi possível carregar o chat desta escala.");
         }
         return false;
       }
@@ -120,9 +120,9 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
       setChatInfrastructureMissing(false);
       setChatAvailable(true);
       setChatMessages([]);
-      setChatErrorMessage("Nao foi possivel carregar o chat desta escala.");
+      setChatErrorMessage("Não foi possível carregar o chat desta escala.");
       if (!silent) {
-        toast("Nao foi possivel carregar o chat desta escala.");
+        toast("Não foi possível carregar o chat desta escala.");
       }
       return false;
     }
@@ -270,7 +270,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   }
 
   if (!schedule) {
-    return <div className="py-20 text-center text-ink-faint">Escala nao encontrada.</div>;
+    return <div className="py-20 text-center text-ink-faint">Escala não encontrada.</div>;
   }
 
   const dept = departments.find((d) => d.id === schedule.department_id);
@@ -290,7 +290,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   const myScheduleMember = sm.find((item) => item.user_id === user.id) || null;
 
   if (user.role === "member" && !isParticipant) {
-    return <div className="py-20 text-center text-ink-faint">Voce nao participa desta escala.</div>;
+    return <div className="py-20 text-center text-ink-faint">Você não participa desta escala.</div>;
   }
 
   const availableToAdd = deptMembers
@@ -421,7 +421,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
         console.error("Erro ao enviar mensagem:", payload || response.statusText);
         if (isChatInfrastructureError(payload?.error)) {
           setChatAvailable(false);
-          toast("O chat desta escala ainda nao foi habilitado no banco.");
+          toast("O chat desta escala ainda não foi habilitado no banco.");
         } else {
           toast("Erro ao enviar mensagem no chat.");
         }
@@ -441,7 +441,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
       console.error("Erro ao enviar mensagem:", error);
       if (error instanceof Error && isChatInfrastructureError(error.message)) {
         setChatAvailable(false);
-        toast("O chat desta escala ainda nao foi habilitado no banco.");
+        toast("O chat desta escala ainda não foi habilitado no banco.");
       } else {
         toast("Erro ao enviar mensagem no chat.");
       }
@@ -475,7 +475,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
         return;
       }
 
-      toast(status === "confirmed" ? "Presenca confirmada!" : "Ausencia registrada.");
+      toast(status === "confirmed" ? "Presença confirmada!" : "Ausência registrada.");
       setResponding(false);
       setDeclineReason("");
       await loadData();
@@ -662,11 +662,11 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
                   {myScheduleMember.status === "pending"
                     ? "Confirme sua participacao nesta escala"
                     : myScheduleMember.status === "confirmed"
-                    ? "Voce ja confirmou presenca"
+                    ? "Você já confirmou presença"
                     : "Voce informou indisponibilidade"}
                 </div>
                 <div className="text-sm text-ink-muted mt-1">
-                  Funcao: {myScheduleMember.function_name || "Nao informada"}
+                  Função: {myScheduleMember.function_name || "Não informada"}
                 </div>
               </div>
 
@@ -690,10 +690,10 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
             {myScheduleMember.status === "pending" && !responding && (
               <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <button onClick={() => respondToSchedule("confirmed")} className="btn btn-green sm:flex-1">
-                  Confirmar presenca
+                  Confirmar presença
                 </button>
                 <button onClick={() => setResponding(true)} className="btn btn-danger sm:flex-1">
-                  Nao poderei servir
+                  Não poderei servir
                 </button>
               </div>
             )}
@@ -701,7 +701,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
             {responding && myScheduleMember.status === "pending" && (
               <div className="mt-4 space-y-3">
                 <div>
-                  <label className="input-label">Motivo da ausencia (opcional)</label>
+                  <label className="input-label">Motivo da ausência (opcional)</label>
                   <textarea
                     className="input-field min-h-[72px]"
                     value={declineReason}
@@ -720,7 +720,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
                     Cancelar
                   </button>
                   <button onClick={() => respondToSchedule("declined")} className="btn btn-danger sm:flex-1">
-                    Confirmar ausencia
+                    Confirmar ausência
                   </button>
                 </div>
               </div>
@@ -862,13 +862,13 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3" style={{ maxHeight: 360 }}>
             {chatInfrastructureMissing ? (
               <div className="text-center text-sm text-ink-faint py-8">
-                O chat desta escala ainda nao esta habilitado neste ambiente. Aplique o script <code>sql/communications.sql</code> no Supabase.
+                O chat desta escala ainda não está habilitado neste ambiente. Aplique o script <code>sql/communications.sql</code> no Supabase.
               </div>
             ) : chatErrorMessage ? (
               <div className="text-center text-sm text-ink-faint py-8">{chatErrorMessage}</div>
             ) : !canAccessScheduleChat ? (
               <div className="text-center text-sm text-ink-faint py-8">
-                O chat desta escala esta disponivel apenas para participantes e lideres.
+                O chat desta escala está disponível apenas para participantes e líderes.
               </div>
             ) : chatMessages.length === 0 ? (
               <div className="text-center text-sm text-ink-faint py-8">Nenhuma mensagem. Seja o primeiro!</div>

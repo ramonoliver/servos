@@ -130,19 +130,19 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className={`grid ${isMember ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 xl:grid-cols-4"} gap-3 mb-6`}>
+      <div className={`grid ${isMember ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"} gap-3 mb-6`}>
         {isMember ? (
           <>
             <Stat value={mySchedules.length} label="Minhas escalas" color="text-brand" />
             <Stat value={myPending.length} label="Pendentes" color="text-amber" />
-            <Stat value={user.confirm_rate + "%"} label="Confirmacao" color="text-success" />
+            <Stat value={user.confirm_rate + "%"} label="Confirmação" color="text-success" />
           </>
         ) : (
           <>
             <Stat value={upcoming.length} label="Escalas ativas" color="text-brand" />
             <Stat value={members.length} label="Membros" color="text-success" />
             <Stat value={pendingTotal} label="Pendentes" color="text-amber" />
-            <Stat value={departments.length} label="Ministerios" color="text-info" />
+            <Stat value={departments.length} label="Ministérios" color="text-info" />
           </>
         )}
       </div>
@@ -151,7 +151,7 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-3.5 bg-amber-light rounded-[14px] border border-amber/10 mb-6">
           <span className="text-lg">&#9888;&#65039;</span>
           <span className="text-[13px] text-ink-soft flex-1">
-            Voce tem <strong>{myPending.length} {myPending.length === 1 ? "escala" : "escalas"}</strong> aguardando sua confirmacao.
+            Você tem <strong>{myPending.length} {myPending.length === 1 ? "escala" : "escalas"}</strong> aguardando sua confirmação.
           </span>
           <Link href="/minhas-escalas" className="text-xs font-semibold text-brand hover:underline self-start">
             Ver &rarr;
@@ -163,7 +163,7 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-3.5 bg-amber-light rounded-[14px] border border-amber/10 mb-6">
           <span className="text-lg">&#9888;&#65039;</span>
           <span className="text-[13px] text-ink-soft flex-1">
-            <strong>{pendingTotal} {pendingTotal === 1 ? "membro" : "membros"}</strong> nao confirmaram escalas.
+            <strong>{pendingTotal} {pendingTotal === 1 ? "membro" : "membros"}</strong> não confirmaram escalas.
           </span>
           <Link href="/escalas" className="text-xs font-semibold text-brand hover:underline self-start">
             Ver escalas &rarr;
@@ -175,7 +175,9 @@ export default function DashboardPage() {
         <div className="space-y-5">
           <div className="card">
             <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3">
-              <span className="font-display text-[17px]">{isMember ? "Minhas proximas escalas" : "Proximas escalas"}</span>
+              <span className="font-display text-[17px] break-words">
+                {isMember ? "Minhas próximas escalas" : "Próximas escalas"}
+              </span>
             </div>
 
             {loading ? (
@@ -200,7 +202,7 @@ export default function DashboardPage() {
                   <Link
                     key={sched.id + "-" + i}
                     href={isMember ? "/minhas-escalas" : `/escalas/${sched.id}`}
-                    className="flex items-center gap-3.5 px-5 py-3 border-t border-border-soft hover:bg-brand-glow transition-colors"
+                    className="flex items-start sm:items-center gap-3.5 px-5 py-3 border-t border-border-soft hover:bg-brand-glow transition-colors"
                   >
                     <div className="w-12 h-[50px] rounded-[10px] bg-surface-alt flex flex-col items-center justify-center flex-shrink-0">
                       <span className="text-[9px] font-bold uppercase text-brand tracking-wide">
@@ -212,8 +214,8 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{ev?.name || "Escala"}</div>
-                      <div className="text-[11px] text-ink-faint">
+                      <div className="text-sm font-medium break-words sm:truncate">{ev?.name || "Escala"}</div>
+                      <div className="text-[11px] text-ink-faint break-words leading-relaxed">
                         {sched.time} &middot; {dept?.name}
                       </div>
                     </div>
@@ -248,7 +250,7 @@ export default function DashboardPage() {
           {!isMember && pendingTotal > 0 && (
             <div className="card">
               <div className="px-5 pt-4 pb-3">
-                <span className="font-display text-[17px]">Aguardando confirmacao</span>
+                <span className="font-display text-[17px] break-words">Aguardando confirmação</span>
               </div>
 
               {allSM
@@ -266,7 +268,7 @@ export default function DashboardPage() {
                   if (!m || !sched) return null;
 
                   return (
-                    <div key={sm.id} className="flex items-center gap-3.5 px-5 py-3 border-t border-border-soft">
+                    <div key={sm.id} className="flex items-start sm:items-center gap-3.5 px-5 py-3 border-t border-border-soft">
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
                         style={{ background: m.avatar_color }}
@@ -275,8 +277,8 @@ export default function DashboardPage() {
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{m.name}</div>
-                        <div className="text-[11px] text-ink-faint">
+                        <div className="text-sm font-medium break-words sm:truncate">{m.name}</div>
+                        <div className="text-[11px] text-ink-faint break-words leading-relaxed">
                           {ev?.name} &middot; {formatShortDate(sched.date)}
                         </div>
                       </div>
@@ -299,15 +301,15 @@ export default function DashboardPage() {
 
           {notifications.length > 0 && (
             <div className="card">
-              <div className="px-5 pt-4 pb-3 flex items-center justify-between">
-                <span className="font-display text-[17px]">Notificacoes</span>
+              <div className="px-5 pt-4 pb-3 flex items-center justify-between gap-3">
+                <span className="font-display text-[17px]">Notificações</span>
                 <span className="badge badge-red">{notifications.length}</span>
               </div>
 
               {notifications.slice(0, 3).map((n) => (
                 <div key={n.id} className="px-5 py-3 border-t border-border-soft">
-                  <div className="text-[13px] font-semibold mb-0.5">{n.title}</div>
-                  <div className="text-[11px] text-ink-muted leading-snug">{n.body}</div>
+                  <div className="text-[13px] font-semibold mb-0.5 break-words">{n.title}</div>
+                  <div className="text-[11px] text-ink-muted leading-relaxed break-words">{n.body}</div>
                 </div>
               ))}
 
@@ -327,9 +329,9 @@ export default function DashboardPage() {
 
 function Stat({ value, label, color }: { value: number | string; label: string; color: string }) {
   return (
-    <div className="bg-surface border border-border-soft rounded-[14px] px-5 py-4">
+    <div className="bg-surface border border-border-soft rounded-[14px] px-5 py-4 min-w-0">
       <div className={`font-display text-[28px] tracking-tight leading-none ${color}`}>{value}</div>
-      <div className="text-xs text-ink-muted font-medium mt-1">{label}</div>
+      <div className="text-xs text-ink-muted font-medium mt-1 break-words">{label}</div>
     </div>
   );
 }

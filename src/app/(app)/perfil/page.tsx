@@ -103,7 +103,7 @@ export default function PerfilPage() {
     }
 
     if (newPw !== confirmPw) {
-      toast("As senhas nao coincidem.");
+      toast("As senhas não coincidem.");
       return;
     }
 
@@ -220,7 +220,7 @@ export default function PerfilPage() {
                 {user.role === "admin"
                   ? "Administrador"
                   : user.role === "leader"
-                  ? "Lider"
+                  ? "Líder"
                   : "Membro"}
               </div>
 

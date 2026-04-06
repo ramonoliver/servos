@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useApp } from "@/hooks/use-app";
 
-export default function ConfiguracoesPage() {
+export default function ConfiguraçõesPage() {
   const { toast, church, refresh, user } = useApp();
   const [churchName, setChurchName] = useState(church.name);
   const [churchCity, setChurchCity] = useState(church.city || "");
@@ -48,8 +48,8 @@ export default function ConfiguracoesPage() {
   return (
     <div className="max-w-[720px]">
       <div className="mb-6">
-        <h1 className="page-title">Configuracoes</h1>
-        <p className="page-subtitle">Ajustes gerais da igreja e orientacoes de uso</p>
+        <h1 className="page-title">Configurações</h1>
+        <p className="page-subtitle">Ajustes gerais da igreja e orientações de uso</p>
       </div>
 
       <div className="card p-6 mb-5">
@@ -80,16 +80,16 @@ export default function ConfiguracoesPage() {
       </div>
 
       <div className="card p-6 mb-5">
-        <h3 className="font-display text-lg mb-3">Permissoes</h3>
+        <h3 className="font-display text-lg mb-3">Permissões</h3>
         <div className="text-[13px] text-ink-muted leading-relaxed space-y-2">
           <p>
-            <strong className="text-ink">Admin:</strong> acesso total - ministerios, membros, escalas, eventos, configuracoes.
+            <strong className="text-ink">Admin:</strong> acesso total - ministérios, membros, escalas, eventos, configurações.
           </p>
           <p>
-            <strong className="text-ink">Lider:</strong> gerencia seu ministerio - cria escalas, convida membros, envia mensagens.
+            <strong className="text-ink">Líder:</strong> gerencia seu ministério - cria escalas, convida membros, envia mensagens.
           </p>
           <p>
-            <strong className="text-ink">Membro:</strong> visualiza escalas, confirma presenca, edita perfil.
+            <strong className="text-ink">Membro:</strong> visualiza escalas, confirma presença, edita perfil.
           </p>
         </div>
       </div>
@@ -97,7 +97,7 @@ export default function ConfiguracoesPage() {
       <div className="card p-6">
         <h3 className="font-display text-lg mb-3">Dados</h3>
         <p className="text-sm text-ink-muted">
-          O reset local de demonstracao foi descontinuado, porque os dados agora ficam persistidos no Supabase.
+          O reset local de demonstração foi descontinuado, porque os dados agora ficam persistidos no Supabase.
         </p>
       </div>
     </div>

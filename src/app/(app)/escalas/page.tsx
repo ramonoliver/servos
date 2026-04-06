@@ -142,7 +142,7 @@ export default function EscalasPage() {
                 key={s.id}
                 className="flex flex-col sm:flex-row sm:items-center gap-3.5 px-5 py-3.5 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors group"
               >
-                <Link href={`/escalas/${s.id}`} className="flex items-center gap-3.5 flex-1 min-w-0">
+                <Link href={`/escalas/${s.id}`} className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
                   <div
                     className={`w-12 h-[50px] rounded-[10px] flex flex-col items-center justify-center flex-shrink-0 ${
                       ev?.type === "special" ? "bg-brand-light" : "bg-surface-alt"
@@ -157,14 +157,14 @@ export default function EscalasPage() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium flex flex-wrap items-center gap-2">
+                    <div className="text-sm font-medium flex flex-wrap items-center gap-2 leading-snug">
                       <span className="break-words">{ev?.name || "Escala"}</span>
                       {ev?.type === "special" && <span className="badge badge-brand">Especial</span>}
                       {s.status === "draft" && <span className="badge badge-info">Rascunho</span>}
                       {s.status === "cancelled" && <span className="badge badge-red">Cancelada</span>}
                     </div>
 
-                    <div className="text-[11px] text-ink-faint break-words">
+                    <div className="text-[11px] text-ink-faint break-words leading-relaxed">
                       {formatShortDate(s.date)} &middot; {s.time} &middot; {dept?.name} &middot; {sm.length} escalados
                     </div>
                   </div>
@@ -182,7 +182,7 @@ export default function EscalasPage() {
                 {canDo("schedule.delete") && (
                   <button
                     onClick={() => deleteSchedule(s.id)}
-                    className="btn btn-ghost btn-sm text-danger sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                    className="btn btn-ghost btn-sm text-danger self-start sm:self-auto opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                     title="Excluir"
                   >
                     &#10005;

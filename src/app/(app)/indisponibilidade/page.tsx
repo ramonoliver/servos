@@ -300,7 +300,7 @@ export default function IndisponibilidadePage() {
         <div className="card mb-6 overflow-hidden">
           <div className="px-5 pt-4 pb-3 border-b border-border-soft flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div className="font-display text-[17px]">Calendario do mes</div>
+              <div className="font-display text-[17px]">Calendário do mês</div>
               <div className="text-sm text-ink-muted">
                 Dias de cultos e escalas aparecem destacados. Clique em um dia para registrar indisponibilidade.
               </div>

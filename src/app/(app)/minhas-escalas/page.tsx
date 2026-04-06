@@ -124,7 +124,7 @@ export default function MinhasEscalasPage() {
         return;
       }
 
-      toast("Presenca confirmada! Obrigado por servir.");
+      toast("Presença confirmada! Obrigado por servir.");
       setResponding(null);
       await loadData();
     } catch (error) {
@@ -153,7 +153,7 @@ export default function MinhasEscalasPage() {
         return;
       }
 
-      toast("Ausencia registrada. O lider sera notificado.");
+      toast("Ausência registrada. O líder será notificado.");
       setResponding(null);
       setDeclineReason("");
       await loadData();
@@ -167,10 +167,10 @@ export default function MinhasEscalasPage() {
     <div>
       <div className="mb-6">
         <h1 className="page-title">Minhas Escalas</h1>
-        <p className="page-subtitle">Suas escalas e confirmacoes</p>
+        <p className="page-subtitle">Suas escalas e confirmações</p>
       </div>
 
-      <div className="flex gap-1 mb-5 bg-surface-alt rounded-[10px] p-0.5 w-fit">
+      <div className="flex flex-wrap gap-1 mb-5 bg-surface-alt rounded-[10px] p-0.5 w-fit max-w-full">
         <button
           onClick={() => setTab("upcoming")}
           className={`px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
@@ -179,7 +179,7 @@ export default function MinhasEscalasPage() {
               : "text-ink-muted"
           }`}
         >
-          Proximas ({upcoming.length})
+          Próximas ({upcoming.length})
         </button>
 
         <button
@@ -217,7 +217,7 @@ export default function MinhasEscalasPage() {
             return (
               <div key={sm.id} className="card">
                 <div className="p-5">
-                  <div className="flex items-start gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                     <div className="w-14 h-14 rounded-[14px] bg-surface-alt flex flex-col items-center justify-center flex-shrink-0">
                       <span className="text-[10px] font-bold uppercase text-brand">
                         {getDayName(schedule.date)}
@@ -227,28 +227,28 @@ export default function MinhasEscalasPage() {
                       </span>
                     </div>
 
-                    <div className="flex-1">
-                      <div className="text-base font-semibold">{ev?.name}</div>
-                      <div className="text-[13px] text-ink-muted">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-base font-semibold break-words">{ev?.name}</div>
+                      <div className="text-[13px] text-ink-muted break-words leading-relaxed">
                         {formatDate(schedule.date)} &middot; {schedule.time} &middot; {dept?.name}
                       </div>
-                      <div className="text-[12px] text-ink-faint mt-1">
-                        Funcao: <strong className="text-ink-soft">{sm.function_name || "-"}</strong>
+                      <div className="text-[12px] text-ink-faint mt-1 break-words leading-relaxed">
+                        Função: <strong className="text-ink-soft">{sm.function_name || "-"}</strong>
                       </div>
                       {schedule.arrival_time && (
-                        <div className="text-[12px] text-ink-faint">
+                        <div className="text-[12px] text-ink-faint break-words">
                           Chegada: {schedule.arrival_time}
                         </div>
                       )}
                       {schedule.instructions && (
-                        <div className="text-[12px] text-ink-faint mt-1 italic">
+                        <div className="text-[12px] text-ink-faint mt-1 italic break-words leading-relaxed">
                           {schedule.instructions}
                         </div>
                       )}
                     </div>
 
                     <span
-                      className={`badge ${
+                      className={`badge self-start sm:self-auto ${
                         sm.status === "confirmed"
                           ? "badge-green"
                           : sm.status === "pending"
@@ -301,18 +301,18 @@ export default function MinhasEscalasPage() {
                   )}
 
                   {sm.status === "pending" && tab === "upcoming" && !isResponding && (
-                    <div className="mt-4 pt-3 border-t border-border-soft flex gap-2">
+                    <div className="mt-4 pt-3 border-t border-border-soft flex flex-col lg:flex-row gap-2">
                       <Link href={`/escalas/${schedule.id}`} className="btn btn-secondary">
                         Abrir escala
                       </Link>
                       <button onClick={() => confirm(sm.id)} className="btn btn-green flex-1">
-                        &#10003; Confirmar presenca
+                        &#10003; Confirmar presença
                       </button>
                       <button
                         onClick={() => setResponding(sm.id)}
                         className="btn btn-danger flex-1"
                       >
-                        Nao poderei servir
+                        Não poderei servir
                       </button>
                     </div>
                   )}
@@ -325,11 +325,11 @@ export default function MinhasEscalasPage() {
                           className="input-field min-h-[60px]"
                           value={declineReason}
                           onChange={(e) => setDeclineReason(e.target.value)}
-                          placeholder="Conte o motivo da sua ausencia..."
+                          placeholder="Conte o motivo da sua ausência..."
                         />
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <button
                           onClick={() => {
                             setResponding(null);
@@ -340,7 +340,7 @@ export default function MinhasEscalasPage() {
                           Cancelar
                         </button>
                         <button onClick={() => decline(sm.id)} className="btn btn-danger flex-1">
-                          Confirmar ausencia
+                          Confirmar ausência
                         </button>
                       </div>
                     </div>

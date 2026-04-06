@@ -17,11 +17,11 @@ type OnboardingProgress = {
 
 const STEPS = [
   { id: "welcome", title: "Bem-vindo ao Servos!", subtitle: "Vamos configurar sua igreja em poucos passos." },
-  { id: "church", title: "Sua Igreja", subtitle: "Complete as informacoes da sua igreja." },
-  { id: "department", title: "Primeiro Ministerio", subtitle: "Crie o primeiro ministerio da sua igreja." },
+  { id: "church", title: "Sua Igreja", subtitle: "Complete as informações da sua igreja." },
+  { id: "department", title: "Primeiro Ministério", subtitle: "Crie o primeiro ministério da sua igreja." },
   { id: "invite", title: "Convide Alguem", subtitle: "Traga um lider ou membro para servir com voce." },
   { id: "event", title: "Primeiro Evento", subtitle: "Configure o culto principal da sua igreja." },
-  { id: "done", title: "Tudo pronto!", subtitle: "Seu ministerio esta organizado. Vamos servir." },
+  { id: "done", title: "Tudo pronto!", subtitle: "Seu ministério está organizado. Vamos servir." },
 ] as const;
 
 const DEPT_ICONS = [
@@ -165,7 +165,7 @@ export default function OnboardingPage() {
             id: genId(),
             department_id: deptId,
             user_id: user.id,
-            function_name: "Lider",
+            function_name: "Líder",
             joined_at: new Date().toISOString(),
           });
 
@@ -350,9 +350,9 @@ export default function OnboardingPage() {
           {current.id === "welcome" && (
             <div className="space-y-3 mb-6">
               {[
-                "Criar ministerios",
+                "Criar ministérios",
                 "Montar escalas inteligentes",
-                "Confirmar presenca com 1 toque",
+                "Confirmar presença com 1 toque",
                 "Manter tudo organizado",
               ].map((item, i) => (
                 <div key={i} className="flex items-center gap-3 py-2">
@@ -387,7 +387,7 @@ export default function OnboardingPage() {
           {current.id === "department" && (
             <div className="space-y-4 mb-6">
               <div>
-                <label className="input-label">Nome do ministerio</label>
+                <label className="input-label">Nome do ministério</label>
                 <input
                   className="input-field"
                   placeholder="Ex: Louvor"
@@ -493,7 +493,7 @@ export default function OnboardingPage() {
             <div className="space-y-3 mb-6">
               {[
                 "Igreja configurada",
-                "Ministerio criado",
+                "Ministério criado",
                 inviteName ? `${inviteName} convidado` : "Membro pode ser convidado depois",
                 `${eventName} criado`,
               ].map((item, i) => (

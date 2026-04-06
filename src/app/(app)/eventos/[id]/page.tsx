@@ -38,7 +38,7 @@ export default function EventoDetailPage({ params }: { params: { id: string } })
   }
 
   if (!ev) {
-    return <div className="py-20 text-center text-ink-faint">Evento nao encontrado.</div>;
+    return <div className="py-20 text-center text-ink-faint">Evento não encontrado.</div>;
   }
 
   return (

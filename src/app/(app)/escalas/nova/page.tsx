@@ -169,7 +169,7 @@ export default function NovaEscalaPage() {
 
   async function save(publish: boolean) {
     if (!date || !eventId || !deptId) {
-      toast("Preencha evento, ministerio e data.");
+      toast("Preencha evento, ministério e data.");
       return;
     }
 
@@ -234,7 +234,7 @@ export default function NovaEscalaPage() {
           </div>
 
           <div>
-            <label className="input-label">Ministerio</label>
+            <label className="input-label">Ministério</label>
             <select
               className="input-field"
               value={deptId}
@@ -308,7 +308,7 @@ export default function NovaEscalaPage() {
           </p>
         ) : scored.length === 0 ? (
           <p className="text-sm text-ink-faint py-8 text-center">
-            Nenhum membro neste ministerio.
+            Nenhum membro neste ministério.
           </p>
         ) : (
           <div className="space-y-2">

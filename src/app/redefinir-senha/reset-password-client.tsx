@@ -33,17 +33,17 @@ export default function ResetPasswordClient() {
       const data = await response.json().catch(() => null);
       if (!response.ok) {
         setStatus("error");
-        setMessage(data?.error || "Nao foi possivel redefinir sua senha.");
+        setMessage(data?.error || "Não foi possível redefinir sua senha.");
         return;
       }
 
       setStatus("success");
-      setMessage("Senha redefinida com sucesso. Voce ja pode entrar.");
+      setMessage("Senha redefinida com sucesso. Você já pode entrar.");
       setTimeout(() => router.push("/login"), 1200);
     } catch (error) {
       console.error("Erro ao redefinir senha:", error);
       setStatus("error");
-      setMessage("Nao foi possivel redefinir sua senha.");
+      setMessage("Não foi possível redefinir sua senha.");
     }
   }
 
@@ -56,12 +56,12 @@ export default function ResetPasswordClient() {
         </p>
 
         <div className="rounded-xl border border-brand-light bg-brand-glow px-4 py-3 text-xs text-ink-muted leading-relaxed mb-4">
-          Escolha uma senha facil de lembrar para voce e dificil de adivinhar para outras pessoas.
+          Escolha uma senha fácil de lembrar para você e difícil de adivinhar para outras pessoas.
         </div>
 
         {!token ? (
           <div className="bg-danger-light text-danger text-sm px-4 py-3 rounded-[10px] border border-danger/10">
-            Link invalido. Solicite uma nova redefinicao de senha.
+            Link inválido. Solicite uma nova redefinição de senha.
           </div>
         ) : (
           <>
@@ -85,7 +85,7 @@ export default function ResetPasswordClient() {
                   className="input-field"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Minimo de 6 caracteres"
+                  placeholder="Mínimo de 6 caracteres"
                   minLength={6}
                   required
                 />

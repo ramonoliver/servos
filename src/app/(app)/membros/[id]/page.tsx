@@ -99,7 +99,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
   }
 
   if (!member) {
-    return <div className="py-20 text-center text-ink-faint">Membro nao encontrado.</div>;
+    return <div className="py-20 text-center text-ink-faint">Membro não encontrado.</div>;
   }
 
   const spouse = member.spouse_id ? members.find((m) => m.id === member.spouse_id) : null;
@@ -140,7 +140,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
               : latestInvite.whatsapp_status === "failed"
               ? "Falhou"
               : latestInvite.whatsapp_status === "skipped"
-              ? "Nao configurado"
+              ? "Não configurado"
               : "Pendente",
           tone:
             latestInvite.whatsapp_status === "sent"
@@ -155,7 +155,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
           label: "Abertura do email",
           value: latestInvite.opened_at
             ? `${formatInviteOpenedAt(latestInvite.opened_at)} (${latestInvite.open_count}x)`
-            : "Ainda nao abriu",
+            : "Ainda não abriu",
           tone: latestInvite.opened_at ? "text-success" : "text-ink",
         },
       ]
@@ -179,7 +179,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
 
       if (!response.ok) {
         console.error("Erro ao reenviar convite:", data);
-        toast("Nao foi possivel reenviar o convite.");
+        toast("Não foi possível reenviar o convite.");
         return;
       }
 
@@ -187,7 +187,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
       await loadData();
     } catch (error) {
       console.error("Erro ao reenviar convite:", error);
-      toast("Nao foi possivel reenviar o convite.");
+      toast("Não foi possível reenviar o convite.");
     } finally {
       setResendingInvite(false);
     }
@@ -213,7 +213,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
 
       const data = await response.json().catch(() => null);
       if (!response.ok) {
-        toast(data?.error || "Nao foi possivel remover este membro.");
+        toast(data?.error || "Não foi possível remover este membro.");
         return;
       }
 
@@ -221,7 +221,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
       router.push("/membros");
     } catch (error) {
       console.error("Erro ao remover membro:", error);
-      toast("Nao foi possivel remover este membro.");
+      toast("Não foi possível remover este membro.");
     }
   }
 
@@ -247,7 +247,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
 
               <div className="flex gap-2 mt-2 flex-wrap">
                 <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${roleCls}`}>
-                  {member.role === "admin" ? "Administrador" : member.role === "leader" ? "Lider" : "Membro"}
+                  {member.role === "admin" ? "Administrador" : member.role === "leader" ? "Líder" : "Membro"}
                 </span>
 
                 {spouse && (
@@ -256,11 +256,11 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
                   </span>
                 )}
 
-                {member.must_change_password && <span className="badge badge-amber">Senha temporaria</span>}
+                {member.must_change_password && <span className="badge badge-amber">Senha temporária</span>}
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 sm:ml-auto sm:self-start">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:ml-auto sm:self-start">
               {canDo("member.edit") && (
                 <button onClick={() => setShowEdit(true)} className="btn btn-secondary btn-sm">
                   &#9998; Editar
@@ -281,7 +281,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
 
           <div className="card">
             <div className="px-5 pt-4 pb-3">
-              <span className="font-display text-[17px]">Historico de Escalas</span>
+              <span className="font-display text-[17px]">Histórico de Escalas</span>
             </div>
 
             {allSM.slice(0, 10).map((sm) => {
@@ -322,17 +322,17 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
 
         <div className="space-y-5">
           <div className="card p-5">
-            <div className="font-display text-lg mb-3">Informacoes</div>
+            <div className="font-display text-lg mb-3">Informações</div>
 
             <div className="space-y-2 text-sm">
               {[
                 ["Telefone", member.phone || "-"],
                 ["Escalas", String(member.total_schedules)],
-                ["Confirmacao", member.confirm_rate + "%"],
+                ["Confirmação", member.confirm_rate + "%"],
                 ["Status", member.status],
                 ["Desde", member.joined_at?.split("T")[0] || "-"],
               ].map(([l, v], i) => (
-                <div key={i} className="flex items-center justify-between gap-4 py-1.5 border-t border-border-soft first:border-t-0">
+                <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-4 py-1.5 border-t border-border-soft first:border-t-0">
                   <span className="text-ink-muted">{l}</span>
                   <span className="font-medium text-right break-words">{v}</span>
                 </div>
@@ -342,11 +342,11 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
 
           {member.must_change_password && (
             <div className="card p-5">
-              <div className="flex items-start justify-between gap-4 mb-3">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-3">
                 <div>
                   <div className="font-display text-lg">Acesso e convite</div>
                   <p className="text-sm text-ink-muted">
-                    Acompanhe o ultimo envio e o progresso de abertura.
+                    Acompanhe o último envio e o progresso de abertura.
                   </p>
                 </div>
 
@@ -366,7 +366,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="rounded-xl bg-surface-alt px-4 py-3">
                       <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">
-                        Ultimo envio
+                        Último envio
                       </div>
                       <div className="text-sm font-medium mt-1">
                         {formatInviteDate(latestInvite.sent_at || latestInvite.created_at)}
@@ -390,7 +390,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
                           <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
                             {item.label}
                           </div>
-                          <div className={`text-sm font-medium mt-0.5 ${item.tone}`}>{item.value}</div>
+                          <div className={`text-sm font-medium mt-0.5 break-words ${item.tone}`}>{item.value}</div>
                         </div>
                       </div>
                     ))}
@@ -405,24 +405,24 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
                 </div>
               ) : (
                 <div className="text-sm text-ink-faint">
-                  Nenhum historico de convite encontrado.
+                  Nenhum histórico de convite encontrado.
                 </div>
               )}
             </div>
           )}
 
           <div className="card p-5">
-            <div className="font-display text-lg mb-3">Ministerios</div>
+            <div className="font-display text-lg mb-3">Ministérios</div>
 
             {dms.length === 0 ? (
-              <p className="text-sm text-ink-faint">Nenhum ministerio.</p>
+              <p className="text-sm text-ink-faint">Nenhum ministério.</p>
             ) : (
               dms.map((dm) => {
                 const d = departments.find((dep) => dep.id === dm.department_id);
                 return d ? (
-                  <div key={dm.id} className="flex items-center justify-between gap-3 py-1.5">
+                  <div key={dm.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3 py-1.5">
                     <span className="text-sm font-medium break-words">{d.name}</span>
-                    <span className="text-xs text-ink-faint text-right">{dm.function_name}</span>
+                    <span className="text-xs text-ink-faint text-left sm:text-right break-words">{dm.function_name}</span>
                   </div>
                 ) : null;
               })

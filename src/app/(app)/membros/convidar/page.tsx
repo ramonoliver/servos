@@ -145,7 +145,7 @@ export default function ConvidarMembroPage() {
 
       if (!response.ok) {
         console.error("Erro ao criar convite:", payload || response.statusText);
-        toast(payload?.error || "Nao foi possivel criar o convite.");
+        toast(payload?.error || "Não foi possível criar o convite.");
       } else {
         const delivery = payload?.delivery || null;
         setInviteDelivery(delivery || null);
@@ -163,7 +163,7 @@ export default function ConvidarMembroPage() {
       }
     } catch (err) {
       console.error("Erro ao criar convite:", err);
-      toast("Nao foi possivel criar o convite.");
+      toast("Não foi possível criar o convite.");
     } finally {
       setSubmitting(false);
     }
@@ -185,7 +185,7 @@ export default function ConvidarMembroPage() {
               <span className="text-ink-muted">Email:</span> <strong>{createdEmail}</strong>
             </div>
             <div className="text-sm">
-              <span className="text-ink-muted">Senha temporaria:</span>{" "}
+              <span className="text-ink-muted">Senha temporária:</span>{" "}
               <strong className="text-brand font-mono text-base">{tempPw}</strong>
             </div>
           </div>
@@ -224,7 +224,7 @@ export default function ConvidarMembroPage() {
                   {inviteDelivery?.whatsapp?.status === "sent"
                     ? "Enviado"
                     : inviteDelivery?.whatsapp?.status === "skipped"
-                    ? "Nao configurado"
+                    ? "Não configurado"
                     : "Falhou"}
                 </strong>
               </div>
@@ -334,7 +334,7 @@ export default function ConvidarMembroPage() {
               onChange={(e) => u("role", e.target.value as MemberRole)}
             >
               <option value="member">Membro</option>
-              <option value="leader">Lider</option>
+              <option value="leader">Líder</option>
               <option value="admin">Administrador</option>
             </select>
           </div>

@@ -43,7 +43,7 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
         schedulesError,
         eventsError,
       });
-      toast("Erro ao carregar dados do ministerio.");
+      toast("Erro ao carregar dados do ministério.");
       setLoading(false);
       return;
     }
@@ -105,25 +105,25 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
 
       if (!response.ok) {
         console.error("Erro ao adicionar membro:", data);
-        toast(data?.error || "Erro ao adicionar membro ao ministerio.");
+        toast(data?.error || "Erro ao adicionar membro ao ministério.");
         return;
       }
 
       toast(
         selectedMembers.length === 1
-          ? "Membro adicionado ao ministerio!"
-          : `${selectedMembers.length} membros adicionados ao ministerio!`
+          ? "Membro adicionado ao ministério!"
+          : `${selectedMembers.length} membros adicionados ao ministério!`
       );
       setShowAddMember(false);
       await loadData();
     } catch (error) {
       console.error("Erro ao adicionar membro:", error);
-      toast("Erro ao adicionar membro ao ministerio.");
+      toast("Erro ao adicionar membro ao ministério.");
     }
   }
 
   async function removeMemberFromDept(dmId: string, memberName: string) {
-    if (!confirm(`Remover ${memberName} deste ministerio?`)) return;
+    if (!confirm(`Remover ${memberName} deste ministério?`)) return;
 
     try {
       const params = new URLSearchParams({
@@ -139,24 +139,24 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
 
       if (!response.ok) {
         console.error("Erro ao remover membro:", data);
-        toast(data?.error || "Erro ao remover membro do ministerio.");
+        toast(data?.error || "Erro ao remover membro do ministério.");
         return;
       }
 
-      toast(memberName + " removido do ministerio.");
+      toast(memberName + " removido do ministério.");
       await loadData();
     } catch (error) {
       console.error("Erro ao remover membro:", error);
-      toast("Erro ao remover membro do ministerio.");
+      toast("Erro ao remover membro do ministério.");
     }
   }
 
   if (!dept) {
-    return <div className="py-20 text-center text-ink-faint">Ministerio nao encontrado.</div>;
+    return <div className="py-20 text-center text-ink-faint">Ministério não encontrado.</div>;
   }
 
   if (loading) {
-    return <div className="py-20 text-center text-ink-faint">Carregando ministerio...</div>;
+    return <div className="py-20 text-center text-ink-faint">Carregando ministério...</div>;
   }
 
   return (
@@ -180,17 +180,17 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
               )}
             </div>
 
-            <p className="text-sm text-ink-muted mb-3 break-words">{dept.description || "Sem descricao."}</p>
+            <p className="text-sm text-ink-muted mb-3 break-words">{dept.description || "Sem descrição."}</p>
 
             <div className="flex flex-wrap gap-2">
               {leaders.length > 0 && (
                 <span className="badge badge-brand">
-                  Lider: {(leaders as User[]).map((m) => m.name.split(" ")[0]).join(", ")}
+                  Líder: {(leaders as User[]).map((m) => m.name.split(" ")[0]).join(", ")}
                 </span>
               )}
               {coLeaders.length > 0 && (
                 <span className="badge badge-secondary">
-                  Co-lider: {(coLeaders as User[]).map((m) => m.name.split(" ")[0]).join(", ")}
+                  Co-líder: {(coLeaders as User[]).map((m) => m.name.split(" ")[0]).join(", ")}
                 </span>
               )}
               <span className="badge badge-secondary">{dms.length} membros</span>
@@ -215,12 +215,12 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
       <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_.8fr] gap-6">
         <div className="card">
           <div className="card-header">
-            <h2 className="card-title">Membros do ministerio</h2>
+            <h2 className="card-title">Membros do ministério</h2>
           </div>
 
           {dms.length === 0 ? (
             <div className="px-5 py-12 text-center text-sm text-ink-faint">
-              Nenhum membro neste ministerio.
+              Nenhum membro neste ministério.
             </div>
           ) : (
             dms.map((dm) => {
@@ -251,7 +251,7 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{member.name}</div>
                       <div className="text-[11px] text-ink-faint">
-                        {dm.function_name || "Sem funcao"} · {member.email}
+                        {dm.function_name || "Sem função"} · {member.email}
                       </div>
                     </div>
                   </Link>
@@ -272,7 +272,7 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
 
         <div className="card">
           <div className="card-header">
-            <h2 className="card-title break-words">Proximas escalas</h2>
+            <h2 className="card-title break-words">Próximas escalas</h2>
           </div>
 
           {schedules.length === 0 ? (
@@ -371,13 +371,13 @@ function AddMemberModal({
     >
       <div className="space-y-4">
         <div className="rounded-2xl border border-border-soft bg-surface-alt px-4 py-3 text-sm text-ink-muted">
-          Selecione varios membros de uma vez e ajuste a funcao individual de cada um, se quiser.
+          Selecione vários membros de uma vez e ajuste a função individual de cada um, se quiser.
         </div>
 
         <div className="space-y-3 max-h-[52vh] overflow-y-auto pr-1">
           {availableToAdd.length === 0 ? (
             <div className="text-sm text-ink-faint text-center py-8">
-              Todos os membros ativos ja estao neste ministerio.
+              Todos os membros ativos já estão neste ministério.
             </div>
           ) : (
             availableToAdd.map((member) => {
@@ -411,7 +411,7 @@ function AddMemberModal({
 
                       {selected && (
                         <div className="mt-3">
-                          <label className="input-label">Funcao no ministerio</label>
+                          <label className="input-label">Função no ministério</label>
                           <input
                             className="input-field"
                             value={selectedUsers[member.id]}

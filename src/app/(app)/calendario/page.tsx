@@ -92,16 +92,16 @@ export default function CalendarioPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="page-title">Calendario</h1>
-        <p className="page-subtitle">Veja escalas do mes e abra os detalhes por dia</p>
+        <h1 className="page-title">Calendário</h1>
+        <p className="page-subtitle">Veja escalas do mês e abra os detalhes por dia</p>
       </div>
 
-      <div className="card p-5">
-        <div className="flex items-center justify-between gap-3 mb-4">
+      <div className="card p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-2 sm:gap-3 mb-4">
           <button onClick={() => setMonthOffset((m) => m - 1)} className="btn btn-ghost btn-sm">
             &larr;
           </button>
-          <span className="font-display text-lg capitalize text-center">{monthName}</span>
+          <span className="font-display text-base sm:text-lg capitalize text-center break-words">{monthName}</span>
           <button onClick={() => setMonthOffset((m) => m + 1)} className="btn btn-ghost btn-sm">
             &rarr;
           </button>
@@ -130,7 +130,7 @@ export default function CalendarioPage() {
               <button
                 key={i}
                 onClick={() => setSelectedDay(day === selectedDay ? null : day)}
-                className={`relative aspect-square rounded-lg flex flex-col items-center justify-center text-sm transition-all ${
+                className={`relative aspect-square min-h-[46px] rounded-lg flex flex-col items-center justify-center text-sm transition-all ${
                   isSelected
                     ? "bg-brand text-white"
                     : isToday
@@ -157,7 +157,7 @@ export default function CalendarioPage() {
 
       {selectedDay && (
         <div className="mt-5">
-          <h3 className="font-display text-lg mb-3">Escalas em {selectedDay}/{month + 1}</h3>
+          <h3 className="font-display text-lg mb-3 break-words">Escalas em {selectedDay}/{month + 1}</h3>
 
           {loading ? (
             <div className="card px-5 py-8 text-center text-sm text-ink-faint">Carregando...</div>
@@ -176,12 +176,12 @@ export default function CalendarioPage() {
                   <Link
                     key={s.id}
                     href={`/escalas/${s.id}`}
-                    className="flex items-center gap-3 px-5 py-3 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors"
+                    className="flex items-start sm:items-center gap-3 px-5 py-3 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors"
                   >
                     <span className="text-lg">{ev ? getIconEmoji(ev.icon) : ""}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium break-words">{ev?.name}</div>
-                      <div className="text-[11px] text-ink-faint break-words">
+                      <div className="text-[11px] text-ink-faint break-words leading-relaxed">
                         {s.time} - {dept?.name} - {sm.length} escalados
                       </div>
                     </div>

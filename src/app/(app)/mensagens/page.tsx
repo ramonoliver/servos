@@ -96,7 +96,7 @@ export default function MensagensPage() {
           console.error("Erro ao carregar mensagens:", payload || response.statusText);
           if (!cancelled) {
             setAllMessages([]);
-            toast("Nao foi possivel carregar as mensagens deste ministerio.");
+            toast("Não foi possível carregar as mensagens deste ministério.");
           }
           return;
         }
@@ -108,7 +108,7 @@ export default function MensagensPage() {
         console.error("Erro ao carregar mensagens:", error);
         if (!cancelled) {
           setAllMessages([]);
-          toast("Nao foi possivel carregar as mensagens deste ministerio.");
+          toast("Não foi possível carregar as mensagens deste ministério.");
         }
       } finally {
         if (!cancelled) {
@@ -251,7 +251,7 @@ export default function MensagensPage() {
     <div>
       <div className="mb-6">
         <h1 className="page-title">Mensagens</h1>
-        <p className="page-subtitle">Chat por ministerio</p>
+        <p className="page-subtitle">Chat por ministério</p>
       </div>
 
       <div className="flex gap-1 mb-5 bg-surface-alt rounded-[10px] p-0.5 w-fit max-w-full flex-wrap">
@@ -272,14 +272,14 @@ export default function MensagensPage() {
 
       {!selectedDept && visibleDepartments.length === 0 && (
         <div className="card px-5 py-12 text-center text-sm text-ink-faint">
-          Voce ainda nao participa de nenhum ministerio com chat disponivel.
+          Você ainda não participa de nenhum ministério com chat disponível.
         </div>
       )}
 
       <div className="card flex flex-col" style={{ minHeight: 440 }}>
         <div className="px-5 pt-4 pb-3 border-b border-border-soft flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <div className="font-display text-[15px]">Chat do ministerio</div>
+            <div className="font-display text-[15px] break-words">Chat do ministério</div>
             <div className="text-[11px] text-ink-faint mt-0.5">
               Conversa interna do time selecionado.
             </div>
@@ -326,7 +326,7 @@ export default function MensagensPage() {
                     </div>
 
                     <div
-                      className={`px-3.5 py-2.5 rounded-2xl text-[13px] leading-snug ${
+                      className={`px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed ${
                         isMe
                           ? "bg-brand text-white rounded-br-sm"
                           : "bg-surface-alt text-ink rounded-bl-sm"
@@ -355,12 +355,18 @@ export default function MensagensPage() {
         </div>
 
         <div className="px-5 py-3 border-t border-border-soft flex flex-col sm:flex-row gap-2">
-          <input
+          <textarea
             value={newMsg}
             onChange={(e) => setNewMsg(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && send()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void send();
+              }
+            }}
             placeholder="Digite sua mensagem..."
-            className="input-field flex-1 !rounded-full"
+            rows={1}
+            className="input-field flex-1 min-h-[46px] max-h-36 resize-y sm:resize-none !rounded-[18px]"
           />
           <button onClick={send} disabled={sending || !selectedDept} className="btn btn-primary sm:self-auto">
             {sending ? "..." : "Enviar"}
