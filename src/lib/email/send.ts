@@ -37,7 +37,13 @@ type PasswordResetInput = {
   churchName?: string;
 };
 
-const host = process.env.BREVO_SMTP_HOST || "smtp-relay.brevo.com";
+function normalizeSmtpHost(value?: string) {
+  if (!value) return "smtp-relay.sendinblue.com";
+  if (value === "smtp-relay.brevo.com") return "smtp-relay.sendinblue.com";
+  return value;
+}
+
+const host = normalizeSmtpHost(process.env.BREVO_SMTP_HOST);
 const port = Number(process.env.BREVO_SMTP_PORT || 587);
 const user = process.env.BREVO_SMTP_USER;
 const pass = process.env.BREVO_SMTP_PASS;
@@ -61,6 +67,9 @@ function getTransporter() {
     host,
     port,
     secure: port === 465,
+    tls: {
+      servername: host,
+    },
     auth: {
       user,
       pass,
