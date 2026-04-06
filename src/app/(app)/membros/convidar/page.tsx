@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/hooks/use-app";
+import { formatPhoneInput } from "@/lib/invitations";
 import { supabase } from "@/lib/supabase/client";
-import { generateTempPassword, hashPassword } from "@/lib/auth/password";
-import { genId, getIconEmoji } from "@/lib/utils/helpers";
+import { getIconEmoji } from "@/lib/utils/helpers";
 import type { User } from "@/types";
 
 type MemberRole = "member" | "leader" | "admin";
@@ -48,8 +48,10 @@ export default function ConvidarMembroPage() {
   const [createdName, setCreatedName] = useState("");
   const [createdEmail, setCreatedEmail] = useState("");
   const [inviteDelivery, setInviteDelivery] = useState<InviteDeliveryResult | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const u = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
+  const u = (k: string, v: string) =>
+    setF((p) => ({ ...p, [k]: k === "phone" ? formatPhoneInput(v) : v }));
 
   useEffect(() => {
     async function loadMembers() {
@@ -107,157 +109,67 @@ export default function ConvidarMembroPage() {
   }
 
   async function invite() {
+    if (submitting) return;
+
     if (!f.name.trim() || !f.email.trim()) {
       toast("Preencha nome e email.");
       return;
     }
 
-    const normalizedEmail = f.email.trim().toLowerCase();
-
-    const { data: existingUser, error: existingUserError } = await supabase
-      .from("users")
-      .select("id, email")
-      .eq("email", normalizedEmail)
-      .maybeSingle();
-
-    if (existingUserError) {
-      console.error("Erro ao verificar email:", existingUserError);
-      toast("Erro ao verificar email.");
-      return;
-    }
-
-    if (existingUser) {
-      toast("Email ja cadastrado.");
-      return;
-    }
-
-    const pw = generateTempPassword();
-    const pwHash = hashPassword(pw);
-    const now = new Date().toISOString();
-    const newUserId = genId();
-
-    const { data: newUser, error: newUserError } = await supabase
-      .from("users")
-      .insert({
-        id: newUserId,
-        church_id: user.church_id,
-        email: normalizedEmail,
-        password_hash: pwHash,
-        name: f.name.trim(),
-        phone: f.phone.trim(),
-        role: f.role,
-        status: "active",
-        avatar_color: `hsl(${Math.floor(Math.random() * 360)}, 40%, 55%)`,
-        photo_url: null,
-        spouse_id: f.spouseId || null,
-        availability: [true, true, true, true, true, true, true],
-        total_schedules: 0,
-        confirm_rate: 100,
-        must_change_password: true,
-        last_served_at: null,
-        notes: "",
-        active: true,
-        joined_at: now,
-        created_at: now,
-      })
-      .select()
-      .single();
-
-    if (newUserError || !newUser) {
-      console.error("Erro ao criar usuário:", newUserError);
-      toast("Erro ao criar conta.");
-      return;
-    }
-
-    if (selectedDepartments.length > 0) {
-      const payload = selectedDepartments.map((dept) => ({
-        id: genId(),
-        department_id: dept.department_id,
-        user_id: newUser.id,
-        function_name: dept.function_name.trim(),
-        joined_at: now,
-      }));
-
-      const { error: deptMemberError } = await supabase
-        .from("department_members")
-        .insert(payload);
-
-      if (deptMemberError) {
-        console.error("Erro ao vincular ministérios:", deptMemberError);
-        toast("Usuário criado, mas houve erro ao vincular aos ministerios.");
-        return;
-      }
-    }
-
-    if (f.spouseId) {
-      const { error: spouseUpdateError } = await supabase
-        .from("users")
-        .update({ spouse_id: newUser.id })
-        .eq("id", f.spouseId);
-
-      if (spouseUpdateError) {
-        console.error("Erro ao atualizar cônjuge:", spouseUpdateError);
-      }
-    }
-
-    const { error: notificationError } = await supabase
-      .from("notifications")
-      .insert({
-        id: genId(),
-        user_id: newUser.id,
-        church_id: user.church_id,
-        title: "Bem-vindo ao Servos!",
-        body: "Configure sua disponibilidade e comece a servir.",
-        icon: "wave",
-        type: "welcome",
-        read: false,
-        action_url: "/perfil",
-        created_at: now,
-      });
-
-    if (notificationError) {
-      console.error("Erro ao criar notificação:", notificationError);
-    }
-
     try {
-      const response = await fetch("/api/send-welcome-email", {
+      setSubmitting(true);
+
+      const response = await fetch("/api/member-invitations/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          to: normalizedEmail,
-          phone: f.phone.trim(),
-          memberName: f.name.trim(),
-          churchName: church?.name || "Sua Igreja",
-          tempPassword: pw,
-          userId: newUser.id,
           churchId: user.church_id,
+          churchName: church?.name || "Sua Igreja",
           invitedByUserId: user.id,
+          name: f.name.trim(),
+          email: f.email.trim(),
+          phone: f.phone.trim(),
+          role: f.role,
+          spouseId: f.spouseId,
+          selectedDepartments,
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error("Erro ao enviar email de boas-vindas:", errorData || response.statusText);
-        toast("Membro criado, mas o email de boas-vindas falhou.");
-      } else {
-        const delivery = (await response.json()) as InviteDeliveryResult;
-        setInviteDelivery(delivery);
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            tempPassword?: string;
+            member?: { name: string; email: string };
+            delivery?: InviteDeliveryResult;
+          }
+        | null;
 
-        if (delivery.whatsapp?.status === "failed") {
+      if (!response.ok) {
+        console.error("Erro ao criar convite:", payload || response.statusText);
+        toast(payload?.error || "Nao foi possivel criar o convite.");
+      } else {
+        const delivery = payload?.delivery || null;
+        setInviteDelivery(delivery || null);
+        setCreatedName(payload?.member?.name || f.name.trim());
+        setCreatedEmail(payload?.member?.email || f.email.trim().toLowerCase());
+        setTempPw(payload?.tempPassword || null);
+
+        if (delivery?.whatsapp?.status === "failed") {
           toast("Convite enviado por email, mas o WhatsApp falhou.");
-        } else if (delivery.whatsapp?.status === "skipped") {
+        } else if (delivery?.whatsapp?.status === "skipped") {
           toast("Email enviado. WhatsApp aguardando configuracao.");
+        } else {
+          toast("Convite enviado com sucesso.");
         }
       }
     } catch (err) {
-      console.error("Erro ao enviar email de boas-vindas:", err);
+      console.error("Erro ao criar convite:", err);
+      toast("Nao foi possivel criar o convite.");
+    } finally {
+      setSubmitting(false);
     }
-
-    setCreatedName(f.name.trim());
-    setCreatedEmail(normalizedEmail);
-    setTempPw(pw);
   }
 
   if (tempPw) {
@@ -287,31 +199,41 @@ export default function ConvidarMembroPage() {
 
           <div className="bg-white border border-border-soft rounded-[14px] p-4 text-left mb-5 space-y-2">
             <div className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">
-              Entrega do convite
+              Resumo do envio
             </div>
-            <div className="text-sm flex items-center justify-between gap-3">
-              <span>Email</span>
-              <strong className={inviteDelivery?.email?.status === "sent" ? "text-success" : "text-danger"}>
-                {inviteDelivery?.email?.status === "sent" ? "Enviado" : "Falhou"}
-              </strong>
+            <div className="rounded-xl bg-surface-alt p-3">
+              <div className="text-sm flex items-center justify-between gap-3">
+                <span>Email</span>
+                <strong className={inviteDelivery?.email?.status === "sent" ? "text-success" : "text-danger"}>
+                  {inviteDelivery?.email?.status === "sent" ? "Enviado" : "Falhou"}
+                </strong>
+              </div>
+              {inviteDelivery?.email?.error && (
+                <div className="text-[11px] text-danger mt-1">{inviteDelivery.email.error}</div>
+              )}
             </div>
-            <div className="text-sm flex items-center justify-between gap-3">
-              <span>WhatsApp</span>
-              <strong
-                className={
-                  inviteDelivery?.whatsapp?.status === "sent"
-                    ? "text-success"
+            <div className="rounded-xl bg-surface-alt p-3">
+              <div className="text-sm flex items-center justify-between gap-3">
+                <span>WhatsApp</span>
+                <strong
+                  className={
+                    inviteDelivery?.whatsapp?.status === "sent"
+                      ? "text-success"
+                      : inviteDelivery?.whatsapp?.status === "skipped"
+                      ? "text-amber"
+                      : "text-danger"
+                  }
+                >
+                  {inviteDelivery?.whatsapp?.status === "sent"
+                    ? "Enviado"
                     : inviteDelivery?.whatsapp?.status === "skipped"
-                    ? "text-amber"
-                    : "text-danger"
-                }
-              >
-                {inviteDelivery?.whatsapp?.status === "sent"
-                  ? "Enviado"
-                  : inviteDelivery?.whatsapp?.status === "skipped"
-                  ? "Nao configurado"
-                  : "Falhou"}
-              </strong>
+                    ? "Nao configurado"
+                    : "Falhou"}
+                </strong>
+              </div>
+              {inviteDelivery?.whatsapp?.error && (
+                <div className="text-[11px] text-ink-faint mt-1">{inviteDelivery.whatsapp.error}</div>
+              )}
             </div>
             <div className="text-xs text-ink-faint">
               Tracking de abertura:{" "}
@@ -338,6 +260,25 @@ export default function ConvidarMembroPage() {
 
           <button onClick={() => router.push("/membros")} className="btn btn-primary w-full">
             Concluir
+          </button>
+          <button
+            onClick={() => {
+              setTempPw(null);
+              setCreatedName("");
+              setCreatedEmail("");
+              setInviteDelivery(null);
+              setF({
+                name: "",
+                email: "",
+                phone: "",
+                role: "member",
+                spouseId: "",
+              });
+              setSelectedDepartments([]);
+            }}
+            className="btn btn-ghost w-full mt-2"
+          >
+            Convidar outro membro
           </button>
         </div>
       </div>
@@ -381,7 +322,11 @@ export default function ConvidarMembroPage() {
               value={f.phone}
               onChange={(e) => u("phone", e.target.value)}
               placeholder="(00) 00000-0000"
+              inputMode="numeric"
             />
+            <div className="text-[11px] text-ink-faint mt-1">
+              Usado para envio automatico por WhatsApp quando configurado.
+            </div>
           </div>
 
           <div>
@@ -493,12 +438,30 @@ export default function ConvidarMembroPage() {
           </div>
         </div>
 
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-[12px] border border-border-soft bg-white px-4 py-3">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">Email</div>
+            <div className="text-sm font-medium mt-1">Convite principal</div>
+            <div className="text-[11px] text-ink-faint mt-1">HTML com tracking de abertura</div>
+          </div>
+          <div className="rounded-[12px] border border-border-soft bg-white px-4 py-3">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">WhatsApp</div>
+            <div className="text-sm font-medium mt-1">Envio automatico</div>
+            <div className="text-[11px] text-ink-faint mt-1">Usa telefone do cadastro</div>
+          </div>
+          <div className="rounded-[12px] border border-border-soft bg-white px-4 py-3">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">Reenvio</div>
+            <div className="text-sm font-medium mt-1">Depois na ficha</div>
+            <div className="text-[11px] text-ink-faint mt-1">Gera nova senha temporaria</div>
+          </div>
+        </div>
+
         <div className="flex gap-3 pt-2">
           <button onClick={() => router.back()} className="btn btn-secondary flex-1">
             Cancelar
           </button>
-          <button onClick={invite} className="btn btn-primary flex-1">
-            Criar conta
+          <button onClick={invite} disabled={submitting} className="btn btn-primary flex-1">
+            {submitting ? "Criando..." : "Criar conta"}
           </button>
         </div>
       </div>

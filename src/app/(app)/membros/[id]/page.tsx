@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useApp } from "@/hooks/use-app";
-import { formatInviteOpenedAt } from "@/lib/invitations";
+import { formatInviteDate, formatInviteOpenedAt } from "@/lib/invitations";
 import { supabase } from "@/lib/supabase/client";
 import { getInitials, formatShortDate, genId } from "@/lib/utils/helpers";
 import { MemberEditModal } from "@/components/shared/member-edit-modal";
@@ -107,6 +107,57 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
       : member.role === "leader"
       ? "bg-brand-light text-brand"
       : "bg-success-light text-success";
+
+  const inviteTimeline = latestInvite
+    ? [
+        {
+          label: "Convite enviado",
+          value: formatInviteDate(latestInvite.sent_at || latestInvite.created_at),
+          tone: "text-ink",
+        },
+        {
+          label: "Email",
+          value:
+            latestInvite.email_status === "sent"
+              ? "Entregue"
+              : latestInvite.email_status === "failed"
+              ? "Falhou"
+              : "Pendente",
+          tone:
+            latestInvite.email_status === "sent"
+              ? "text-success"
+              : latestInvite.email_status === "failed"
+              ? "text-danger"
+              : "text-amber",
+        },
+        {
+          label: "WhatsApp",
+          value:
+            latestInvite.whatsapp_status === "sent"
+              ? "Entregue"
+              : latestInvite.whatsapp_status === "failed"
+              ? "Falhou"
+              : latestInvite.whatsapp_status === "skipped"
+              ? "Nao configurado"
+              : "Pendente",
+          tone:
+            latestInvite.whatsapp_status === "sent"
+              ? "text-success"
+              : latestInvite.whatsapp_status === "failed"
+              ? "text-danger"
+              : latestInvite.whatsapp_status === "skipped"
+              ? "text-amber"
+              : "text-ink",
+        },
+        {
+          label: "Abertura do email",
+          value: latestInvite.opened_at
+            ? `${formatInviteOpenedAt(latestInvite.opened_at)} (${latestInvite.open_count}x)`
+            : "Ainda nao abriu",
+          tone: latestInvite.opened_at ? "text-success" : "text-ink",
+        },
+      ]
+    : [];
 
   async function resendInvite() {
     setResendingInvite(true);
@@ -255,9 +306,9 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
             <div className="card p-5">
               <div className="flex items-start justify-between gap-4 mb-3">
                 <div>
-                  <div className="font-display text-lg">Convite</div>
+                  <div className="font-display text-lg">Acesso e convite</div>
                   <p className="text-sm text-ink-muted">
-                    Status do ultimo envio para este membro.
+                    Acompanhe o ultimo envio e o progresso de abertura.
                   </p>
                 </div>
 
@@ -273,43 +324,46 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
               </div>
 
               {latestInvite ? (
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between gap-4">
-                    <span className="text-ink-muted">Email</span>
-                    <strong className={latestInvite.email_status === "sent" ? "text-success" : "text-danger"}>
-                      {latestInvite.email_status === "sent" ? "Enviado" : "Falhou"}
-                    </strong>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-surface-alt px-4 py-3">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">
+                        Ultimo envio
+                      </div>
+                      <div className="text-sm font-medium mt-1">
+                        {formatInviteDate(latestInvite.sent_at || latestInvite.created_at)}
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-surface-alt px-4 py-3">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">
+                        Aberturas
+                      </div>
+                      <div className="text-sm font-medium mt-1">
+                        {latestInvite.open_count} {latestInvite.open_count === 1 ? "abertura" : "aberturas"}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-ink-muted">WhatsApp</span>
-                    <strong
-                      className={
-                        latestInvite.whatsapp_status === "sent"
-                          ? "text-success"
-                          : latestInvite.whatsapp_status === "skipped"
-                          ? "text-amber"
-                          : latestInvite.whatsapp_status === "failed"
-                          ? "text-danger"
-                          : "text-ink"
-                      }
-                    >
-                      {latestInvite.whatsapp_status === "sent"
-                        ? "Enviado"
-                        : latestInvite.whatsapp_status === "skipped"
-                        ? "Nao configurado"
-                        : latestInvite.whatsapp_status === "failed"
-                        ? "Falhou"
-                        : "Pendente"}
-                    </strong>
+
+                  <div className="space-y-3">
+                    {inviteTimeline.map((item) => (
+                      <div key={item.label} className="flex gap-3">
+                        <div className="w-2.5 h-2.5 rounded-full bg-brand mt-1.5 shrink-0" />
+                        <div className="flex-1 border-b border-border-soft pb-3 last:border-b-0 last:pb-0">
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+                            {item.label}
+                          </div>
+                          <div className={`text-sm font-medium mt-0.5 ${item.tone}`}>{item.value}</div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-ink-muted">Abertura do email</span>
-                    <strong className="text-ink">
-                      {latestInvite.opened_at
-                        ? `${formatInviteOpenedAt(latestInvite.opened_at)} (${latestInvite.open_count}x)`
-                        : "Ainda nao abriu"}
-                    </strong>
-                  </div>
+
+                  {(latestInvite.email_error || latestInvite.whatsapp_error) && (
+                    <div className="rounded-xl border border-amber/20 bg-amber-light px-4 py-3 text-xs text-amber">
+                      {latestInvite.email_error && <div>Email: {latestInvite.email_error}</div>}
+                      {latestInvite.whatsapp_error && <div>WhatsApp: {latestInvite.whatsapp_error}</div>}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-sm text-ink-faint">

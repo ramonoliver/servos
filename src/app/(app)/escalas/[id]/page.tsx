@@ -24,13 +24,10 @@ type ScheduleChat = {
   created_at: string;
 };
 
-function isMissingRelationError(error: unknown) {
-  if (!error || typeof error !== "object") return false;
-  const maybeError = error as { code?: string; message?: string };
-  return (
-    maybeError.code === "42P01" ||
-    maybeError.message?.toLowerCase().includes("schedule_chats") === true
-  );
+function isChatInfrastructureError(errorMessage?: string | null) {
+  if (!errorMessage) return false;
+  const normalized = errorMessage.toLowerCase();
+  return normalized.includes("schedule_chats") || normalized.includes("relation");
 }
 
 export default function EscalaDetailPage({ params }: { params: { id: string } }) {
@@ -112,12 +109,6 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
       return;
     }
 
-    const { data: chatsData, error: chatsError } = await supabase
-      .from("schedule_chats")
-      .select("*")
-      .eq("schedule_id", scheduleData.id)
-      .order("created_at", { ascending: true });
-
     setSchedule(scheduleData as Schedule);
     setEv((eventData || null) as Event | null);
     setSm((smData || []) as ScheduleMember[]);
@@ -126,16 +117,30 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
     setAllUD((unavailableData || []) as UnavailableDate[]);
     setAllSchedules((allSchedulesData || []) as Schedule[]);
     setAllSM((allSMData || []) as ScheduleMember[]);
-    if (chatsError) {
-      console.error("Erro ao carregar chat da escala:", chatsError);
+    try {
+      const response = await fetch(
+        `/api/schedule-chats?scheduleId=${encodeURIComponent(scheduleData.id)}&churchId=${encodeURIComponent(user.church_id)}`
+      );
+      const payload = (await response.json().catch(() => null)) as
+        | { messages?: ScheduleChat[]; error?: string }
+        | null;
+
+      if (!response.ok) {
+        console.error("Erro ao carregar chat da escala:", payload || response.statusText);
+        setChatAvailable(false);
+        setChatMessages([]);
+        if (!isChatInfrastructureError(payload?.error)) {
+          toast("Nao foi possivel carregar o chat desta escala.");
+        }
+      } else {
+        setChatAvailable(true);
+        setChatMessages(payload?.messages || []);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar chat da escala:", error);
       setChatAvailable(false);
       setChatMessages([]);
-      if (!isMissingRelationError(chatsError)) {
-        toast("Nao foi possivel carregar o chat desta escala.");
-      }
-    } else {
-      setChatAvailable(true);
-      setChatMessages((chatsData || []) as ScheduleChat[]);
+      toast("Nao foi possivel carregar o chat desta escala.");
     }
     setLoading(false);
   }
@@ -278,17 +283,38 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
 
     setSendingChat(true);
 
-    const { error } = await supabase.from("schedule_chats").insert({
-      id: genId(),
-      schedule_id: schedule.id,
-      sender_id: user.id,
-      content: text,
-      created_at: new Date().toISOString(),
-    });
+    try {
+      const response = await fetch("/api/schedule-chats", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          scheduleId: schedule.id,
+          churchId: user.church_id,
+          senderId: user.id,
+          content: text,
+        }),
+      });
 
-    if (error) {
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+
+      if (!response.ok) {
+        console.error("Erro ao enviar mensagem:", payload || response.statusText);
+        if (isChatInfrastructureError(payload?.error)) {
+          setChatAvailable(false);
+          toast("O chat desta escala ainda nao foi habilitado no banco.");
+        } else {
+          toast("Erro ao enviar mensagem no chat.");
+        }
+        setSendingChat(false);
+        return;
+      }
+    } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
-      if (isMissingRelationError(error)) {
+      if (error instanceof Error && isChatInfrastructureError(error.message)) {
         setChatAvailable(false);
         toast("O chat desta escala ainda nao foi habilitado no banco.");
       } else {
