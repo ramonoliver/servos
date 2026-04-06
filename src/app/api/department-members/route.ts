@@ -1,20 +1,25 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiActor } from "@/lib/auth/api-session";
 import { can } from "@/lib/auth/permissions";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { genId } from "@/lib/utils/helpers";
 
 const postSchema = z.object({
-  actorId: z.string().min(1),
-  churchId: z.string().min(1),
   departmentId: z.string().min(1),
-  userId: z.string().min(1),
+  userId: z.string().min(1).optional(),
   functionName: z.string().default(""),
+  members: z
+    .array(
+      z.object({
+        userId: z.string().min(1),
+        functionName: z.string().default(""),
+      })
+    )
+    .default([]),
 });
 
 const deleteSchema = z.object({
-  actorId: z.string().min(1),
-  churchId: z.string().min(1),
   departmentId: z.string().min(1),
   departmentMemberId: z.string().min(1),
 });
@@ -62,7 +67,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Dados invalidos para adicionar membro." }, { status: 400 });
     }
 
-    const { actorId, churchId, departmentId, userId, functionName } = parsed.data;
+    const { session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+
+    const actorId = session!.user_id;
+    const churchId = session!.church_id;
+    const { departmentId, userId, functionName, members } = parsed.data;
     const supabase = getSupabaseServerClient();
 
     const allowed = await canManageDepartmentMember({ actorId, churchId, departmentId });
@@ -70,40 +80,56 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Sem permissao para alterar este ministerio." }, { status: 403 });
     }
 
-    const [{ data: member, error: memberError }, { data: existingLink, error: existingLinkError }] =
+    const normalizedMembers =
+      members.length > 0
+        ? members
+        : userId
+        ? [{ userId, functionName }]
+        : [];
+
+    if (normalizedMembers.length === 0) {
+      return NextResponse.json({ error: "Nenhum membro informado." }, { status: 400 });
+    }
+
+    const uniqueUserIds = [...new Set(normalizedMembers.map((item) => item.userId))];
+    const [{ data: foundMembers, error: membersError }, { data: existingLinks, error: existingLinksError }] =
       await Promise.all([
         supabase
           .from("users")
           .select("id, church_id, active")
-          .eq("id", userId)
+          .in("id", uniqueUserIds)
           .eq("church_id", churchId)
-          .maybeSingle(),
+          .eq("active", true),
         supabase
           .from("department_members")
-          .select("id")
+          .select("id, user_id")
           .eq("department_id", departmentId)
-          .eq("user_id", userId)
-          .maybeSingle(),
+          .in("user_id", uniqueUserIds),
       ]);
 
-    if (memberError) throw memberError;
-    if (existingLinkError) throw existingLinkError;
+    if (membersError) throw membersError;
+    if (existingLinksError) throw existingLinksError;
 
-    if (!member?.active) {
-      return NextResponse.json({ error: "Membro nao encontrado." }, { status: 404 });
+    const activeMemberIds = new Set((foundMembers || []).map((member) => member.id));
+    const linkedUserIds = new Set((existingLinks || []).map((link) => link.user_id));
+
+    if (uniqueUserIds.some((id) => !activeMemberIds.has(id))) {
+      return NextResponse.json({ error: "Um dos membros selecionados nao foi encontrado." }, { status: 404 });
     }
 
-    if (existingLink) {
-      return NextResponse.json({ error: "Este membro ja esta no ministerio." }, { status: 409 });
+    if (uniqueUserIds.some((id) => linkedUserIds.has(id))) {
+      return NextResponse.json({ error: "Um dos membros selecionados ja esta no ministerio." }, { status: 409 });
     }
 
-    const { error } = await supabase.from("department_members").insert({
-      id: genId(),
-      department_id: departmentId,
-      user_id: userId,
-      function_name: functionName.trim(),
-      joined_at: new Date().toISOString(),
-    });
+    const { error } = await supabase.from("department_members").insert(
+      normalizedMembers.map((item) => ({
+        id: genId(),
+        department_id: departmentId,
+        user_id: item.userId,
+        function_name: item.functionName.trim(),
+        joined_at: new Date().toISOString(),
+      }))
+    );
 
     if (error) throw error;
 
@@ -121,8 +147,6 @@ export async function DELETE(req: Request) {
   try {
     const url = new URL(req.url);
     const parsed = deleteSchema.safeParse({
-      actorId: url.searchParams.get("actorId"),
-      churchId: url.searchParams.get("churchId"),
       departmentId: url.searchParams.get("departmentId"),
       departmentMemberId: url.searchParams.get("departmentMemberId"),
     });
@@ -131,7 +155,12 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Dados invalidos para remover membro." }, { status: 400 });
     }
 
-    const { actorId, churchId, departmentId, departmentMemberId } = parsed.data;
+    const { session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+
+    const actorId = session!.user_id;
+    const churchId = session!.church_id;
+    const { departmentId, departmentMemberId } = parsed.data;
     const supabase = getSupabaseServerClient();
 
     const allowed = await canManageDepartmentMember({ actorId, churchId, departmentId });

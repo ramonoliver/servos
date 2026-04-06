@@ -1,18 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiSession } from "@/lib/auth/api-session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { genId } from "@/lib/utils/helpers";
 
 const getSchema = z.object({
   departmentId: z.string().min(1),
-  churchId: z.string().min(1),
-  viewerId: z.string().min(1),
 });
 
 const postSchema = z.object({
   departmentId: z.string().min(1),
-  churchId: z.string().min(1),
-  senderId: z.string().min(1),
   content: z.string().trim().min(1).max(2000),
 });
 
@@ -58,21 +55,23 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const parsed = getSchema.safeParse({
       departmentId: url.searchParams.get("departmentId"),
-      churchId: url.searchParams.get("churchId"),
-      viewerId: url.searchParams.get("viewerId"),
     });
 
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid query params." }, { status: 400 });
     }
 
-    const { departmentId, churchId, viewerId } = parsed.data;
+    const { session, errorResponse } = requireApiSession(req);
+    if (!session) return errorResponse!;
+
+    const { departmentId } = parsed.data;
+    const churchId = session.church_id;
     const supabase = getSupabaseServerClient();
 
     const canAccess = await canAccessDepartmentMessages({
       departmentId,
       churchId,
-      userId: viewerId,
+      userId: session.user_id,
     });
 
     if (!canAccess) {
@@ -106,7 +105,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
     }
 
-    const { departmentId, churchId, senderId, content } = parsed.data;
+    const { session, errorResponse } = requireApiSession(req);
+    if (!session) return errorResponse!;
+
+    const { departmentId, content } = parsed.data;
+    const churchId = session.church_id;
+    const senderId = session.user_id;
     const supabase = getSupabaseServerClient();
 
     const canAccess = await canAccessDepartmentMessages({

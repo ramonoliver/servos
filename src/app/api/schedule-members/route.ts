@@ -1,19 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiActor } from "@/lib/auth/api-session";
 import { can } from "@/lib/auth/permissions";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { genId } from "@/lib/utils/helpers";
 
 const postSchema = z.object({
-  actorId: z.string().min(1),
-  churchId: z.string().min(1),
   scheduleId: z.string().min(1),
   userId: z.string().min(1),
 });
 
 const deleteSchema = z.object({
-  actorId: z.string().min(1),
-  churchId: z.string().min(1),
   scheduleId: z.string().min(1),
   scheduleMemberId: z.string().min(1),
 });
@@ -21,16 +18,12 @@ const deleteSchema = z.object({
 const patchSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("respond"),
-    actorId: z.string().min(1),
-    churchId: z.string().min(1),
     scheduleMemberId: z.string().min(1),
     status: z.enum(["confirmed", "declined"]),
     declineReason: z.string().default(""),
   }),
   z.object({
     action: z.literal("substitute"),
-    actorId: z.string().min(1),
-    churchId: z.string().min(1),
     scheduleId: z.string().min(1),
     declinedScheduleMemberId: z.string().min(1),
     substituteId: z.string().min(1),
@@ -98,7 +91,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Dados invalidos para adicionar membro a escala." }, { status: 400 });
     }
 
-    const { actorId, churchId, scheduleId, userId } = parsed.data;
+    const { session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+
+    const actorId = session!.user_id;
+    const churchId = session!.church_id;
+    const { scheduleId, userId } = parsed.data;
     const supabase = getSupabaseServerClient();
     const { allowed, schedule } = await canManageSchedule({ actorId, churchId, scheduleId });
 
@@ -170,8 +168,6 @@ export async function DELETE(req: Request) {
   try {
     const url = new URL(req.url);
     const parsed = deleteSchema.safeParse({
-      actorId: url.searchParams.get("actorId"),
-      churchId: url.searchParams.get("churchId"),
       scheduleId: url.searchParams.get("scheduleId"),
       scheduleMemberId: url.searchParams.get("scheduleMemberId"),
     });
@@ -180,7 +176,12 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Dados invalidos para remover membro da escala." }, { status: 400 });
     }
 
-    const { actorId, churchId, scheduleId, scheduleMemberId } = parsed.data;
+    const { session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+
+    const actorId = session!.user_id;
+    const churchId = session!.church_id;
+    const { scheduleId, scheduleMemberId } = parsed.data;
     const supabase = getSupabaseServerClient();
     const { allowed } = await canManageSchedule({ actorId, churchId, scheduleId });
 
@@ -214,9 +215,13 @@ export async function PATCH(req: Request) {
     }
 
     const supabase = getSupabaseServerClient();
+    const { session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
 
     if (parsed.data.action === "respond") {
-      const { actorId, churchId, scheduleMemberId, status, declineReason } = parsed.data;
+      const actorId = session!.user_id;
+      const churchId = session!.church_id;
+      const { scheduleMemberId, status, declineReason } = parsed.data;
       const { data: scheduleMember, error: scheduleMemberError } = await supabase
         .from("schedule_members")
         .select("id, user_id")
@@ -257,7 +262,9 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ success: true });
     }
 
-    const { actorId, churchId, scheduleId, declinedScheduleMemberId, substituteId } = parsed.data;
+    const actorId = session!.user_id;
+    const churchId = session!.church_id;
+    const { scheduleId, declinedScheduleMemberId, substituteId } = parsed.data;
     const { allowed, schedule } = await canManageSchedule({ actorId, churchId, scheduleId });
 
     if (!allowed || !schedule) {

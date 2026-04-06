@@ -22,8 +22,6 @@ export default function ConfiguracoesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          actorId: user.id,
-          churchId: church.id,
           name: churchName.trim(),
           city: churchCity.trim(),
         }),
@@ -48,9 +46,10 @@ export default function ConfiguracoesPage() {
   }
 
   return (
-    <div className="max-w-[600px]">
+    <div className="max-w-[720px]">
       <div className="mb-6">
         <h1 className="page-title">Configuracoes</h1>
+        <p className="page-subtitle">Ajustes gerais da igreja e orientacoes de uso</p>
       </div>
 
       <div className="card p-6 mb-5">
@@ -74,7 +73,7 @@ export default function ConfiguracoesPage() {
             />
           </div>
 
-          <button onClick={saveChurch} disabled={saving} className="btn btn-primary btn-sm">
+          <button onClick={saveChurch} disabled={saving} className="btn btn-primary btn-sm w-full sm:w-auto">
             {saving ? "Salvando..." : "Salvar"}
           </button>
         </div>

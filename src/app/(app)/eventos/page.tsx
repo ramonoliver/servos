@@ -56,8 +56,6 @@ export default function EventosPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: "delete",
-          actorId: user.id,
-          churchId: user.church_id,
           eventId: ev.id,
         }),
       });
@@ -80,13 +78,13 @@ export default function EventosPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="page-title">Eventos</h1>
           <p className="page-subtitle">Cultos e eventos especiais</p>
         </div>
         {canDo("event.create") && (
-          <button onClick={() => setModal({ type: "form" })} className="btn btn-primary">
+          <button onClick={() => setModal({ type: "form" })} className="btn btn-primary self-start sm:self-auto">
             + Novo
           </button>
         )}
@@ -106,36 +104,38 @@ export default function EventosPage() {
                 section.list.map((e) => (
                   <div
                     key={e.id}
-                    className="flex items-center gap-3 px-5 py-3 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors group"
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-3 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors group"
                   >
                     <span className="text-xl">{getIconEmoji(e.icon)}</span>
 
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">{e.name}</div>
-                      {e.description && <div className="text-[11px] text-ink-faint">{e.description}</div>}
-                      {e.location && <div className="text-[11px] text-ink-faint">{e.location}</div>}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium break-words">{e.name}</div>
+                      {e.description && <div className="text-[11px] text-ink-faint break-words">{e.description}</div>}
+                      {e.location && <div className="text-[11px] text-ink-faint break-words">{e.location}</div>}
                     </div>
 
-                    <span className={`badge ${e.type === "recurring" ? "badge-green" : "badge-brand"}`}>
-                      {e.type === "recurring" ? "Recorrente" : "Especial"}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                      <span className={`badge ${e.type === "recurring" ? "badge-green" : "badge-brand"}`}>
+                        {e.type === "recurring" ? "Recorrente" : "Especial"}
+                      </span>
 
-                    {canDo("event.edit") && (
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => setModal({ type: "form", ev: e })}
-                          className="btn btn-ghost btn-sm"
-                        >
-                          &#9998;
-                        </button>
-                        <button
-                          onClick={() => setModal({ type: "delete", ev: e })}
-                          className="btn btn-ghost btn-sm text-danger"
-                        >
-                          &#10005;
-                        </button>
-                      </div>
-                    )}
+                      {canDo("event.edit") && (
+                        <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => setModal({ type: "form", ev: e })}
+                            className="btn btn-ghost btn-sm"
+                          >
+                            &#9998;
+                          </button>
+                          <button
+                            onClick={() => setModal({ type: "delete", ev: e })}
+                            className="btn btn-ghost btn-sm text-danger"
+                          >
+                            &#10005;
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))
               )}
@@ -147,8 +147,6 @@ export default function EventosPage() {
       {modal?.type === "form" && (
         <EventForm
           ev={(modal as any).ev}
-          userId={user.id}
-          churchId={user.church_id}
           toast={toast}
           close={() => setModal(null)}
           onSaved={async () => {
@@ -184,15 +182,11 @@ export default function EventosPage() {
 
 function EventForm({
   ev,
-  userId,
-  churchId,
   toast,
   close,
   onSaved,
 }: {
   ev?: Event;
-  userId: string;
-  churchId: string;
   toast: (msg: string) => void;
   close: () => void;
   onSaved: () => Promise<void>;
@@ -232,8 +226,6 @@ function EventForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: isEdit ? "update" : "create",
-          actorId: userId,
-          churchId,
           eventId: ev?.id,
           data,
         }),

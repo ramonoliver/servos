@@ -58,8 +58,6 @@ export default function NotificacoesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          actorId: user.id,
-          churchId: user.church_id,
           notificationIds: unreadIds,
         }),
       });
@@ -90,8 +88,6 @@ export default function NotificacoesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          actorId: user.id,
-          churchId: user.church_id,
           notificationIds: [id],
         }),
       });
@@ -112,14 +108,14 @@ export default function NotificacoesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 className="page-title">Notificacoes</h1>
 
         {hasUnread && (
           <button
             onClick={markAllRead}
             disabled={markingAll}
-            className="btn btn-secondary btn-sm"
+            className="btn btn-secondary btn-sm self-start sm:self-auto"
           >
             {markingAll ? "Marcando..." : "Marcar todas como lidas"}
           </button>
@@ -153,7 +149,7 @@ export default function NotificacoesPage() {
                   Servos
                 </span>
                 {!n.read && <span className="w-2 h-2 rounded-full bg-brand" />}
-                <span className="text-[10px] text-ink-faint ml-auto">
+                <span className="text-[10px] text-ink-faint ml-auto text-right shrink-0">
                   {new Date(n.created_at).toLocaleDateString("pt-BR", {
                     day: "2-digit",
                     month: "2-digit",
@@ -163,8 +159,8 @@ export default function NotificacoesPage() {
                 </span>
               </div>
 
-              <div className="text-[13px] font-semibold mb-0.5">{n.title}</div>
-              <div className="text-xs text-ink-muted leading-relaxed">{n.body}</div>
+              <div className="text-[13px] font-semibold mb-0.5 break-words">{n.title}</div>
+              <div className="text-xs text-ink-muted leading-relaxed break-words">{n.body}</div>
             </Link>
           ))}
         </div>

@@ -90,12 +90,23 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              <div className="mt-2 text-right">
+                <Link href="/esqueci-senha" className="text-xs font-semibold text-brand hover:underline">
+                  Esqueci minha senha
+                </Link>
+              </div>
             </div>
 
             <button type="submit" disabled={loading} className="btn btn-primary w-full py-3 text-base">
               {loading ? "Entrando..." : "Entrar"}
             </button>
           </form>
+
+          <div className="mt-4 rounded-xl border border-brand-light bg-brand-glow px-4 py-3">
+            <p className="text-xs text-ink-muted leading-relaxed">
+              Se esqueceu a senha, use o link de redefinicao. Se recebeu um convite novo, entre com a senha enviada e troque em seguida no perfil.
+            </p>
+          </div>
 
           <div className="flex items-center gap-4 my-5">
             <div className="flex-1 h-px bg-border-soft" />

@@ -1,18 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiSession } from "@/lib/auth/api-session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { genId } from "@/lib/utils/helpers";
 
 const getSchema = z.object({
   scheduleId: z.string().min(1),
-  churchId: z.string().min(1),
-  viewerId: z.string().min(1),
 });
 
 const postSchema = z.object({
   scheduleId: z.string().min(1),
-  churchId: z.string().min(1),
-  senderId: z.string().min(1),
   content: z.string().trim().min(1).max(2000),
 });
 
@@ -63,15 +60,17 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const parsed = getSchema.safeParse({
       scheduleId: url.searchParams.get("scheduleId"),
-      churchId: url.searchParams.get("churchId"),
-      viewerId: url.searchParams.get("viewerId"),
     });
 
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid query params." }, { status: 400 });
     }
 
-    const { scheduleId, churchId, viewerId } = parsed.data;
+    const { session, errorResponse } = requireApiSession(req);
+    if (!session) return errorResponse!;
+
+    const { scheduleId } = parsed.data;
+    const churchId = session.church_id;
     const supabase = getSupabaseServerClient();
 
     const allowed = await ensureScheduleBelongsToChurch(scheduleId, churchId);
@@ -79,7 +78,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Schedule not found." }, { status: 404 });
     }
 
-    const canAccess = await canAccessScheduleChat({ scheduleId, churchId, userId: viewerId });
+    const canAccess = await canAccessScheduleChat({ scheduleId, churchId, userId: session.user_id });
     if (!canAccess) {
       return NextResponse.json({ error: "Forbidden." }, { status: 403 });
     }
@@ -111,7 +110,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid payload." }, { status: 400 });
     }
 
-    const { scheduleId, churchId, senderId, content } = parsed.data;
+    const { session, errorResponse } = requireApiSession(req);
+    if (!session) return errorResponse!;
+
+    const { scheduleId, content } = parsed.data;
+    const churchId = session.church_id;
+    const senderId = session.user_id;
     const supabase = getSupabaseServerClient();
 
     const [scheduleResult, senderResult] = await Promise.all([

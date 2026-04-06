@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiActor } from "@/lib/auth/api-session";
 import { can } from "@/lib/auth/permissions";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({
-  actorId: z.string().min(1),
-  churchId: z.string().min(1),
   name: z.string().trim().min(1),
   city: z.string().trim().default(""),
 });
@@ -17,17 +16,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Dados invalidos para atualizar a igreja." }, { status: 400 });
     }
 
-    const { actorId, churchId, name, city } = parsed.data;
+    const { actor, session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+
+    const churchId = session!.church_id;
+    const { name, city } = parsed.data;
     const supabase = getSupabaseServerClient();
-
-    const { data: actor, error: actorError } = await supabase
-      .from("users")
-      .select("id, role, church_id, active")
-      .eq("id", actorId)
-      .eq("church_id", churchId)
-      .maybeSingle();
-
-    if (actorError) throw actorError;
     if (!actor?.active || !can(actor.role, "settings.edit")) {
       return NextResponse.json({ error: "Sem permissao para atualizar configuracoes." }, { status: 403 });
     }

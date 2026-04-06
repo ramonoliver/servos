@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { requireApiActor } from "@/lib/auth/api-session";
+import { can } from "@/lib/auth/permissions";
 import { generateTempPassword, hashPassword } from "@/lib/auth/password";
 import { deliverMemberInvitation } from "@/lib/server/member-invitations";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
@@ -6,23 +8,28 @@ import type { User } from "@/types";
 
 type ResendInviteBody = {
   userId?: string;
-  churchId?: string;
-  churchName?: string;
-  invitedByUserId?: string;
 };
 
 export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => ({}))) as ResendInviteBody;
-    const { userId, churchId, churchName, invitedByUserId } = body;
+    const { userId } = body;
 
-    if (!userId || !churchId || !churchName) {
+    if (!userId) {
       return NextResponse.json(
-        { error: "userId, churchId and churchName are required." },
+        { error: "userId is required." },
         { status: 400 }
       );
     }
 
+    const { actor, session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+    if (!actor?.active || !can(actor.role, "member.invite")) {
+      return NextResponse.json({ error: "Sem permissao para reenviar convites." }, { status: 403 });
+    }
+
+    const churchId = session!.church_id;
+    const invitedByUserId = session!.user_id;
     const supabase = getSupabaseServerClient();
     const { data: member, error: memberError } = await supabase
       .from("users")
@@ -35,6 +42,17 @@ export async function POST(req: Request) {
 
     if (!member) {
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
+    }
+
+    const { data: church, error: churchError } = await supabase
+      .from("churches")
+      .select("id, name")
+      .eq("id", churchId)
+      .maybeSingle();
+
+    if (churchError) throw churchError;
+    if (!church) {
+      return NextResponse.json({ error: "Church not found." }, { status: 404 });
     }
 
     const typedMember = member as User;
@@ -54,7 +72,7 @@ export async function POST(req: Request) {
       to: typedMember.email,
       phone: typedMember.phone || "",
       memberName: typedMember.name,
-      churchName,
+      churchName: church.name,
       tempPassword,
       userId: typedMember.id,
       churchId,

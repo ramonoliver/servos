@@ -12,6 +12,18 @@ const bodySchema = z.object({
   phone: z.string().default(""),
   password: z.string().min(6),
   churchName: z.string().trim().min(1),
+  weeklyServices: z
+    .array(
+      z.object({
+        day: z.string().min(1),
+        time: z.string().min(1),
+      })
+    )
+    .min(1)
+    .default([
+      { day: "0", time: "18:00" },
+      { day: "3", time: "19:30" },
+    ]),
 });
 
 export async function POST(req: Request) {
@@ -21,7 +33,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Dados invalidos para criar conta." }, { status: 400 });
     }
 
-    const { name, email, phone, password, churchName } = parsed.data;
+    const { name, email, phone, password, churchName, weeklyServices } = parsed.data;
     const supabase = getSupabaseServerClient();
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -87,36 +99,21 @@ export async function POST(req: Request) {
       throw userError || new Error("Falha ao criar usuario.");
     }
 
-    const initialEvents = [
-      {
-        id: genId(),
-        church_id: church.id,
-        name: "Culto de Domingo",
-        description: "",
-        type: "recurring",
-        icon: "church",
-        location: "",
-        base_time: "18:00",
-        instructions: "",
-        recurrence: "weekly",
-        active: true,
-        created_at: now,
-      },
-      {
-        id: genId(),
-        church_id: church.id,
-        name: "Culto de Quarta",
-        description: "",
-        type: "recurring",
-        icon: "church",
-        location: "",
-        base_time: "19:30",
-        instructions: "",
-        recurrence: "weekly",
-        active: true,
-        created_at: now,
-      },
-    ];
+    const dayLabels = ["Domingo", "Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"];
+    const initialEvents = weeklyServices.map((service) => ({
+      id: genId(),
+      church_id: church.id,
+      name: `Culto de ${dayLabels[Number(service.day)] || "Culto"}`,
+      description: "",
+      type: "recurring" as const,
+      icon: "church",
+      location: "",
+      base_time: service.time,
+      instructions: "",
+      recurrence: `weekly:${service.day}`,
+      active: true,
+      created_at: now,
+    }));
 
     const { error: eventsError } = await supabase.from("events").insert(initialEvents);
     if (eventsError) throw eventsError;

@@ -111,12 +111,12 @@ export default function DashboardPage() {
         </div>
 
         {!isMember && canDo("schedule.create") && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Link href="/escalas/nova" className="btn btn-primary btn-sm whitespace-nowrap">
+          <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+            <Link href="/escalas/nova" className="btn btn-primary btn-sm">
               + Nova Escala
             </Link>
             {canDo("member.invite") && (
-              <Link href="/membros/convidar" className="btn btn-secondary btn-sm whitespace-nowrap">
+              <Link href="/membros/convidar" className="btn btn-secondary btn-sm">
                 Convidar Membro
               </Link>
             )}
@@ -130,7 +130,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className={`grid ${isMember ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4"} gap-3 mb-6`}>
+      <div className={`grid ${isMember ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 xl:grid-cols-4"} gap-3 mb-6`}>
         {isMember ? (
           <>
             <Stat value={mySchedules.length} label="Minhas escalas" color="text-brand" />
@@ -148,24 +148,24 @@ export default function DashboardPage() {
       </div>
 
       {isMember && myPending.length > 0 && (
-        <div className="flex items-center gap-3 px-5 py-3.5 bg-amber-light rounded-[14px] border border-amber/10 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-3.5 bg-amber-light rounded-[14px] border border-amber/10 mb-6">
           <span className="text-lg">&#9888;&#65039;</span>
           <span className="text-[13px] text-ink-soft flex-1">
             Voce tem <strong>{myPending.length} {myPending.length === 1 ? "escala" : "escalas"}</strong> aguardando sua confirmacao.
           </span>
-          <Link href="/minhas-escalas" className="text-xs font-semibold text-brand hover:underline whitespace-nowrap">
+          <Link href="/minhas-escalas" className="text-xs font-semibold text-brand hover:underline self-start">
             Ver &rarr;
           </Link>
         </div>
       )}
 
       {!isMember && pendingTotal > 0 && (
-        <div className="flex items-center gap-3 px-5 py-3.5 bg-amber-light rounded-[14px] border border-amber/10 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-3.5 bg-amber-light rounded-[14px] border border-amber/10 mb-6">
           <span className="text-lg">&#9888;&#65039;</span>
           <span className="text-[13px] text-ink-soft flex-1">
             <strong>{pendingTotal} {pendingTotal === 1 ? "membro" : "membros"}</strong> nao confirmaram escalas.
           </span>
-          <Link href="/escalas" className="text-xs font-semibold text-brand hover:underline whitespace-nowrap">
+          <Link href="/escalas" className="text-xs font-semibold text-brand hover:underline self-start">
             Ver escalas &rarr;
           </Link>
         </div>
@@ -174,7 +174,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
         <div className="space-y-5">
           <div className="card">
-            <div className="flex items-center justify-between px-5 pt-4 pb-3">
+            <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3">
               <span className="font-display text-[17px]">{isMember ? "Minhas proximas escalas" : "Proximas escalas"}</span>
             </div>
 
@@ -220,7 +220,7 @@ export default function DashboardPage() {
 
                     {isMember && mySM ? (
                       <span
-                        className={`badge ${
+                        className={`badge shrink-0 ${
                           mySM.status === "confirmed"
                             ? "badge-green"
                             : mySM.status === "pending"
@@ -235,7 +235,7 @@ export default function DashboardPage() {
                           : "Recusado"}
                       </span>
                     ) : (
-                      <span className={`badge ${confirmed === sm.length && sm.length > 0 ? "badge-green" : "badge-amber"}`}>
+                      <span className={`badge shrink-0 ${confirmed === sm.length && sm.length > 0 ? "badge-green" : "badge-amber"}`}>
                         {confirmed}/{sm.length}
                       </span>
                     )}

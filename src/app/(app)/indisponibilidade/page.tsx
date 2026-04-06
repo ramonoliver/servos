@@ -4,7 +4,40 @@ import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { formatDate, getInitials } from "@/lib/utils/helpers";
-import type { UnavailableDate, User } from "@/types";
+import type { UnavailableDate, User, Event, Schedule } from "@/types";
+
+const MONTH_LABEL = new Intl.DateTimeFormat("pt-BR", {
+  month: "long",
+  year: "numeric",
+});
+
+const WEEKDAY_SHORT = ["D", "S", "T", "Q", "Q", "S", "S"];
+
+function toDateKey(date: Date) {
+  return date.toISOString().split("T")[0];
+}
+
+function parseRecurringWeekday(event: Event) {
+  const recurrence = event.recurrence || "";
+  if (recurrence.startsWith("weekly:")) {
+    const value = Number(recurrence.split(":")[1]);
+    return Number.isInteger(value) ? value : null;
+  }
+
+  const normalized = `${event.name} ${event.description}`.toLowerCase();
+  const weekdays = [
+    "domingo",
+    "segunda",
+    "terca",
+    "quarta",
+    "quinta",
+    "sexta",
+    "sabado",
+  ];
+
+  const index = weekdays.findIndex((weekday) => normalized.includes(weekday));
+  return index >= 0 ? index : null;
+}
 
 export default function IndisponibilidadePage() {
   const { user, toast, canDo } = useApp();
@@ -16,9 +49,15 @@ export default function IndisponibilidadePage() {
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
   const [filterUser, setFilterUser] = useState("all");
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const todayDate = new Date();
+    return new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
+  });
 
   const [members, setMembers] = useState<User[]>([]);
   const [allUD, setAllUD] = useState<UnavailableDate[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -41,14 +80,16 @@ export default function IndisponibilidadePage() {
     }
 
     const memberIds = ((usersData || []) as User[]).map((member) => member.id);
-    const [{ data: udData, error: udError }] = await Promise.all([
+    const [{ data: udData, error: udError }, { data: eventsData, error: eventsError }, { data: schedulesData, error: schedulesError }] = await Promise.all([
       memberIds.length
         ? supabase.from("unavailable_dates").select("*").in("user_id", memberIds)
         : Promise.resolve({ data: [], error: null }),
+      supabase.from("events").select("*").eq("church_id", user.church_id).eq("active", true),
+      supabase.from("schedules").select("*").eq("church_id", user.church_id).neq("status", "cancelled"),
     ]);
 
-    if (udError) {
-      console.error({ udError });
+    if (udError || eventsError || schedulesError) {
+      console.error({ udError, eventsError, schedulesError });
       toast("Erro ao carregar indisponibilidades.");
       setLoading(false);
       return;
@@ -56,6 +97,8 @@ export default function IndisponibilidadePage() {
 
     setMembers((usersData || []) as User[]);
     setAllUD((udData || []) as UnavailableDate[]);
+    setEvents((eventsData || []) as Event[]);
+    setSchedules((schedulesData || []) as Schedule[]);
     setLoading(false);
   }
 
@@ -104,8 +147,6 @@ export default function IndisponibilidadePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          actorId: user.id,
-          churchId: user.church_id,
           type,
           date,
           endDate,
@@ -141,8 +182,6 @@ export default function IndisponibilidadePage() {
 
     try {
       const params = new URLSearchParams({
-        actorId: user.id,
-        churchId: user.church_id,
         unavailableDateId: id,
       });
 
@@ -170,6 +209,55 @@ export default function IndisponibilidadePage() {
 
   const typeColor = (t: string) =>
     t === "single" ? "badge-amber" : t === "range" ? "badge-brand" : "badge-red";
+
+  const monthDays = useMemo(() => {
+    const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const start = new Date(firstDay);
+    start.setDate(start.getDate() - firstDay.getDay());
+
+    return Array.from({ length: 42 }).map((_, index) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + index);
+      return date;
+    });
+  }, [currentMonth]);
+
+  const highlightedDates = useMemo(() => {
+    const map = new Map<string, { labels: string[]; hasSchedule: boolean }>();
+    const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+
+    const addHighlight = (dateKey: string, label: string, hasSchedule = false) => {
+      const current = map.get(dateKey) || { labels: [], hasSchedule: false };
+      if (!current.labels.includes(label)) {
+        current.labels.push(label);
+      }
+      current.hasSchedule = current.hasSchedule || hasSchedule;
+      map.set(dateKey, current);
+    };
+
+    schedules.forEach((schedule) => {
+      if (schedule.date >= toDateKey(monthStart) && schedule.date <= toDateKey(monthEnd)) {
+        addHighlight(schedule.date, "Escala", true);
+      }
+    });
+
+    events.forEach((event) => {
+      const weekday = parseRecurringWeekday(event);
+      if (weekday === null) return;
+
+      for (let day = 1; day <= monthEnd.getDate(); day += 1) {
+        const current = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+        if (current.getDay() === weekday) {
+          addHighlight(toDateKey(current), `${event.name} · ${event.base_time || ""}`.trim());
+        }
+      }
+    });
+
+    return map;
+  }, [currentMonth, events, schedules]);
+
+  const myUnavailableDates = new Set(allUD.filter((item) => item.user_id === user.id).map((item) => item.date));
 
   return (
     <div>
@@ -205,6 +293,97 @@ export default function IndisponibilidadePage() {
               </option>
             ))}
           </select>
+        </div>
+      )}
+
+      {isMember && (
+        <div className="card mb-6 overflow-hidden">
+          <div className="px-5 pt-4 pb-3 border-b border-border-soft flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="font-display text-[17px]">Calendario do mes</div>
+              <div className="text-sm text-ink-muted">
+                Dias de cultos e escalas aparecem destacados. Clique em um dia para registrar indisponibilidade.
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <button
+                onClick={() => setCurrentMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
+                className="btn btn-secondary btn-sm"
+              >
+                &larr;
+              </button>
+              <div className="text-sm font-semibold min-w-[110px] sm:min-w-[140px] text-center capitalize">
+                {MONTH_LABEL.format(currentMonth)}
+              </div>
+              <button
+                onClick={() => setCurrentMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
+                className="btn btn-secondary btn-sm"
+              >
+                &rarr;
+              </button>
+            </div>
+          </div>
+
+          <div className="px-4 py-4">
+            <div className="grid grid-cols-7 gap-2 mb-2">
+              {WEEKDAY_SHORT.map((label) => (
+                <div key={label} className="text-center text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+                  {label}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7 gap-2">
+              {monthDays.map((calendarDay) => {
+                const dateKey = toDateKey(calendarDay);
+                const isCurrentMonth = calendarDay.getMonth() === currentMonth.getMonth();
+                const highlight = highlightedDates.get(dateKey);
+                const isUnavailable = myUnavailableDates.has(dateKey);
+
+                return (
+                  <button
+                    key={dateKey}
+                    type="button"
+                    onClick={() => {
+                      setDate(dateKey);
+                      setType("single");
+                      setEndDate("");
+                      setShowForm(true);
+                    }}
+                    className={`min-h-[88px] rounded-2xl border p-2 text-left transition-all ${
+                      isCurrentMonth
+                        ? "border-border-soft bg-white"
+                        : "border-transparent bg-surface-alt/70 text-ink-ghost"
+                    } ${
+                      highlight
+                        ? highlight.hasSchedule
+                          ? "ring-2 ring-brand/25 border-brand-light bg-brand-glow"
+                          : "border-amber/30 bg-amber-light/60"
+                        : ""
+                    } ${isUnavailable ? "border-danger/30 bg-danger-light/70" : ""}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold">{calendarDay.getDate()}</span>
+                      {isUnavailable && <span className="text-[9px] font-bold text-danger uppercase">Indisp.</span>}
+                    </div>
+
+                    {highlight ? (
+                      <div className="mt-2 space-y-1">
+                        {highlight.labels.slice(0, 2).map((label) => (
+                          <div key={label} className="text-[10px] leading-tight text-ink-muted line-clamp-2">
+                            {label}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-[10px] text-ink-ghost">Sem evento</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 

@@ -93,14 +93,15 @@ export default function CalendarioPage() {
     <div>
       <div className="mb-6">
         <h1 className="page-title">Calendario</h1>
+        <p className="page-subtitle">Veja escalas do mes e abra os detalhes por dia</p>
       </div>
 
       <div className="card p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between gap-3 mb-4">
           <button onClick={() => setMonthOffset((m) => m - 1)} className="btn btn-ghost btn-sm">
             &larr;
           </button>
-          <span className="font-display text-lg capitalize">{monthName}</span>
+          <span className="font-display text-lg capitalize text-center">{monthName}</span>
           <button onClick={() => setMonthOffset((m) => m + 1)} className="btn btn-ghost btn-sm">
             &rarr;
           </button>
@@ -178,9 +179,9 @@ export default function CalendarioPage() {
                     className="flex items-center gap-3 px-5 py-3 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors"
                   >
                     <span className="text-lg">{ev ? getIconEmoji(ev.icon) : ""}</span>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">{ev?.name}</div>
-                      <div className="text-[11px] text-ink-faint">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium break-words">{ev?.name}</div>
+                      <div className="text-[11px] text-ink-faint break-words">
                         {s.time} - {dept?.name} - {sm.length} escalados
                       </div>
                     </div>

@@ -125,9 +125,6 @@ export default function ConvidarMembroPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          churchId: user.church_id,
-          churchName: church?.name || "Sua Igreja",
-          invitedByUserId: user.id,
           name: f.name.trim(),
           email: f.email.trim(),
           phone: f.phone.trim(),
@@ -438,7 +435,7 @@ export default function ConvidarMembroPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="rounded-[12px] border border-border-soft bg-white px-4 py-3">
             <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">Email</div>
             <div className="text-sm font-medium mt-1">Convite principal</div>

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiActor } from "@/lib/auth/api-session";
+import { can } from "@/lib/auth/permissions";
 import { generateTempPassword, hashPassword } from "@/lib/auth/password";
 import { deliverMemberInvitation } from "@/lib/server/member-invitations";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
@@ -11,9 +13,6 @@ const selectedDepartmentSchema = z.object({
 });
 
 const bodySchema = z.object({
-  churchId: z.string().min(1),
-  churchName: z.string().min(1),
-  invitedByUserId: z.string().min(1),
   name: z.string().trim().min(1),
   email: z.string().trim().email(),
   phone: z.string().optional().default(""),
@@ -31,9 +30,6 @@ export async function POST(req: Request) {
     }
 
     const {
-      churchId,
-      churchName,
-      invitedByUserId,
       name,
       email,
       phone,
@@ -42,8 +38,27 @@ export async function POST(req: Request) {
       selectedDepartments,
     } = parsed.data;
 
+    const { actor, session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+    if (!actor?.active || !can(actor.role, "member.invite")) {
+      return NextResponse.json({ error: "Sem permissao para convidar membros." }, { status: 403 });
+    }
+
+    const churchId = session!.church_id;
+    const invitedByUserId = session!.user_id;
     const supabase = getSupabaseServerClient();
     const normalizedEmail = email.trim().toLowerCase();
+
+    const { data: church, error: churchError } = await supabase
+      .from("churches")
+      .select("id, name")
+      .eq("id", churchId)
+      .maybeSingle();
+
+    if (churchError) throw churchError;
+    if (!church) {
+      return NextResponse.json({ error: "Igreja nao encontrada." }, { status: 404 });
+    }
 
     const { data: existingUser, error: existingUserError } = await supabase
       .from("users")
@@ -142,7 +157,7 @@ export async function POST(req: Request) {
       to: normalizedEmail,
       phone: phone.trim(),
       memberName: name.trim(),
-      churchName,
+      churchName: church.name,
       tempPassword,
       userId: newUser.id,
       churchId,

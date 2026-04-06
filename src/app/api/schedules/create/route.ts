@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiActor } from "@/lib/auth/api-session";
 import { can } from "@/lib/auth/permissions";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { genId } from "@/lib/utils/helpers";
 
 const bodySchema = z.object({
-  actorId: z.string().min(1),
-  churchId: z.string().min(1),
   eventId: z.string().min(1),
   departmentId: z.string().min(1),
   date: z.string().min(1),
@@ -25,8 +24,6 @@ export async function POST(req: Request) {
     }
 
     const {
-      actorId,
-      churchId,
       eventId,
       departmentId,
       date,
@@ -37,16 +34,15 @@ export async function POST(req: Request) {
       selectedIds,
     } = parsed.data;
 
+    const { actor, session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+
+    const actorId = session!.user_id;
+    const churchId = session!.church_id;
     const supabase = getSupabaseServerClient();
 
-    const [{ data: actor, error: actorError }, { data: department, error: departmentError }, { data: event, error: eventError }] =
+    const [{ data: department, error: departmentError }, { data: event, error: eventError }] =
       await Promise.all([
-        supabase
-          .from("users")
-          .select("id, role, church_id, active")
-          .eq("id", actorId)
-          .eq("church_id", churchId)
-          .maybeSingle(),
         supabase
           .from("departments")
           .select("id, church_id, leader_ids, co_leader_ids")
@@ -61,7 +57,6 @@ export async function POST(req: Request) {
           .maybeSingle(),
       ]);
 
-    if (actorError) throw actorError;
     if (departmentError) throw departmentError;
     if (eventError) throw eventError;
 

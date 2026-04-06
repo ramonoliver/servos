@@ -111,8 +111,6 @@ export default function MinhasEscalasPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "respond",
-          actorId: user.id,
-          churchId: user.church_id,
           scheduleMemberId: smId,
           status: "confirmed",
           declineReason: "",
@@ -142,8 +140,6 @@ export default function MinhasEscalasPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "respond",
-          actorId: user.id,
-          churchId: user.church_id,
           scheduleMemberId: smId,
           status: "declined",
           declineReason,

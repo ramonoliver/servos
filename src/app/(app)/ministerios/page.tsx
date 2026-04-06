@@ -53,8 +53,6 @@ export default function MinisteriosPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: "delete",
-          actorId: user.id,
-          churchId: user.church_id,
           departmentId: d.id,
         }),
       });
@@ -78,14 +76,14 @@ export default function MinisteriosPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="page-title">Ministerios</h1>
           <p className="page-subtitle">{departments.length} departamentos</p>
         </div>
 
         {canDo("department.create") && (
-          <button onClick={() => setModal({ type: "form" })} className="btn btn-primary">
+          <button onClick={() => setModal({ type: "form" })} className="btn btn-primary self-start sm:self-auto">
             + Novo
           </button>
         )}
@@ -94,7 +92,7 @@ export default function MinisteriosPage() {
       {loading ? (
         <div className="card p-8 text-center text-sm text-ink-faint">Carregando ministerios...</div>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {departments.map((d) => {
             const count = allDM.filter((dm) => dm.department_id === d.id).length;
             const leaderNames = (d.leader_ids || [])
@@ -128,8 +126,8 @@ export default function MinisteriosPage() {
                 </div>
 
                 <div className="p-4">
-                  <div className="font-display text-[17px] mb-0.5">{d.name}</div>
-                  <div className="text-xs text-ink-muted">
+                  <div className="font-display text-[17px] mb-0.5 break-words">{d.name}</div>
+                  <div className="text-xs text-ink-muted break-words">
                     {count} membros{leaderNames.length ? " · " + leaderNames.join(", ") : ""}
                   </div>
                   {d.description && (
@@ -216,8 +214,6 @@ function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: isEdit ? "update" : "create",
-          actorId: user.id,
-          churchId: user.church_id,
           departmentId: dept?.id,
           data,
         }),

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { suggestMembers, autoSelectWithCouples } from "@/lib/ai/engine";
@@ -18,6 +18,7 @@ import type {
 export default function NovaEscalaPage() {
   const { user, toast, departments } = useApp();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [events, setEvents] = useState<Event[]>([]);
   const [members, setMembers] = useState<User[]>([]);
@@ -97,14 +98,20 @@ export default function NovaEscalaPage() {
     setAllUD((udData || []) as UnavailableDate[]);
 
     if (!eventId && loadedEvents.length > 0) setEventId(loadedEvents[0].id);
-    if (!deptId && departments.length > 0) setDeptId(departments[0].id);
+    if (!deptId && departments.length > 0) {
+      const requestedDepartmentId = searchParams.get("departmentId");
+      const initialDepartmentId = departments.some((department) => department.id === requestedDepartmentId)
+        ? requestedDepartmentId
+        : departments[0].id;
+      setDeptId(initialDepartmentId || "");
+    }
 
     setLoading(false);
   }
 
   useEffect(() => {
     loadData();
-  }, [user.church_id, departments.length]);
+  }, [user.church_id, departments.length, searchParams]);
 
   const deptMembers = useMemo(
     () => allDM.filter((dm) => dm.department_id === deptId),
@@ -171,8 +178,6 @@ export default function NovaEscalaPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          actorId: user.id,
-          churchId: user.church_id,
           eventId,
           departmentId: deptId,
           date,

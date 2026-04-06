@@ -23,6 +23,9 @@ export default function PerfilPage() {
   const [curPw, setCurPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
+  const [showCurPw, setShowCurPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
@@ -62,8 +65,6 @@ export default function PerfilPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId: user.id,
-          churchId: user.church_id,
           name: name.trim(),
           phone: phone.trim(),
           availability: avail,
@@ -115,8 +116,6 @@ export default function PerfilPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId: user.id,
-          churchId: user.church_id,
           currentPassword: curPw,
           newPassword: newPw,
           confirmPassword: confirmPw,
@@ -263,9 +262,14 @@ export default function PerfilPage() {
       {tab === "senha" && (
         <div className="card p-6 space-y-4">
           <div>
-            <label className="input-label">Senha atual</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="input-label mb-0">Senha atual</label>
+              <button type="button" onClick={() => setShowCurPw((value) => !value)} className="text-xs font-semibold text-brand hover:underline">
+                {showCurPw ? "Ocultar" : "Ver senha"}
+              </button>
+            </div>
             <input
-              type="password"
+              type={showCurPw ? "text" : "password"}
               className="input-field"
               value={curPw}
               onChange={(e) => setCurPw(e.target.value)}
@@ -273,9 +277,14 @@ export default function PerfilPage() {
           </div>
 
           <div>
-            <label className="input-label">Nova senha (min. 6 caracteres)</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="input-label mb-0">Nova senha (min. 6 caracteres)</label>
+              <button type="button" onClick={() => setShowNewPw((value) => !value)} className="text-xs font-semibold text-brand hover:underline">
+                {showNewPw ? "Ocultar" : "Ver senha"}
+              </button>
+            </div>
             <input
-              type="password"
+              type={showNewPw ? "text" : "password"}
               className="input-field"
               value={newPw}
               onChange={(e) => setNewPw(e.target.value)}
@@ -283,9 +292,14 @@ export default function PerfilPage() {
           </div>
 
           <div>
-            <label className="input-label">Confirmar nova senha</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="input-label mb-0">Confirmar nova senha</label>
+              <button type="button" onClick={() => setShowConfirmPw((value) => !value)} className="text-xs font-semibold text-brand hover:underline">
+                {showConfirmPw ? "Ocultar" : "Ver senha"}
+              </button>
+            </div>
             <input
-              type="password"
+              type={showConfirmPw ? "text" : "password"}
               className="input-field"
               value={confirmPw}
               onChange={(e) => setConfirmPw(e.target.value)}

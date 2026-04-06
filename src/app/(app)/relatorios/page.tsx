@@ -81,7 +81,7 @@ export default function RelatoriosPage() {
         <p className="page-subtitle">Insights do seu ministerio</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
         <div className="bg-surface border border-border-soft rounded-[14px] px-5 py-4">
           <div className="font-display text-[28px] text-brand">
             {loading ? "..." : schedules.length}
@@ -104,7 +104,7 @@ export default function RelatoriosPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <div className="card">
           <div className="px-5 pt-4 pb-3">
             <span className="font-display text-[17px]">Mais servem</span>

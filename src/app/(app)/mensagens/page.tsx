@@ -86,7 +86,7 @@ export default function MensagensPage() {
 
       try {
         const response = await fetch(
-          `/api/department-messages?departmentId=${encodeURIComponent(selectedDept)}&churchId=${encodeURIComponent(user.church_id)}&viewerId=${encodeURIComponent(user.id)}`
+          `/api/department-messages?departmentId=${encodeURIComponent(selectedDept)}`
         );
         const payload = (await response.json().catch(() => null)) as
           | { messages?: Message[]; error?: string }
@@ -142,7 +142,7 @@ export default function MensagensPage() {
     const loadMessagesSilently = async () => {
       try {
         const response = await fetch(
-          `/api/department-messages?departmentId=${encodeURIComponent(selectedDept)}&churchId=${encodeURIComponent(user.church_id)}&viewerId=${encodeURIComponent(user.id)}`
+          `/api/department-messages?departmentId=${encodeURIComponent(selectedDept)}`
         );
         const payload = (await response.json().catch(() => null)) as
           | { messages?: Message[] }
@@ -217,8 +217,6 @@ export default function MensagensPage() {
       },
       body: JSON.stringify({
         departmentId: selectedDept,
-        churchId: user.church_id,
-        senderId: user.id,
         content: newMsg.trim(),
       }),
     });
@@ -256,7 +254,7 @@ export default function MensagensPage() {
         <p className="page-subtitle">Chat por ministerio</p>
       </div>
 
-      <div className="flex gap-1 mb-5 bg-surface-alt rounded-[10px] p-0.5 w-fit flex-wrap">
+      <div className="flex gap-1 mb-5 bg-surface-alt rounded-[10px] p-0.5 w-fit max-w-full flex-wrap">
         {visibleDepartments.map((d) => (
           <button
             key={d.id}
@@ -279,7 +277,7 @@ export default function MensagensPage() {
       )}
 
       <div className="card flex flex-col" style={{ minHeight: 440 }}>
-        <div className="px-5 pt-4 pb-3 border-b border-border-soft flex items-center justify-between gap-3">
+        <div className="px-5 pt-4 pb-3 border-b border-border-soft flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <div className="font-display text-[15px]">Chat do ministerio</div>
             <div className="text-[11px] text-ink-faint mt-0.5">
@@ -318,7 +316,7 @@ export default function MensagensPage() {
               return (
                 <div key={m.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                   <div
-                    className={`max-w-[70%] flex gap-2 ${isMe ? "flex-row-reverse" : ""} items-end`}
+                    className={`max-w-[88%] sm:max-w-[70%] flex gap-2 ${isMe ? "flex-row-reverse" : ""} items-end`}
                   >
                     <div
                       className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"
@@ -340,7 +338,7 @@ export default function MensagensPage() {
                         </div>
                       )}
 
-                      {m.content}
+                      <div className="break-words whitespace-pre-wrap">{m.content}</div>
 
                       <div className="text-[9px] opacity-50 mt-1 text-right">
                         {new Date(m.created_at).toLocaleTimeString("pt-BR", {
@@ -356,7 +354,7 @@ export default function MensagensPage() {
           )}
         </div>
 
-        <div className="px-5 py-3 border-t border-border-soft flex gap-2">
+        <div className="px-5 py-3 border-t border-border-soft flex flex-col sm:flex-row gap-2">
           <input
             value={newMsg}
             onChange={(e) => setNewMsg(e.target.value)}
@@ -364,7 +362,7 @@ export default function MensagensPage() {
             placeholder="Digite sua mensagem..."
             className="input-field flex-1 !rounded-full"
           />
-          <button onClick={send} disabled={sending || !selectedDept} className="btn btn-primary">
+          <button onClick={send} disabled={sending || !selectedDept} className="btn btn-primary sm:self-auto">
             {sending ? "..." : "Enviar"}
           </button>
         </div>

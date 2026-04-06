@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiActor } from "@/lib/auth/api-session";
 import { can } from "@/lib/auth/permissions";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({
-  actorId: z.string().min(1),
   scheduleId: z.string().min(1),
-  churchId: z.string().min(1),
 });
 
 export async function POST(req: Request) {
@@ -17,25 +16,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Dados invalidos para excluir escala." }, { status: 400 });
     }
 
-    const { actorId, scheduleId, churchId } = parsed.data;
+    const { actor, session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+
+    const churchId = session!.church_id;
+    const { scheduleId } = parsed.data;
     const supabase = getSupabaseServerClient();
 
-    const [{ data: actor, error: actorError }, { data: schedule, error: scheduleError }] = await Promise.all([
-      supabase
-        .from("users")
-        .select("id, role, church_id, active")
-        .eq("id", actorId)
-        .eq("church_id", churchId)
-        .maybeSingle(),
-      supabase
+    const { data: schedule, error: scheduleError } = await supabase
         .from("schedules")
         .select("id, church_id")
         .eq("id", scheduleId)
         .eq("church_id", churchId)
-        .maybeSingle(),
-    ]);
-
-    if (actorError) throw actorError;
+        .maybeSingle();
     if (scheduleError) throw scheduleError;
 
     if (!actor?.active || !can(actor.role, "schedule.delete")) {

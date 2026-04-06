@@ -21,6 +21,13 @@ type ScheduleReminderInput = {
   departmentName: string;
 };
 
+type PasswordResetInput = {
+  to: string;
+  memberName: string;
+  resetUrl: string;
+  churchName?: string;
+};
+
 const host = process.env.BREVO_SMTP_HOST || "smtp-relay.brevo.com";
 const port = Number(process.env.BREVO_SMTP_PORT || 587);
 const user = process.env.BREVO_SMTP_USER;
@@ -151,6 +158,52 @@ export async function sendScheduleReminderEmail({
     to,
     subject: "Lembrete de escala - Servos",
     html,
+  });
+}
+
+export async function sendPasswordResetEmail({
+  to,
+  memberName,
+  resetUrl,
+  churchName,
+}: PasswordResetInput) {
+  const transporter = getTransporter();
+  const safeMemberName = escapeHtml(memberName);
+  const safeChurchName = churchName ? escapeHtml(churchName) : "sua igreja";
+  const safeResetUrl = escapeHtml(resetUrl);
+
+  const html = `
+    <div style="margin:0;padding:24px;background:#f4efe7;font-family:Georgia,'Times New Roman',serif;color:#24170f;">
+      <div style="max-width:640px;margin:0 auto;background:#fffdf8;border:1px solid #eadfcd;border-radius:28px;overflow:hidden;box-shadow:0 20px 50px rgba(67,41,19,.08);">
+        <div style="padding:32px;background:linear-gradient(135deg,#f4e4c9 0%,#f7efe3 55%,#fffdf8 100%);border-bottom:1px solid #eadfcd;">
+          <div style="font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:#8a6441;font-family:Arial,sans-serif;font-weight:700;">Servos</div>
+          <h1 style="margin:14px 0 10px;font-size:34px;line-height:1.05;font-weight:700;color:#24170f;">Redefina sua senha</h1>
+          <p style="margin:0;font-size:16px;line-height:1.7;color:#5e4632;">${safeMemberName}, recebemos um pedido para redefinir o seu acesso em <strong>${safeChurchName}</strong>.</p>
+        </div>
+        <div style="padding:28px 32px;">
+          <div style="background:#2f241c;border-radius:24px;padding:24px;color:#fff7ef;">
+            <div style="font-size:12px;opacity:.72;margin-bottom:10px;font-family:Arial,sans-serif;">Use o botao abaixo para criar uma nova senha com seguranca.</div>
+            <a href="${safeResetUrl}" style="display:inline-block;background:#fff7ef;color:#2f241c;padding:12px 18px;border-radius:14px;font-size:15px;font-weight:700;text-decoration:none;">Redefinir senha</a>
+          </div>
+          <p style="margin:18px 0 0;font-size:15px;line-height:1.8;color:#4d3a2b;">Se o botao nao funcionar, copie este link no navegador:</p>
+          <p style="margin:8px 0 0;font-size:14px;line-height:1.7;color:#8a6441;word-break:break-all;">${safeResetUrl}</p>
+          <p style="margin:14px 0 0;font-size:15px;line-height:1.8;color:#4d3a2b;">Esse link expira em pouco tempo. Se voce nao solicitou a alteracao, ignore este email.</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  return transporter.sendMail({
+    from,
+    to,
+    subject: "Redefinicao de senha - Servos",
+    html,
+    text: [
+      `Ola, ${memberName}!`,
+      `Recebemos um pedido para redefinir seu acesso em ${churchName || "sua igreja"}.`,
+      `Abra este link para redefinir sua senha: ${resetUrl}`,
+      "Se voce nao solicitou a alteracao, ignore esta mensagem.",
+    ].join("\n"),
   });
 }
 

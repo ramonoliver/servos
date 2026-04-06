@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiActor } from "@/lib/auth/api-session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { genId } from "@/lib/utils/helpers";
 
@@ -17,14 +18,10 @@ const songSchema = z.object({
 });
 
 const postSchema = z.object({
-  actorId: z.string().min(1),
-  churchId: z.string().min(1),
   song: songSchema,
 });
 
 const deleteSchema = z.object({
-  actorId: z.string().min(1),
-  churchId: z.string().min(1),
   songId: z.string().min(1),
 });
 
@@ -39,17 +36,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Dados invalidos para salvar musica." }, { status: 400 });
     }
 
-    const { actorId, churchId, song } = parsed.data;
+    const { actor, session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+
+    const { song } = parsed.data;
+    const actorId = session!.user_id;
+    const churchId = session!.church_id;
     const supabase = getSupabaseServerClient();
-
-    const { data: actor, error: actorError } = await supabase
-      .from("users")
-      .select("id, role, church_id, active")
-      .eq("id", actorId)
-      .eq("church_id", churchId)
-      .maybeSingle();
-
-    if (actorError) throw actorError;
     if (!actor?.active || !canManageSongs(actor.role)) {
       return NextResponse.json({ error: "Sem permissao para gerenciar repertorio." }, { status: 403 });
     }
@@ -104,8 +97,6 @@ export async function DELETE(req: Request) {
   try {
     const url = new URL(req.url);
     const parsed = deleteSchema.safeParse({
-      actorId: url.searchParams.get("actorId"),
-      churchId: url.searchParams.get("churchId"),
       songId: url.searchParams.get("songId"),
     });
 
@@ -113,25 +104,19 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Dados invalidos para remover musica." }, { status: 400 });
     }
 
-    const { actorId, churchId, songId } = parsed.data;
+    const { actor, session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+
+    const churchId = session!.church_id;
+    const { songId } = parsed.data;
     const supabase = getSupabaseServerClient();
 
-    const [{ data: actor, error: actorError }, { data: song, error: songError }] = await Promise.all([
-      supabase
-        .from("users")
-        .select("id, role, church_id, active")
-        .eq("id", actorId)
-        .eq("church_id", churchId)
-        .maybeSingle(),
-      supabase
-        .from("songs")
-        .select("id, church_id")
-        .eq("id", songId)
-        .eq("church_id", churchId)
-        .maybeSingle(),
-    ]);
-
-    if (actorError) throw actorError;
+    const { data: song, error: songError } = await supabase
+      .from("songs")
+      .select("id, church_id")
+      .eq("id", songId)
+      .eq("church_id", churchId)
+      .maybeSingle();
     if (songError) throw songError;
     if (!actor?.active || !canManageSongs(actor.role)) {
       return NextResponse.json({ error: "Sem permissao para gerenciar repertorio." }, { status: 403 });

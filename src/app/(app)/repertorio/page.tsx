@@ -125,8 +125,6 @@ export default function RepertorioPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          actorId: user.id,
-          churchId: user.church_id,
           song: {
             department_id: deptId || null,
             title: title.trim(),
@@ -167,8 +165,6 @@ export default function RepertorioPage() {
 
     try {
       const params = new URLSearchParams({
-        actorId: user.id,
-        churchId: user.church_id,
         songId: id,
       });
 
@@ -238,7 +234,7 @@ export default function RepertorioPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               <div>
                 <label className="input-label">Tom</label>
                 <select value={key} onChange={(e) => setKey(e.target.value)} className="input-field">
@@ -281,7 +277,7 @@ export default function RepertorioPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div>
                 <label className="input-label">Link da Cifra</label>
                 <input
@@ -322,7 +318,7 @@ export default function RepertorioPage() {
               />
             </div>
 
-            <div className="flex gap-2 justify-end">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
               <button
                 onClick={() => {
                   setShowForm(false);
@@ -340,14 +336,14 @@ export default function RepertorioPage() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-5">
+      <div className="flex flex-col xl:flex-row gap-3 mb-5">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar música ou artista..."
           className="input-field flex-1"
         />
-        <select value={themeFilter} onChange={(e) => setThemeFilter(e.target.value)} className="input-field sm:w-40">
+        <select value={themeFilter} onChange={(e) => setThemeFilter(e.target.value)} className="input-field w-full xl:w-40">
           {themes.map((t) => (
             <option key={t} value={t}>
               {t === "all" ? "Todos os temas" : t}
@@ -355,7 +351,7 @@ export default function RepertorioPage() {
           ))}
         </select>
         {departments.length > 1 && (
-          <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="input-field sm:w-44">
+          <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="input-field w-full xl:w-44">
             <option value="all">Todos os ministérios</option>
             {departments.map((d: any) => (
               <option key={d.id} value={d.id}>{d.name}</option>
@@ -391,7 +387,7 @@ export default function RepertorioPage() {
           {filtered.map((song, i) => (
             <div
               key={song.id}
-              className={`flex items-center gap-4 px-5 py-3.5 hover:bg-brand-glow transition-colors ${
+              className={`flex flex-col sm:flex-row sm:items-center gap-4 px-5 py-3.5 hover:bg-brand-glow transition-colors ${
                 i > 0 ? "border-t border-border-soft" : ""
               }`}
             >
@@ -400,17 +396,18 @@ export default function RepertorioPage() {
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold truncate">{song.title}</div>
-                <div className="text-[11px] text-ink-faint">
+                <div className="text-sm font-semibold break-words">{song.title}</div>
+                <div className="text-[11px] text-ink-faint break-words">
                   {song.artist || "—"}
                   {song.bpm ? ` · ${song.bpm} BPM` : ""}
                   {song.times_used > 0 ? ` · Usada ${song.times_used}×` : ""}
                 </div>
               </div>
 
-              <span className="badge badge-brand hidden sm:inline-flex">{song.theme}</span>
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <span className="badge badge-brand">{song.theme}</span>
 
-              <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5">
                 {song.chords_url && (
                   <a
                     href={song.chords_url}
@@ -454,22 +451,23 @@ export default function RepertorioPage() {
                     </svg>
                   </a>
                 )}
-              </div>
+                </div>
 
-              {canDo("schedule.create") && (
-                <button
-                  onClick={() => removeSong(song.id, song.title)}
-                  className="text-ink-ghost hover:text-danger transition-colors p-1 ml-1"
-                  title="Remover"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6l-1 14H6L5 6" />
-                    <path d="M10 11v6" />
-                    <path d="M14 11v6" />
-                  </svg>
-                </button>
-              )}
+                {canDo("schedule.create") && (
+                  <button
+                    onClick={() => removeSong(song.id, song.title)}
+                    className="text-ink-ghost hover:text-danger transition-colors p-1"
+                    title="Remover"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-1 14H6L5 6" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

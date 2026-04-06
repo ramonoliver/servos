@@ -86,7 +86,7 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
     [allMembers, deptMemberIds]
   );
 
-  async function addMemberToDept(userId: string, funcName: string) {
+  async function addMembersToDept(selectedMembers: { userId: string; functionName: string }[]) {
     if (!dept) return;
 
     try {
@@ -96,11 +96,8 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          actorId: user.id,
-          churchId: user.church_id,
           departmentId: dept.id,
-          userId,
-          functionName: funcName,
+          members: selectedMembers,
         }),
       });
 
@@ -112,7 +109,11 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
         return;
       }
 
-      toast("Membro adicionado ao ministerio!");
+      toast(
+        selectedMembers.length === 1
+          ? "Membro adicionado ao ministerio!"
+          : `${selectedMembers.length} membros adicionados ao ministerio!`
+      );
       setShowAddMember(false);
       await loadData();
     } catch (error) {
@@ -126,8 +127,6 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
 
     try {
       const params = new URLSearchParams({
-        actorId: user.id,
-        churchId: user.church_id,
         departmentId: dept.id,
         departmentMemberId: dmId,
       });
@@ -162,8 +161,8 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
 
   return (
     <div className="space-y-6">
-      <div className="card p-6 flex items-start justify-between gap-5">
-        <div className="flex items-start gap-4">
+      <div className="card p-5 sm:p-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-sm"
             style={{ background: dept.color + "22", color: dept.color }}
@@ -171,9 +170,9 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
             {getIconEmoji(dept.icon)}
           </div>
 
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h1 className="page-title mb-0">{dept.name}</h1>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <h1 className="page-title mb-0 break-words leading-tight">{dept.name}</h1>
               {!dept.active && (
                 <span className="text-[10px] font-semibold bg-danger-light text-danger px-2 py-0.5 rounded-full">
                   Inativo
@@ -181,7 +180,7 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
               )}
             </div>
 
-            <p className="text-sm text-ink-muted mb-3">{dept.description || "Sem descricao."}</p>
+            <p className="text-sm text-ink-muted mb-3 break-words">{dept.description || "Sem descricao."}</p>
 
             <div className="flex flex-wrap gap-2">
               {leaders.length > 0 && (
@@ -199,14 +198,21 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
           </div>
         </div>
 
-        {canDo("member.edit", dept.id) && (
-          <button onClick={() => setShowAddMember(true)} className="btn btn-primary">
-            + Adicionar membro
-          </button>
-        )}
+        <div className="flex flex-col sm:flex-row gap-2 self-start lg:self-auto">
+          {canDo("schedule.create", dept.id) && (
+            <Link href={`/escalas/nova?departmentId=${dept.id}`} className="btn btn-secondary">
+              + Nova escala
+            </Link>
+          )}
+          {canDo("member.edit", dept.id) && (
+            <button onClick={() => setShowAddMember(true)} className="btn btn-primary">
+              + Adicionar membros
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="grid lg:grid-cols-[1.2fr_.8fr] gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_.8fr] gap-6">
         <div className="card">
           <div className="card-header">
             <h2 className="card-title">Membros do ministerio</h2>
@@ -266,7 +272,7 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
 
         <div className="card">
           <div className="card-header">
-            <h2 className="card-title">Proximas escalas</h2>
+            <h2 className="card-title break-words">Proximas escalas</h2>
           </div>
 
           {schedules.length === 0 ? (
@@ -297,7 +303,7 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
         <AddMemberModal
           availableToAdd={availableToAdd}
           onClose={() => setShowAddMember(false)}
-          onSave={addMemberToDept}
+          onSave={addMembersToDept}
         />
       )}
     </div>
@@ -311,52 +317,115 @@ function AddMemberModal({
 }: {
   availableToAdd: User[];
   onClose: () => void;
-  onSave: (userId: string, funcName: string) => void;
+  onSave: (members: { userId: string; functionName: string }[]) => void;
 }) {
-  const [userId, setUserId] = useState("");
-  const [funcName, setFuncName] = useState("");
+  const [selectedUsers, setSelectedUsers] = useState<Record<string, string>>({});
+
+  function toggleUser(userId: string) {
+    setSelectedUsers((current) => {
+      const next = { ...current };
+      if (next[userId] !== undefined) {
+        delete next[userId];
+      } else {
+        next[userId] = "";
+      }
+      return next;
+    });
+  }
+
+  function updateFunction(userId: string, functionName: string) {
+    setSelectedUsers((current) => ({
+      ...current,
+      [userId]: functionName,
+    }));
+  }
+
+  const selectedIds = Object.keys(selectedUsers);
 
   return (
     <Modal
-      title="Adicionar membro"
+      title="Adicionar membros"
       close={onClose}
-      width={460}
+      width={680}
       footer={
         <>
           <button onClick={onClose} className="btn btn-secondary">
             Cancelar
           </button>
           <button
-            onClick={() => onSave(userId, funcName)}
-            disabled={!userId}
+            onClick={() =>
+              onSave(
+                selectedIds.map((userId) => ({
+                  userId,
+                  functionName: selectedUsers[userId] || "",
+                }))
+              )
+            }
+            disabled={selectedIds.length === 0}
             className="btn btn-primary"
           >
-            Adicionar
+            Adicionar selecionados
           </button>
         </>
       }
     >
       <div className="space-y-4">
-        <div>
-          <label className="input-label">Membro</label>
-          <select className="input-field" value={userId} onChange={(e) => setUserId(e.target.value)}>
-            <option value="">Selecione</option>
-            {availableToAdd.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+        <div className="rounded-2xl border border-border-soft bg-surface-alt px-4 py-3 text-sm text-ink-muted">
+          Selecione varios membros de uma vez e ajuste a funcao individual de cada um, se quiser.
         </div>
 
-        <div>
-          <label className="input-label">Funcao</label>
-          <input
-            className="input-field"
-            value={funcName}
-            onChange={(e) => setFuncName(e.target.value)}
-            placeholder="Ex: Vocal, Camera, Recepcao..."
-          />
+        <div className="space-y-3 max-h-[52vh] overflow-y-auto pr-1">
+          {availableToAdd.length === 0 ? (
+            <div className="text-sm text-ink-faint text-center py-8">
+              Todos os membros ativos ja estao neste ministerio.
+            </div>
+          ) : (
+            availableToAdd.map((member) => {
+              const selected = selectedUsers[member.id] !== undefined;
+
+              return (
+                <div
+                  key={member.id}
+                  className={`rounded-2xl border p-4 transition-all ${
+                    selected
+                      ? "border-brand bg-brand-glow shadow-sm"
+                      : "border-border-soft bg-white"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleUser(member.id)}
+                      className={`mt-1 w-5 h-5 rounded-md border-2 flex items-center justify-center text-[11px] font-bold transition-all ${
+                        selected
+                          ? "bg-brand border-brand text-white"
+                          : "border-border bg-white text-transparent"
+                      }`}
+                    >
+                      ✓
+                    </button>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold truncate">{member.name}</div>
+                      <div className="text-[12px] text-ink-faint truncate">{member.email}</div>
+
+                      {selected && (
+                        <div className="mt-3">
+                          <label className="input-label">Funcao no ministerio</label>
+                          <input
+                            className="input-field"
+                            value={selectedUsers[member.id]}
+                            onChange={(e) => updateFunction(member.id, e.target.value)}
+                            placeholder="Ex: Vocal, Camera, Recepcao..."
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </Modal>

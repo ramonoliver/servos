@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiActor } from "@/lib/auth/api-session";
 import { can } from "@/lib/auth/permissions";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { genId } from "@/lib/utils/helpers";
@@ -17,8 +18,6 @@ const eventDataSchema = z.object({
 
 const bodySchema = z.object({
   mode: z.enum(["create", "update", "delete"]),
-  actorId: z.string().min(1),
-  churchId: z.string().min(1),
   eventId: z.string().optional(),
   data: eventDataSchema.optional(),
 });
@@ -30,17 +29,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Dados invalidos para gerenciar evento." }, { status: 400 });
     }
 
-    const { mode, actorId, churchId, eventId, data } = parsed.data;
+    const { actor, session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+
+    const churchId = session!.church_id;
+    const { mode, eventId, data } = parsed.data;
     const supabase = getSupabaseServerClient();
-
-    const { data: actor, error: actorError } = await supabase
-      .from("users")
-      .select("id, role, church_id, active")
-      .eq("id", actorId)
-      .eq("church_id", churchId)
-      .maybeSingle();
-
-    if (actorError) throw actorError;
     if (!actor?.active) {
       return NextResponse.json({ error: "Usuario nao encontrado." }, { status: 404 });
     }

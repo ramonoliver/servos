@@ -58,13 +58,15 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   const [chatAvailable, setChatAvailable] = useState(true);
   const [sendingChat, setSendingChat] = useState(false);
   const [chatSyncMode, setChatSyncMode] = useState<"idle" | "realtime" | "polling">("idle");
+  const [responding, setResponding] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   async function loadChatMessages(scheduleId: string, silent = false) {
     try {
       const response = await fetch(
-        `/api/schedule-chats?scheduleId=${encodeURIComponent(scheduleId)}&churchId=${encodeURIComponent(user.church_id)}&viewerId=${encodeURIComponent(user.id)}`
+        `/api/schedule-chats?scheduleId=${encodeURIComponent(scheduleId)}`
       );
       const payload = (await response.json().catch(() => null)) as
         | { messages?: ScheduleChat[]; error?: string }
@@ -253,6 +255,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   const scheduledUserIds = sm.map((s) => s.user_id);
   const isParticipant = scheduledUserIds.includes(user.id);
   const canAccessScheduleChat = user.role === "admin" || user.role === "leader" || isParticipant;
+  const myScheduleMember = sm.find((item) => item.user_id === user.id) || null;
 
   if (user.role === "member" && !isParticipant) {
     return <div className="py-20 text-center text-ink-faint">Voce nao participa desta escala.</div>;
@@ -279,8 +282,6 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          actorId: user.id,
-          churchId: user.church_id,
           scheduleId: schedule.id,
           userId,
         }),
@@ -308,8 +309,6 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
 
     try {
       const params = new URLSearchParams({
-        actorId: user.id,
-        churchId: user.church_id,
         scheduleId: schedule.id,
         scheduleMemberId: smItem.id,
       });
@@ -343,8 +342,6 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "substitute",
-          actorId: user.id,
-          churchId: user.church_id,
           scheduleId: schedule.id,
           declinedScheduleMemberId: declinedSM.id,
           substituteId,
@@ -380,8 +377,6 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
         },
         body: JSON.stringify({
           scheduleId: schedule.id,
-          churchId: user.church_id,
-          senderId: user.id,
           content: text,
         }),
       });
@@ -424,6 +419,38 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
 
     setChatMsg("");
     setSendingChat(false);
+  }
+
+  async function respondToSchedule(status: "confirmed" | "declined") {
+    if (!myScheduleMember) return;
+
+    try {
+      const response = await fetch("/api/schedule-members", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "respond",
+          scheduleMemberId: myScheduleMember.id,
+          status,
+          declineReason: status === "declined" ? declineReason : "",
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao responder escala:", data);
+        toast(data?.error || "Erro ao responder escala.");
+        return;
+      }
+
+      toast(status === "confirmed" ? "Presenca confirmada!" : "Ausencia registrada.");
+      setResponding(false);
+      setDeclineReason("");
+      await loadData();
+    } catch (error) {
+      console.error("Erro ao responder escala:", error);
+      toast("Erro ao responder escala.");
+    }
   }
 
   function MemberRow({ item, showFn = true }: { item: ScheduleMember; showFn?: boolean }) {
@@ -563,9 +590,9 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
         &larr; Escalas
       </Link>
 
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="page-title flex items-center gap-2">
+      <div className="flex flex-col gap-3 mb-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="page-title flex flex-wrap items-center gap-2 break-words">
             {ev && getIconEmoji(ev.icon)} {ev?.name || "Escala"}
           </h1>
           <p className="page-subtitle">
@@ -590,6 +617,85 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
           </button>
         )}
       </div>
+
+      {myScheduleMember && (
+        <div className="card mb-5 border border-brand-light/60 bg-brand-glow">
+          <div className="p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand mb-1">
+                  Minha resposta
+                </div>
+                <div className="font-display text-lg leading-tight">
+                  {myScheduleMember.status === "pending"
+                    ? "Confirme sua participacao nesta escala"
+                    : myScheduleMember.status === "confirmed"
+                    ? "Voce ja confirmou presenca"
+                    : "Voce informou indisponibilidade"}
+                </div>
+                <div className="text-sm text-ink-muted mt-1">
+                  Funcao: {myScheduleMember.function_name || "Nao informada"}
+                </div>
+              </div>
+
+              <span
+                className={`badge self-start ${
+                  myScheduleMember.status === "confirmed"
+                    ? "badge-green"
+                    : myScheduleMember.status === "pending"
+                    ? "badge-amber"
+                    : "badge-red"
+                }`}
+              >
+                {myScheduleMember.status === "confirmed"
+                  ? "Confirmado"
+                  : myScheduleMember.status === "pending"
+                  ? "Pendente"
+                  : "Recusado"}
+              </span>
+            </div>
+
+            {myScheduleMember.status === "pending" && !responding && (
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <button onClick={() => respondToSchedule("confirmed")} className="btn btn-green sm:flex-1">
+                  Confirmar presenca
+                </button>
+                <button onClick={() => setResponding(true)} className="btn btn-danger sm:flex-1">
+                  Nao poderei servir
+                </button>
+              </div>
+            )}
+
+            {responding && myScheduleMember.status === "pending" && (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <label className="input-label">Motivo da ausencia (opcional)</label>
+                  <textarea
+                    className="input-field min-h-[72px]"
+                    value={declineReason}
+                    onChange={(e) => setDeclineReason(e.target.value)}
+                    placeholder="Conte o motivo para ajudar a equipe a se reorganizar..."
+                  />
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    onClick={() => {
+                      setResponding(false);
+                      setDeclineReason("");
+                    }}
+                    className="btn btn-secondary sm:flex-1"
+                  >
+                    Cancelar
+                  </button>
+                  <button onClick={() => respondToSchedule("declined")} className="btn btn-danger sm:flex-1">
+                    Confirmar ausencia
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {allOk && (
         <div className="flex items-center gap-3 px-5 py-3.5 bg-success-light rounded-[14px] border border-success/10 mb-5">

@@ -24,19 +24,32 @@ Abra http://localhost:3000
 
 ## SQL de infraestrutura
 
-Para ambientes novos no Supabase, aplique o script consolidado abaixo no SQL Editor:
+Fonte de verdade para novos ambientes:
+
+- diretório [`sql/migrations`](/Users/ramonoliveira/Downloads/Servosapp/servos/sql/migrations)
+
+Ordem atual das migrations:
+
+- [20260406160000_schedule_chats.sql](/Users/ramonoliveira/Downloads/Servosapp/servos/sql/migrations/20260406160000_schedule_chats.sql)
+- [20260406160100_member_invitations.sql](/Users/ramonoliveira/Downloads/Servosapp/servos/sql/migrations/20260406160100_member_invitations.sql)
+- [20260406160200_realtime_messages.sql](/Users/ramonoliveira/Downloads/Servosapp/servos/sql/migrations/20260406160200_realtime_messages.sql)
+- [20260406160300_password_reset_tokens.sql](/Users/ramonoliveira/Downloads/Servosapp/servos/sql/migrations/20260406160300_password_reset_tokens.sql)
+
+Script consolidado para aplicar tudo de uma vez no SQL Editor:
 
 - [sql/communications.sql](/Users/ramonoliveira/Downloads/Servosapp/servos/sql/communications.sql)
 
-Esse script configura:
+Esse pacote cobre:
 
 - `schedule_chats`
 - `member_invitations`
+- `password_reset_tokens`
+- realtime de `messages` e `schedule_chats`
 - índices
 - constraints básicas
 - permissões compatíveis com a arquitetura atual do app
 
-Os arquivos [sql/schedule_chats.sql](/Users/ramonoliveira/Downloads/Servosapp/servos/sql/schedule_chats.sql) e [sql/member_invitations.sql](/Users/ramonoliveira/Downloads/Servosapp/servos/sql/member_invitations.sql) continuam disponíveis como versões separadas por tabela.
+Os arquivos [sql/schedule_chats.sql](/Users/ramonoliveira/Downloads/Servosapp/servos/sql/schedule_chats.sql), [sql/member_invitations.sql](/Users/ramonoliveira/Downloads/Servosapp/servos/sql/member_invitations.sql) e [sql/password_reset_tokens.sql](/Users/ramonoliveira/Downloads/Servosapp/servos/sql/password_reset_tokens.sql) continuam disponíveis como versões separadas.
 
 ## Stack
 

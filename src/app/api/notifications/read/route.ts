@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiActor } from "@/lib/auth/api-session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({
-  actorId: z.string().min(1),
-  churchId: z.string().min(1),
   notificationIds: z.array(z.string()).min(1),
 });
 
@@ -15,17 +14,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Dados invalidos para marcar notificacoes." }, { status: 400 });
     }
 
-    const { actorId, churchId, notificationIds } = parsed.data;
+    const { actor, errorResponse } = await requireApiActor(req, { select: "id, church_id, active" });
+    if (errorResponse) return errorResponse;
+
+    const { notificationIds } = parsed.data;
     const supabase = getSupabaseServerClient();
-
-    const { data: actor, error: actorError } = await supabase
-      .from("users")
-      .select("id, church_id, active")
-      .eq("id", actorId)
-      .eq("church_id", churchId)
-      .maybeSingle();
-
-    if (actorError) throw actorError;
     if (!actor?.active) {
       return NextResponse.json({ error: "Usuario nao encontrado." }, { status: 404 });
     }
@@ -33,7 +26,7 @@ export async function POST(req: Request) {
     const { error } = await supabase
       .from("notifications")
       .update({ read: true })
-      .eq("user_id", actorId)
+      .eq("user_id", actor.id)
       .in("id", notificationIds);
 
     if (error) throw error;

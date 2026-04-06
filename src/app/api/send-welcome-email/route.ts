@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { requireApiActor } from "@/lib/auth/api-session";
+import { can } from "@/lib/auth/permissions";
 import { deliverMemberInvitation } from "@/lib/server/member-invitations";
 
 type SendWelcomeEmailBody = {
@@ -14,6 +16,12 @@ type SendWelcomeEmailBody = {
 
 export async function POST(req: Request) {
   try {
+    const { actor, session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+    if (!actor?.active || !can(actor.role, "member.invite")) {
+      return NextResponse.json({ error: "Sem permissao para enviar convite." }, { status: 403 });
+    }
+
     const body = (await req.json().catch(() => ({}))) as SendWelcomeEmailBody;
     const {
       to,

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiActor } from "@/lib/auth/api-session";
 import { can } from "@/lib/auth/permissions";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { genId } from "@/lib/utils/helpers";
@@ -10,8 +11,6 @@ const selectedDepartmentSchema = z.object({
 });
 
 const bodySchema = z.object({
-  actorId: z.string().min(1),
-  churchId: z.string().min(1),
   memberId: z.string().min(1),
   updates: z.object({
     name: z.string().trim().min(1),
@@ -33,25 +32,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Dados invalidos para atualizar membro." }, { status: 400 });
     }
 
-    const { actorId, churchId, memberId, updates, selectedDepartments, spouseId } = parsed.data;
+    const { actor, session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+
+    const actorId = session!.user_id;
+    const churchId = session!.church_id;
+    const { memberId, updates, selectedDepartments, spouseId } = parsed.data;
     const supabase = getSupabaseServerClient();
 
-    const [{ data: actor, error: actorError }, { data: member, error: memberError }] = await Promise.all([
-      supabase
-        .from("users")
-        .select("id, role, church_id, active")
-        .eq("id", actorId)
-        .eq("church_id", churchId)
-        .maybeSingle(),
-      supabase
+    const { data: member, error: memberError } = await supabase
         .from("users")
         .select("id, church_id, spouse_id, active, role")
         .eq("id", memberId)
         .eq("church_id", churchId)
-        .maybeSingle(),
-    ]);
-
-    if (actorError) throw actorError;
+        .maybeSingle();
     if (memberError) throw memberError;
 
     if (!actor?.active || !can(actor.role, "member.edit")) {

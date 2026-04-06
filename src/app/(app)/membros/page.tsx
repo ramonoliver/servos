@@ -134,9 +134,7 @@ export default function MembrosPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          actorId: user.id,
           targetUserId: m.id,
-          churchId: user.church_id,
         }),
       });
 
@@ -167,9 +165,6 @@ export default function MembrosPage() {
         },
         body: JSON.stringify({
           userId: member.id,
-          churchId: user.church_id,
-          churchName: church.name,
-          invitedByUserId: user.id,
         }),
       });
 
@@ -201,29 +196,29 @@ export default function MembrosPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="page-title">Membros</h1>
           <p className="page-subtitle">{members.length} voluntarios</p>
         </div>
 
         {canDo("member.invite") && (
-          <Link href="/membros/convidar" className="btn btn-primary">
+          <Link href="/membros/convidar" className="btn btn-primary self-start sm:self-auto">
             + Convidar
           </Link>
         )}
       </div>
 
-      <div className="flex items-center gap-3 mb-5">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-5">
         <input
-          className="input-field max-w-[280px]"
+          className="input-field w-full lg:max-w-[280px]"
           placeholder="Buscar por nome ou email..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
 
         <select
-          className="input-field max-w-[200px]"
+          className="input-field w-full lg:max-w-[220px]"
           value={deptFilter}
           onChange={(e) => setDeptFilter(e.target.value)}
         >
@@ -279,7 +274,7 @@ export default function MembrosPage() {
             return (
               <div
                 key={m.id}
-                className="flex items-center gap-3.5 px-5 py-3 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors group"
+                className="flex flex-col sm:flex-row sm:items-center gap-3.5 px-5 py-3 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors group"
               >
                 <Link href={`/membros/${m.id}`} className="flex items-center gap-3.5 flex-1 min-w-0">
                   {m.photo_url ? (
@@ -302,7 +297,7 @@ export default function MembrosPage() {
                       {m.name}
                       {m.must_change_password ? " *" : ""}
                     </div>
-                    <div className="text-[11px] text-ink-faint">
+                    <div className="text-[11px] text-ink-faint break-words">
                       {func}
                       {deptNames.length ? " · " + deptNames.join(", ") : ""}
                       {" · "}
@@ -310,41 +305,61 @@ export default function MembrosPage() {
                     </div>
                   </div>
 
-                  <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${roleCls}`}>
-                    {m.role === "admin" ? "Admin" : m.role === "leader" ? "Lider" : "Membro"}
-                  </span>
-
-                  {spouse && (
-                    <span className="text-[9px] font-semibold text-brand bg-brand-light px-1.5 py-0.5 rounded-full">
-                      &#128145; {spouse.name.split(" ")[0]}
+                  <div className="hidden sm:flex items-center gap-2">
+                    <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${roleCls}`}>
+                      {m.role === "admin" ? "Admin" : m.role === "leader" ? "Lider" : "Membro"}
                     </span>
-                  )}
 
-                  {inviteBadge && (
-                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${inviteBadge.cls}`}>
-                      {inviteBadge.label}
-                    </span>
-                  )}
+                    {spouse && (
+                      <span className="text-[9px] font-semibold text-brand bg-brand-light px-1.5 py-0.5 rounded-full">
+                        &#128145; {spouse.name.split(" ")[0]}
+                      </span>
+                    )}
+
+                    {inviteBadge && (
+                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${inviteBadge.cls}`}>
+                        {inviteBadge.label}
+                      </span>
+                    )}
+                  </div>
                 </Link>
 
-                {canDo("member.invite") && m.must_change_password && (
-                  <button
-                    onClick={() => resendInvite(m)}
-                    disabled={resendingId === m.id}
-                    className="btn btn-secondary btn-sm whitespace-nowrap"
-                  >
-                    {resendingId === m.id ? "Reenviando..." : "Reenviar convite"}
-                  </button>
-                )}
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                  <div className="flex sm:hidden flex-wrap items-center gap-2">
+                    <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${roleCls}`}>
+                      {m.role === "admin" ? "Admin" : m.role === "leader" ? "Lider" : "Membro"}
+                    </span>
+                    {spouse && (
+                      <span className="text-[9px] font-semibold text-brand bg-brand-light px-1.5 py-0.5 rounded-full">
+                        &#128145; {spouse.name.split(" ")[0]}
+                      </span>
+                    )}
+                    {inviteBadge && (
+                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${inviteBadge.cls}`}>
+                        {inviteBadge.label}
+                      </span>
+                    )}
+                  </div>
 
-                {canDo("member.remove") && m.id !== user.id && (
-                  <button
-                    onClick={() => removeMember(m)}
-                    className="btn btn-ghost btn-sm text-danger opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    &#10005;
-                  </button>
-                )}
+                  {canDo("member.invite") && m.must_change_password && (
+                    <button
+                      onClick={() => resendInvite(m)}
+                      disabled={resendingId === m.id}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      {resendingId === m.id ? "Reenviando..." : "Reenviar convite"}
+                    </button>
+                  )}
+
+                  {canDo("member.remove") && m.id !== user.id && (
+                    <button
+                      onClick={() => removeMember(m)}
+                      className="btn btn-ghost btn-sm text-danger sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                    >
+                      &#10005;
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })

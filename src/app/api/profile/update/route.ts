@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiActor } from "@/lib/auth/api-session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({
-  userId: z.string().min(1),
-  churchId: z.string().min(1),
   name: z.string().trim().min(1),
   phone: z.string().trim().default(""),
   availability: z.array(z.boolean()).length(7),
@@ -19,18 +18,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Dados invalidos para atualizar perfil." }, { status: 400 });
     }
 
-    const { userId, churchId, name, phone, availability, photoUrl } = parsed.data;
+    const { actor, session, errorResponse } = await requireApiActor(req, { select: "id, church_id, active" });
+    if (errorResponse) return errorResponse;
+
+    const { name, phone, availability, photoUrl } = parsed.data;
     const supabase = getSupabaseServerClient();
-
-    const { data: member, error: memberError } = await supabase
-      .from("users")
-      .select("id, church_id, active")
-      .eq("id", userId)
-      .eq("church_id", churchId)
-      .maybeSingle();
-
-    if (memberError) throw memberError;
-    if (!member?.active) {
+    if (!actor?.active) {
       return NextResponse.json({ error: "Usuario nao encontrado." }, { status: 404 });
     }
 
@@ -44,8 +37,8 @@ export async function POST(req: Request) {
     const { data: updatedUser, error: updateError } = await supabase
       .from("users")
       .update(updates)
-      .eq("id", userId)
-      .eq("church_id", churchId)
+      .eq("id", actor.id)
+      .eq("church_id", session!.church_id)
       .select("*")
       .single();
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useApp } from "@/hooks/use-app";
 import { formatInviteDate, formatInviteOpenedAt } from "@/lib/invitations";
 import { supabase } from "@/lib/supabase/client";
@@ -24,6 +25,7 @@ type SelectedDepartment = {
 
 export default function MembroDetailPage({ params }: { params: { id: string } }) {
   const { user, church, departments, canDo, toast } = useApp();
+  const router = useRouter();
 
   const [showEdit, setShowEdit] = useState(false);
   const [member, setMember] = useState<User | null>(null);
@@ -170,9 +172,6 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
         },
         body: JSON.stringify({
           userId: member.id,
-          churchId: user.church_id,
-          churchName: church.name,
-          invitedByUserId: user.id,
         }),
       });
 
@@ -194,15 +193,47 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
     }
   }
 
+  async function removeMember() {
+    if (!member || !canDo("member.remove") || member.id === user.id) return;
+    const confirmed = window.confirm(
+      user.role === "admin"
+        ? `Excluir ${member.name} permanentemente e apagar os dados relacionados?`
+        : `Remover ${member.name} da igreja?`
+    );
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch("/api/members/deactivate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetUserId: member.id,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        toast(data?.error || "Nao foi possivel remover este membro.");
+        return;
+      }
+
+      toast(user.role === "admin" ? "Usuario excluido com sucesso." : "Membro removido com sucesso.");
+      router.push("/membros");
+    } catch (error) {
+      console.error("Erro ao remover membro:", error);
+      toast("Nao foi possivel remover este membro.");
+    }
+  }
+
   return (
     <div>
       <Link href="/membros" className="inline-flex items-center gap-1.5 text-[13px] text-brand font-medium mb-5 hover:underline">
         &larr; Membros
       </Link>
 
-      <div className="grid grid-cols-[1fr_320px] gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
         <div className="space-y-5">
-          <div className="flex items-center gap-5 mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-5 mb-2">
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-bold"
               style={{ background: member.avatar_color }}
@@ -210,9 +241,9 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
               {getInitials(member.name)}
             </div>
 
-            <div>
-              <h1 className="page-title">{member.name}</h1>
-              <p className="page-subtitle">{member.email}</p>
+            <div className="min-w-0 flex-1">
+              <h1 className="page-title break-words">{member.name}</h1>
+              <p className="page-subtitle break-all">{member.email}</p>
 
               <div className="flex gap-2 mt-2 flex-wrap">
                 <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${roleCls}`}>
@@ -229,11 +260,18 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
               </div>
             </div>
 
-            {canDo("member.edit") && (
-              <button onClick={() => setShowEdit(true)} className="btn btn-secondary btn-sm ml-auto self-start">
-                &#9998; Editar
-              </button>
-            )}
+            <div className="flex flex-wrap gap-2 sm:ml-auto sm:self-start">
+              {canDo("member.edit") && (
+                <button onClick={() => setShowEdit(true)} className="btn btn-secondary btn-sm">
+                  &#9998; Editar
+                </button>
+              )}
+              {canDo("member.remove") && member.id !== user.id && (
+                <button onClick={removeMember} className="btn btn-danger btn-sm">
+                  Excluir usuario
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="card p-5">
@@ -294,9 +332,9 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
                 ["Status", member.status],
                 ["Desde", member.joined_at?.split("T")[0] || "-"],
               ].map(([l, v], i) => (
-                <div key={i} className="flex justify-between py-1.5 border-t border-border-soft first:border-t-0">
+                <div key={i} className="flex items-center justify-between gap-4 py-1.5 border-t border-border-soft first:border-t-0">
                   <span className="text-ink-muted">{l}</span>
-                  <span className="font-medium">{v}</span>
+                  <span className="font-medium text-right break-words">{v}</span>
                 </div>
               ))}
             </div>
@@ -325,7 +363,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
 
               {latestInvite ? (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="rounded-xl bg-surface-alt px-4 py-3">
                       <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">
                         Ultimo envio
@@ -359,7 +397,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
                   </div>
 
                   {(latestInvite.email_error || latestInvite.whatsapp_error) && (
-                    <div className="rounded-xl border border-amber/20 bg-amber-light px-4 py-3 text-xs text-amber">
+                  <div className="rounded-xl border border-amber/20 bg-amber-light px-4 py-3 text-xs text-amber break-words">
                       {latestInvite.email_error && <div>Email: {latestInvite.email_error}</div>}
                       {latestInvite.whatsapp_error && <div>WhatsApp: {latestInvite.whatsapp_error}</div>}
                     </div>
@@ -382,9 +420,9 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
               dms.map((dm) => {
                 const d = departments.find((dep) => dep.id === dm.department_id);
                 return d ? (
-                  <div key={dm.id} className="flex items-center justify-between py-1.5">
-                    <span className="text-sm font-medium">{d.name}</span>
-                    <span className="text-xs text-ink-faint">{dm.function_name}</span>
+                  <div key={dm.id} className="flex items-center justify-between gap-3 py-1.5">
+                    <span className="text-sm font-medium break-words">{d.name}</span>
+                    <span className="text-xs text-ink-faint text-right">{dm.function_name}</span>
                   </div>
                 ) : null;
               })
@@ -408,8 +446,6 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
                   "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                  actorId: user.id,
-                  churchId: user.church_id,
                   memberId: member.id,
                   updates,
                   selectedDepartments,

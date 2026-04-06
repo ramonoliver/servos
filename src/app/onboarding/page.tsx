@@ -198,9 +198,6 @@ export default function OnboardingPage() {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              churchId: church.id,
-              churchName: church.name,
-              invitedByUserId: user.id,
               name: inviteName.trim(),
               email: normalizedEmail,
               phone: "",

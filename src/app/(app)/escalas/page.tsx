@@ -61,9 +61,7 @@ export default function EscalasPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          actorId: user.id,
           scheduleId: id,
-          churchId: user.church_id,
         }),
       });
 
@@ -85,20 +83,20 @@ export default function EscalasPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="page-title">Escalas</h1>
           <p className="page-subtitle">{schedules.length} escalas</p>
         </div>
 
         {canDo("schedule.create") && (
-          <Link href="/escalas/nova" className="btn btn-primary">
+          <Link href="/escalas/nova" className="btn btn-primary self-start sm:self-auto">
             + Nova Escala
           </Link>
         )}
       </div>
 
-      <div className="flex gap-1 mb-5 bg-surface-alt rounded-[10px] p-0.5 w-fit">
+      <div className="flex flex-wrap gap-1 mb-5 bg-surface-alt rounded-[10px] p-0.5 w-fit max-w-full">
         {(["all", "active", "draft"] as const).map((f) => (
           <button
             key={f}
@@ -142,7 +140,7 @@ export default function EscalasPage() {
             return (
               <div
                 key={s.id}
-                className="flex items-center gap-3.5 px-5 py-3.5 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors group"
+                className="flex flex-col sm:flex-row sm:items-center gap-3.5 px-5 py-3.5 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors group"
               >
                 <Link href={`/escalas/${s.id}`} className="flex items-center gap-3.5 flex-1 min-w-0">
                   <div
@@ -159,32 +157,32 @@ export default function EscalasPage() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate flex items-center gap-2">
-                      {ev?.name || "Escala"}
+                    <div className="text-sm font-medium flex flex-wrap items-center gap-2">
+                      <span className="break-words">{ev?.name || "Escala"}</span>
                       {ev?.type === "special" && <span className="badge badge-brand">Especial</span>}
                       {s.status === "draft" && <span className="badge badge-info">Rascunho</span>}
                       {s.status === "cancelled" && <span className="badge badge-red">Cancelada</span>}
                     </div>
 
-                    <div className="text-[11px] text-ink-faint">
+                    <div className="text-[11px] text-ink-faint break-words">
                       {formatShortDate(s.date)} &middot; {s.time} &middot; {dept?.name} &middot; {sm.length} escalados
                     </div>
                   </div>
 
                   {sm.length > 0 ? (
-                    <span className={`badge ${allOk ? "badge-green" : "badge-amber"}`}>
+                    <span className={`badge shrink-0 ${allOk ? "badge-green" : "badge-amber"}`}>
                       {confirmed}/{sm.length}
                       {allOk ? " \u2713" : ""}
                     </span>
                   ) : (
-                    <span className="badge badge-info">Vazia</span>
+                    <span className="badge shrink-0 badge-info">Vazia</span>
                   )}
                 </Link>
 
                 {canDo("schedule.delete") && (
                   <button
                     onClick={() => deleteSchedule(s.id)}
-                    className="btn btn-ghost btn-sm text-danger opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="btn btn-ghost btn-sm text-danger sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                     title="Excluir"
                   >
                     &#10005;
