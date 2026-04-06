@@ -2,17 +2,28 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendScheduleReminderEmail } from "@/lib/email/send";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 type RouteBody = {
   scheduleId?: string;
 };
 
+function getSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL is required.");
+  }
+
+  if (!supabaseKey) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY is required.");
+  }
+
+  return createClient(supabaseUrl, supabaseKey);
+}
+
 export async function POST(req: Request) {
   try {
+    const supabase = getSupabase();
     const body = (await req.json().catch(() => ({}))) as RouteBody;
     const { scheduleId } = body;
 
@@ -38,7 +49,7 @@ export async function POST(req: Request) {
     if (schedulesError) throw schedulesError;
 
     if (!schedules || schedules.length === 0) {
-      return NextResponse.json({ message: "Nenhuma escala encontrada." });
+      return NextResponse.json({ success: true, sentCount: 0, failedCount: 0, sent: [], failed: [] });
     }
 
     const sent: Array<{ scheduleId: string; email: string }> = [];
@@ -90,6 +101,11 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("Erro no envio de lembretes:", error);
-    return NextResponse.json({ error: "Erro ao enviar lembretes" }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Erro ao enviar lembretes",
+      },
+      { status: 500 }
+    );
   }
 }
