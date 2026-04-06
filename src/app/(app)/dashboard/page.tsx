@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
+import { Avatar } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
 import { getVerseOfDay } from "@/lib/ai/engine";
-import { getGreeting, getDayName, getInitials, formatShortDate } from "@/lib/utils/helpers";
+import { getGreeting, getDayName, formatShortDate } from "@/lib/utils/helpers";
 import Link from "next/link";
 import type { Schedule, ScheduleMember, Event, User, Notification } from "@/types";
 
@@ -294,12 +295,7 @@ export default function DashboardPage() {
 
                   return (
                     <div key={sm.id} className="flex items-start sm:items-center gap-3.5 px-5 py-3 border-t border-border-soft">
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
-                        style={{ background: m.avatar_color }}
-                      >
-                        {getInitials(m.name)}
-                      </div>
+                      <Avatar name={m.name} color={m.avatar_color} photoUrl={m.photo_url} size={32} />
 
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium break-words sm:truncate">{m.name}</div>

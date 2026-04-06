@@ -1,6 +1,6 @@
-import { sendWhatsAppInvite, sendWelcomeEmail } from "@/lib/email/send";
+import { sendSmsInvite, sendWelcomeEmail } from "@/lib/email/send";
 import {
-  buildWhatsAppInvitePreview,
+  buildSmsInvitePreview,
   createInviteTrackingToken,
   getInviteOpenTrackingUrl,
 } from "@/lib/invitations";
@@ -39,7 +39,7 @@ export async function deliverMemberInvitation(input: DeliveryInput) {
         phone: phone || null,
         tracking_token: trackingToken,
         email_status: "pending",
-        whatsapp_status: phone ? "pending" : "skipped",
+        sms_status: phone ? "pending" : "skipped",
         sent_at: now,
         created_at: now,
       });
@@ -74,7 +74,7 @@ export async function deliverMemberInvitation(input: DeliveryInput) {
     emailError = error instanceof Error ? error.message : "Falha ao enviar email";
   }
 
-  const whatsapp = await sendWhatsAppInvite({
+  const sms = await sendSmsInvite({
     to: phone || "",
     memberName,
     churchName,
@@ -89,25 +89,25 @@ export async function deliverMemberInvitation(input: DeliveryInput) {
       .update({
         email_status: emailStatus,
         email_error: emailError,
-        whatsapp_status: whatsapp.status,
-        whatsapp_error: whatsapp.error,
+        sms_status: sms.status,
+        sms_error: sms.error,
       })
       .eq("id", invitationId);
   }
 
   return {
-    success: emailStatus === "sent" || whatsapp.status === "sent",
+    success: emailStatus === "sent" || sms.status === "sent",
     invitationId,
     trackingEnabled,
     email: {
       status: emailStatus,
       error: emailError,
     },
-    whatsapp: {
-      ...whatsapp,
+    sms: {
+      ...sms,
       preview:
-        whatsapp.status === "skipped"
-          ? buildWhatsAppInvitePreview({
+        sms.status === "skipped"
+          ? buildSmsInvitePreview({
               memberName,
               churchName,
               tempPassword,

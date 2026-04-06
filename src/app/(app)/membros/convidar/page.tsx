@@ -21,7 +21,7 @@ type InviteDeliveryResult = {
     status: "sent" | "failed";
     error: string | null;
   };
-  whatsapp?: {
+  sms?: {
     status: "sent" | "failed" | "skipped";
     error: string | null;
     preview?: string | null;
@@ -153,10 +153,10 @@ export default function ConvidarMembroPage() {
         setCreatedEmail(payload?.member?.email || f.email.trim().toLowerCase());
         setTempPw(payload?.tempPassword || null);
 
-        if (delivery?.whatsapp?.status === "failed") {
-          toast("Convite enviado por email, mas o WhatsApp falhou.");
-        } else if (delivery?.whatsapp?.status === "skipped") {
-          toast("Email enviado. WhatsApp aguardando configuracao.");
+        if (delivery?.sms?.status === "failed") {
+          toast("Convite enviado por email, mas o SMS falhou.");
+        } else if (delivery?.sms?.status === "skipped") {
+          toast("Email enviado. SMS aguardando configuracao.");
         } else {
           toast("Convite enviado com sucesso.");
         }
@@ -211,25 +211,25 @@ export default function ConvidarMembroPage() {
             </div>
             <div className="rounded-xl bg-surface-alt p-3">
               <div className="text-sm flex items-center justify-between gap-3">
-                <span>WhatsApp</span>
+                <span>SMS</span>
                 <strong
                   className={
-                    inviteDelivery?.whatsapp?.status === "sent"
+                    inviteDelivery?.sms?.status === "sent"
                       ? "text-success"
-                      : inviteDelivery?.whatsapp?.status === "skipped"
+                      : inviteDelivery?.sms?.status === "skipped"
                       ? "text-amber"
                       : "text-danger"
                   }
                 >
-                  {inviteDelivery?.whatsapp?.status === "sent"
+                  {inviteDelivery?.sms?.status === "sent"
                     ? "Enviado"
-                    : inviteDelivery?.whatsapp?.status === "skipped"
+                    : inviteDelivery?.sms?.status === "skipped"
                     ? "Não configurado"
                     : "Falhou"}
                 </strong>
               </div>
-              {inviteDelivery?.whatsapp?.error && (
-                <div className="text-[11px] text-ink-faint mt-1">{inviteDelivery.whatsapp.error}</div>
+              {inviteDelivery?.sms?.error && (
+                <div className="text-[11px] text-ink-faint mt-1">{inviteDelivery.sms.error}</div>
               )}
             </div>
             <div className="text-xs text-ink-faint">
@@ -238,9 +238,9 @@ export default function ConvidarMembroPage() {
                 {inviteDelivery?.trackingEnabled ? "ativo" : "indisponivel"}
               </strong>
             </div>
-            {inviteDelivery?.whatsapp?.preview && (
+            {inviteDelivery?.sms?.preview && (
               <div className="rounded-xl bg-surface-alt p-3 text-xs text-ink-muted whitespace-pre-line">
-                {inviteDelivery.whatsapp.preview}
+                {inviteDelivery.sms.preview}
               </div>
             )}
           </div>
@@ -322,7 +322,7 @@ export default function ConvidarMembroPage() {
               inputMode="numeric"
             />
             <div className="text-[11px] text-ink-faint mt-1">
-              Usado para envio automatico por WhatsApp quando configurado.
+              Usado para envio automatico por SMS quando configurado.
             </div>
           </div>
 
@@ -442,7 +442,7 @@ export default function ConvidarMembroPage() {
             <div className="text-[11px] text-ink-faint mt-1">HTML com tracking de abertura</div>
           </div>
           <div className="rounded-[12px] border border-border-soft bg-white px-4 py-3">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">WhatsApp</div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">SMS</div>
             <div className="text-sm font-medium mt-1">Envio automatico</div>
             <div className="text-[11px] text-ink-faint mt-1">Usa telefone do cadastro</div>
           </div>

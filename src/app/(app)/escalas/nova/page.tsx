@@ -3,9 +3,10 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useApp } from "@/hooks/use-app";
+import { Avatar } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
 import { suggestMembers, autoSelectWithCouples } from "@/lib/ai/engine";
-import { getDayOfWeek, getInitials, getIconEmoji } from "@/lib/utils/helpers";
+import { getDayOfWeek, getIconEmoji } from "@/lib/utils/helpers";
 import type {
   Event,
   User,
@@ -196,7 +197,25 @@ export default function NovaEscalaPage() {
         return;
       }
 
-      toast(publish ? `Escala publicada com ${selectedIds.length} membros!` : "Rascunho salvo.");
+      if (publish) {
+        const smsSentCount = data?.notifications?.sms?.sent || 0;
+        const smsFailedCount = data?.notifications?.sms?.failed || 0;
+        const smsSkippedCount = data?.notifications?.sms?.skipped || 0;
+
+        if (smsSentCount > 0) {
+          toast(
+            `Escala publicada com ${selectedIds.length} membro(s). SMS enviado para ${smsSentCount}.`
+          );
+        } else if (smsSkippedCount > 0) {
+          toast("Escala publicada. SMS ainda nao configurado neste ambiente.");
+        } else if (smsFailedCount > 0) {
+          toast(`Escala publicada, mas o SMS falhou para ${smsFailedCount} membro(s).`);
+        } else {
+          toast(`Escala publicada com ${selectedIds.length} membro(s)!`);
+        }
+      } else {
+        toast("Rascunho salvo.");
+      }
       router.push("/escalas");
     } catch (error) {
       console.error("Erro ao criar escala:", error);
@@ -338,12 +357,12 @@ export default function NovaEscalaPage() {
                       {isSelected ? "\u2713" : ""}
                     </div>
 
-                    <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
-                      style={{ background: item.user.avatar_color }}
-                    >
-                      {getInitials(item.user.name)}
-                    </div>
+                    <Avatar
+                      name={item.user.name}
+                      color={item.user.avatar_color}
+                      photoUrl={item.user.photo_url}
+                      size={28}
+                    />
 
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-medium truncate">{item.user.name}</div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
+import { Avatar } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
 import { formatDate, getDayName, getInitials } from "@/lib/utils/helpers";
 import Link from "next/link";
@@ -278,12 +279,7 @@ export default function MinhasEscalasPage() {
                               key={t.id}
                               className="flex items-center gap-1.5 bg-surface-alt px-2.5 py-1 rounded-full"
                             >
-                              <div
-                                className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
-                                style={{ background: m.avatar_color }}
-                              >
-                                {getInitials(m.name)}
-                              </div>
+                              <Avatar name={m.name} color={m.avatar_color} photoUrl={m.photo_url} size={20} />
                               <span className="text-[11px] font-medium">
                                 {m.name.split(" ")[0]}
                               </span>

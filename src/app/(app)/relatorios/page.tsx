@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
+import { Avatar } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
-import { getInitials } from "@/lib/utils/helpers";
 import type { User, Schedule, ScheduleMember } from "@/types";
 
 export default function RelatóriosPage() {
@@ -118,12 +118,7 @@ export default function RelatóriosPage() {
             topServing.map((m, i) => (
               <div key={m.id} className="flex items-center gap-3 px-5 py-2.5 border-t border-border-soft">
                 <span className="text-xs text-ink-faint w-4">{i + 1}.</span>
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
-                  style={{ background: m.avatar_color }}
-                >
-                  {getInitials(m.name)}
-                </div>
+                <Avatar name={m.name} color={m.avatar_color} photoUrl={m.photo_url} size={28} />
                 <div className="flex-1 text-sm font-medium">{m.name}</div>
                 <span className="text-sm font-semibold text-brand">{m.total_schedules}</span>
               </div>
@@ -144,12 +139,7 @@ export default function RelatóriosPage() {
             lowConfirm.map((m, i) => (
               <div key={m.id} className="flex items-center gap-3 px-5 py-2.5 border-t border-border-soft">
                 <span className="text-xs text-ink-faint w-4">{i + 1}.</span>
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
-                  style={{ background: m.avatar_color }}
-                >
-                  {getInitials(m.name)}
-                </div>
+                <Avatar name={m.name} color={m.avatar_color} photoUrl={m.photo_url} size={28} />
                 <div className="flex-1 text-sm font-medium">{m.name}</div>
                 <span
                   className={`text-sm font-semibold ${

@@ -33,6 +33,7 @@ export function createSessionPayload(user: User): Session {
     name: user.name,
     role: user.role,
     avatar_color: user.avatar_color,
+    photo_url: user.photo_url,
     expires_at: Date.now() + SEVEN_DAYS * 1000,
   };
 }

@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useApp } from "@/hooks/use-app";
+import { Avatar } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
-import { getInitials } from "@/lib/utils/helpers";
 import type { Message, User } from "@/types";
 
 function sortMessages(messages: Message[]) {
@@ -305,12 +305,12 @@ export default function MensagensPage() {
                   <div
                     className={`max-w-[88%] sm:max-w-[70%] flex gap-2 ${isMe ? "flex-row-reverse" : ""} items-end`}
                   >
-                    <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"
-                      style={{ background: sender?.avatar_color || "#999" }}
-                    >
-                      {getInitials(sender?.name || "?")}
-                    </div>
+                    <Avatar
+                      name={sender?.name || "?"}
+                      color={sender?.avatar_color || "#999"}
+                      photoUrl={sender?.photo_url}
+                      size={28}
+                    />
 
                     <div
                       className={`px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed ${

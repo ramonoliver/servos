@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import {
-  buildWhatsAppInvitePreview,
-  normalizePhoneForWhatsApp,
+  buildSmsInvitePreview,
+  normalizePhoneForSms,
 } from "@/lib/invitations";
 
 type WelcomeEmailInput = {
@@ -13,6 +13,15 @@ type WelcomeEmailInput = {
 };
 
 type ScheduleReminderInput = {
+  to: string;
+  memberName: string;
+  eventName: string;
+  date: string;
+  time: string;
+  departmentName: string;
+};
+
+type SmsScheduleInput = {
   to: string;
   memberName: string;
   eventName: string;
@@ -161,6 +170,52 @@ export async function sendScheduleReminderEmail({
   });
 }
 
+async function sendSmsMessage(params: {
+  to: string;
+  body: string;
+}) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_SMS_FROM;
+  const normalizedPhone = normalizePhoneForSms(params.to);
+
+  if (!normalizedPhone) {
+    return { status: "skipped" as const, error: "Membro sem telefone para SMS." };
+  }
+
+  if (!accountSid || !authToken || !fromNumber) {
+    return {
+      status: "skipped" as const,
+      error: "SMS nao configurado. Defina TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN e TWILIO_SMS_FROM.",
+    };
+  }
+
+  const body = new URLSearchParams({
+    To: `+${normalizedPhone}`,
+    From: fromNumber,
+    Body: params.body,
+  });
+
+  const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: body.toString(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    return {
+      status: "failed" as const,
+      error: errorText || "Falha ao enviar SMS.",
+    };
+  }
+
+  return { status: "sent" as const, error: null };
+}
+
 export async function sendPasswordResetEmail({
   to,
   memberName,
@@ -207,7 +262,7 @@ export async function sendPasswordResetEmail({
   });
 }
 
-type WhatsAppInviteInput = {
+type SmsInviteInput = {
   to: string;
   memberName: string;
   churchName: string;
@@ -215,68 +270,58 @@ type WhatsAppInviteInput = {
   email: string;
 };
 
-export async function sendWhatsAppInvite({
+export async function sendSmsInvite({
   to,
   memberName,
   churchName,
   tempPassword,
   email,
-}: WhatsAppInviteInput): Promise<{ status: "sent" | "failed" | "skipped"; error: string | null }> {
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const templateName = process.env.WHATSAPP_TEMPLATE_NAME;
-  const languageCode = process.env.WHATSAPP_TEMPLATE_LANGUAGE_CODE || "pt_BR";
-  const normalizedPhone = normalizePhoneForWhatsApp(to);
+}: SmsInviteInput): Promise<{ status: "sent" | "failed" | "skipped"; error: string | null }> {
+  return sendSmsMessage({
+    to,
+    body: buildSmsInvitePreview({
+      memberName,
+      churchName,
+      email,
+      tempPassword,
+    }),
+  });
+}
 
-  if (!normalizedPhone) {
-    return { status: "skipped", error: "Membro sem telefone para WhatsApp." };
-  }
+export async function sendSmsScheduleAssignment({
+  to,
+  memberName,
+  eventName,
+  date,
+  time,
+  departmentName,
+}: SmsScheduleInput): Promise<{ status: "sent" | "failed" | "skipped"; error: string | null }> {
+  return sendSmsMessage({
+    to,
+    body: [
+      `Servos: ${memberName}, nova escala em ${eventName}.`,
+      `${date} às ${time}.`,
+      `Ministério: ${departmentName}.`,
+      "Abra o app e confirme.",
+    ].join("\n"),
+  });
+}
 
-  if (!accessToken || !phoneNumberId || !templateName) {
-    return {
-      status: "skipped",
-      error: "WhatsApp Cloud API nao configurada. Defina WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID e WHATSAPP_TEMPLATE_NAME.",
-    };
-  }
-
-  const response = await fetch(
-    `https://graph.facebook.com/v22.0/${phoneNumberId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: normalizedPhone,
-        type: "template",
-        template: {
-          name: templateName,
-          language: { code: languageCode },
-          components: [
-            {
-              type: "body",
-              parameters: [
-                { type: "text", text: memberName },
-                { type: "text", text: churchName },
-                { type: "text", text: email },
-                { type: "text", text: tempPassword },
-              ],
-            },
-          ],
-        },
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    return {
-      status: "failed",
-      error: errorText || "Falha ao enviar WhatsApp.",
-    };
-  }
-
-  return { status: "sent", error: null };
+export async function sendSmsScheduleReminder({
+  to,
+  memberName,
+  eventName,
+  date,
+  time,
+  departmentName,
+}: SmsScheduleInput): Promise<{ status: "sent" | "failed" | "skipped"; error: string | null }> {
+  return sendSmsMessage({
+    to,
+    body: [
+      `Servos: lembrete para ${memberName}.`,
+      `${eventName} em ${date} às ${time}.`,
+      `Ministério: ${departmentName}.`,
+      "Se ainda não respondeu, confirme no app.",
+    ].join("\n"),
+  });
 }

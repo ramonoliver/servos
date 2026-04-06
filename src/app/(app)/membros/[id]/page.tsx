@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { useApp } from "@/hooks/use-app";
 import { formatInviteDate, formatInviteOpenedAt } from "@/lib/invitations";
 import { supabase } from "@/lib/supabase/client";
-import { getInitials, formatShortDate } from "@/lib/utils/helpers";
+import { formatShortDate } from "@/lib/utils/helpers";
 import { MemberEditModal } from "@/components/shared/member-edit-modal";
-import { AvailabilityGrid } from "@/components/ui";
+import { AvailabilityGrid, Avatar } from "@/components/ui";
 import Link from "next/link";
 import type {
   User,
@@ -140,21 +140,21 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
               : "text-amber",
         },
         {
-          label: "WhatsApp",
+          label: "SMS",
           value:
-            latestInvite.whatsapp_status === "sent"
+            latestInvite.sms_status === "sent"
               ? "Entregue"
-              : latestInvite.whatsapp_status === "failed"
+              : latestInvite.sms_status === "failed"
               ? "Falhou"
-              : latestInvite.whatsapp_status === "skipped"
+              : latestInvite.sms_status === "skipped"
               ? "Não configurado"
               : "Pendente",
           tone:
-            latestInvite.whatsapp_status === "sent"
+            latestInvite.sms_status === "sent"
               ? "text-success"
-              : latestInvite.whatsapp_status === "failed"
+              : latestInvite.sms_status === "failed"
               ? "text-danger"
-              : latestInvite.whatsapp_status === "skipped"
+              : latestInvite.sms_status === "skipped"
               ? "text-amber"
               : "text-ink",
         },
@@ -241,12 +241,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
         <div className="space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center gap-5 mb-2">
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-bold"
-              style={{ background: member.avatar_color }}
-            >
-              {getInitials(member.name)}
-            </div>
+            <Avatar name={member.name} color={member.avatar_color} photoUrl={member.photo_url} size={64} />
 
             <div className="min-w-0 flex-1">
               <h1 className="page-title break-words">{member.name}</h1>
@@ -403,10 +398,10 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
                     ))}
                   </div>
 
-                  {(latestInvite.email_error || latestInvite.whatsapp_error) && (
+                  {(latestInvite.email_error || latestInvite.sms_error) && (
                   <div className="rounded-xl border border-amber/20 bg-amber-light px-4 py-3 text-xs text-amber break-words">
                       {latestInvite.email_error && <div>Email: {latestInvite.email_error}</div>}
-                      {latestInvite.whatsapp_error && <div>WhatsApp: {latestInvite.whatsapp_error}</div>}
+                      {latestInvite.sms_error && <div>SMS: {latestInvite.sms_error}</div>}
                     </div>
                   )}
                 </div>

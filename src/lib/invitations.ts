@@ -25,7 +25,7 @@ export function getInviteOpenTrackingUrl(token: string) {
   return `${getAppBaseUrl()}/api/member-invitations/open/${token}`;
 }
 
-export function normalizePhoneForWhatsApp(phone: string) {
+export function normalizePhoneForSms(phone: string) {
   const digits = phone.replace(/\D/g, "");
 
   if (!digits) return "";
@@ -35,7 +35,7 @@ export function normalizePhoneForWhatsApp(phone: string) {
   return digits;
 }
 
-export function buildWhatsAppInvitePreview(params: {
+export function buildSmsInvitePreview(params: {
   memberName: string;
   churchName: string;
   tempPassword: string;

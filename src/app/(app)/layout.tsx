@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { AppProvider, useApp } from "@/hooks/use-app";
+import { Avatar } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
 import { getInitials, getIconEmoji } from "@/lib/utils/helpers";
 import type { Notification, User } from "@/types";
@@ -122,30 +123,7 @@ function SvgIcon({ name, size = 20 }: { name: string; size?: number }) {
 }
 
 function UserAvatar({ user, size = 32 }: { user: User; size?: number }) {
-  if (user.photo_url) {
-    return (
-      <img
-        src={user.photo_url}
-        alt={user.name}
-        className="rounded-full object-cover flex-shrink-0"
-        style={{ width: size, height: size }}
-      />
-    );
-  }
-
-  return (
-    <div
-      className="rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-      style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.32,
-        background: user.avatar_color,
-      }}
-    >
-      {getInitials(user.name)}
-    </div>
-  );
+  return <Avatar name={user.name} color={user.avatar_color} photoUrl={user.photo_url} size={size} />;
 }
 
 function Shell({ children }: { children: React.ReactNode }) {

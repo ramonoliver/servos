@@ -109,10 +109,34 @@ export function StatCard({ value, label, color = "text-brand" }: { value: string
 // ============================================
 // AVATAR
 // ============================================
-export function Avatar({ name, color, size = 36 }: { name: string; color: string; size?: number }) {
+export function Avatar({
+  name,
+  color,
+  photoUrl,
+  size = 36,
+  className = "",
+}: {
+  name: string;
+  color: string;
+  photoUrl?: string | null;
+  size?: number;
+  className?: string;
+}) {
   const initials = name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt={name}
+        className={cn("rounded-full object-cover flex-shrink-0", className)}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+
   return (
-    <div className="rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+    <div className={cn("rounded-full flex items-center justify-center text-white font-bold flex-shrink-0", className)}
       style={{ width: size, height: size, fontSize: size * 0.32, background: color }}>
       {initials}
     </div>

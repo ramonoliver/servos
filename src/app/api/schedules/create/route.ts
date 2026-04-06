@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireApiActor } from "@/lib/auth/api-session";
 import { can } from "@/lib/auth/permissions";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { sendScheduleAssignmentAlerts } from "@/lib/server/schedule-notifications";
 import { genId } from "@/lib/utils/helpers";
 
 const bodySchema = z.object({
@@ -130,7 +131,16 @@ export async function POST(req: Request) {
       if (scheduleMembersError) throw scheduleMembersError;
     }
 
-    return NextResponse.json({ success: true, scheduleId });
+    const notifications =
+      publish && validSelectedIds.length > 0
+        ? await sendScheduleAssignmentAlerts({
+            churchId,
+            scheduleId,
+            userIds: validSelectedIds,
+          })
+        : null;
+
+    return NextResponse.json({ success: true, scheduleId, notifications });
   } catch (error) {
     console.error("API schedules/create error:", error);
     return NextResponse.json(

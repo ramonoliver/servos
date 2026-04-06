@@ -191,9 +191,9 @@ export default function MembrosPage() {
       }
 
       const emailSent = data?.email?.status === "sent";
-      const whatsappSent = data?.whatsapp?.status === "sent";
+      const smsSent = data?.sms?.status === "sent";
 
-      if (emailSent || whatsappSent) {
+      if (emailSent || smsSent) {
         toast(`Convite reenviado para ${member.name}.`);
       } else {
         toast("O convite foi recriado, mas os envios falharam.");

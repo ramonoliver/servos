@@ -139,7 +139,8 @@ export async function POST(req: Request) {
       name: user.name,
       role: user.role,
       avatar_color: user.avatar_color,
-    } satisfies Pick<User, "id" | "church_id" | "email" | "name" | "role" | "avatar_color">;
+      photo_url: user.photo_url,
+    } satisfies Pick<User, "id" | "church_id" | "email" | "name" | "role" | "avatar_color" | "photo_url">;
     const response = NextResponse.json({ success: true, session, user: clientUser });
     response.headers.append("Set-Cookie", buildSessionCookie(token));
     return response;

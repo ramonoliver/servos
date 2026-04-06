@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireApiActor } from "@/lib/auth/api-session";
 import { can } from "@/lib/auth/permissions";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { sendScheduleAssignmentAlerts } from "@/lib/server/schedule-notifications";
 import { genId } from "@/lib/utils/helpers";
 
 const postSchema = z.object({
@@ -154,7 +155,13 @@ export async function POST(req: Request) {
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true });
+    const notifications = await sendScheduleAssignmentAlerts({
+      churchId,
+      scheduleId,
+      userIds: [userId],
+    });
+
+    return NextResponse.json({ success: true, notifications });
   } catch (error) {
     console.error("API schedule-members POST error:", error);
     return NextResponse.json(
@@ -333,7 +340,13 @@ export async function PATCH(req: Request) {
 
     if (updateError) throw updateError;
 
-    return NextResponse.json({ success: true });
+    const notifications = await sendScheduleAssignmentAlerts({
+      churchId,
+      scheduleId,
+      userIds: [substituteId],
+    });
+
+    return NextResponse.json({ success: true, notifications });
   } catch (error) {
     console.error("API schedule-members PATCH error:", error);
     return NextResponse.json(

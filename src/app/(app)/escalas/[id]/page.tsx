@@ -25,6 +25,15 @@ type ScheduleChat = {
   created_at: string;
 };
 
+type DeliveryPanelState = {
+  title: string;
+  emailSentCount: number;
+  emailSkippedCount: number;
+  smsSentCount: number;
+  smsSkippedCount: number;
+  failed: Array<{ userId: string; channel: "email" | "sms"; error: string }>;
+} | null;
+
 function isChatInfrastructureError(errorMessage?: string | null) {
   if (!errorMessage) return false;
   const normalized = errorMessage.toLowerCase();
@@ -62,6 +71,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   const [chatSyncMode, setChatSyncMode] = useState<"idle" | "realtime" | "polling">("idle");
   const [responding, setResponding] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
+  const [deliveryPanel, setDeliveryPanel] = useState<DeliveryPanelState>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -293,6 +303,24 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   const canAccessScheduleChat = user.role === "admin" || user.role === "leader" || isParticipant;
   const myScheduleMember = sm.find((item) => item.user_id === user.id) || null;
 
+  function openDeliveryPanel(
+    title: string,
+    payload?: {
+      email?: { sent?: number; skipped?: number };
+      sms?: { sent?: number; skipped?: number };
+      failed?: Array<{ userId: string; channel: "email" | "sms"; error: string }>;
+    } | null
+  ) {
+    setDeliveryPanel({
+      title,
+      emailSentCount: payload?.email?.sent || 0,
+      emailSkippedCount: payload?.email?.skipped || 0,
+      smsSentCount: payload?.sms?.sent || 0,
+      smsSkippedCount: payload?.sms?.skipped || 0,
+      failed: payload?.failed || [],
+    });
+  }
+
   if (user.role === "member" && !isParticipant) {
     return <div className="py-20 text-center text-ink-faint">Você não participa desta escala.</div>;
   }
@@ -330,7 +358,16 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
         return;
       }
 
-      toast("Membro adicionado a escala!");
+      const smsSentCount = data?.notifications?.sms?.sent || 0;
+      const smsSkippedCount = data?.notifications?.sms?.skipped || 0;
+      toast(
+        smsSentCount > 0
+          ? `Membro adicionado a escala. SMS enviado para ${smsSentCount}.`
+          : smsSkippedCount > 0
+          ? "Membro adicionado a escala. SMS nao configurado neste ambiente."
+          : "Membro adicionado a escala!"
+      );
+      openDeliveryPanel("Entrega ao adicionar membro", data?.notifications || null);
       setShowAddMember(false);
       await loadData();
     } catch (error) {
@@ -391,7 +428,16 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
         return;
       }
 
-      toast(`${sub.name} adicionado como substituto!`);
+      const smsSentCount = data?.notifications?.sms?.sent || 0;
+      const smsSkippedCount = data?.notifications?.sms?.skipped || 0;
+      toast(
+        smsSentCount > 0
+          ? `${sub.name} adicionado como substituto. SMS enviado.`
+          : smsSkippedCount > 0
+          ? `${sub.name} adicionado como substituto. SMS nao configurado.`
+          : `${sub.name} adicionado como substituto!`
+      );
+      openDeliveryPanel("Entrega ao adicionar substituto", data?.notifications || null);
       await loadData();
     } catch (error) {
       console.error("Erro ao adicionar substituto:", error);
@@ -766,9 +812,20 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
                 }
 
                 const sentCount = data?.sentCount || 0;
+                const emailSentCount = data?.emailSentCount || 0;
+                const emailSkippedCount = data?.emailSkippedCount || 0;
+                const smsSentCount = data?.smsSentCount || 0;
+                const smsSkippedCount = data?.smsSkippedCount || 0;
+                openDeliveryPanel("Resultado do envio de lembretes", {
+                  email: { sent: emailSentCount, skipped: emailSkippedCount },
+                  sms: { sent: smsSentCount, skipped: smsSkippedCount },
+                  failed: data?.failed || [],
+                });
                 toast(
                   sentCount > 0
-                    ? `Lembrete enviado para ${sentCount} membro(s)!`
+                    ? `Lembretes enviados: ${emailSentCount} email(s) e ${smsSentCount} SMS(s).`
+                    : smsSkippedCount > 0
+                    ? "Nenhum SMS foi enviado porque o canal ainda nao esta configurado."
                     : "Nenhum lembrete enviado."
                 );
               } catch (error) {
@@ -780,6 +837,71 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
           >
             Lembrar &rarr;
           </button>
+        </div>
+      )}
+
+      {deliveryPanel && (
+        <div className="card p-5 mb-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4">
+            <div>
+              <div className="font-display text-lg">{deliveryPanel.title}</div>
+              <p className="text-sm text-ink-muted">
+                Resumo do último disparo desta escala por canal.
+              </p>
+            </div>
+            <button
+              onClick={() => setDeliveryPanel(null)}
+              className="btn btn-ghost btn-sm self-start"
+            >
+              Fechar
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <div className="rounded-xl bg-surface-alt px-4 py-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">Email</div>
+              <div className="text-sm font-medium mt-1">
+                {deliveryPanel.emailSentCount} enviado(s)
+              </div>
+              {deliveryPanel.emailSkippedCount > 0 && (
+                <div className="text-xs text-ink-faint mt-1">
+                  {deliveryPanel.emailSkippedCount} pulado(s)
+                </div>
+              )}
+            </div>
+            <div className="rounded-xl bg-surface-alt px-4 py-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">SMS</div>
+              <div className="text-sm font-medium mt-1">
+                {deliveryPanel.smsSentCount} enviado(s)
+              </div>
+              {deliveryPanel.smsSkippedCount > 0 && (
+                <div className="text-xs text-ink-faint mt-1">
+                  {deliveryPanel.smsSkippedCount} pulado(s)
+                </div>
+              )}
+            </div>
+          </div>
+
+          {deliveryPanel.failed.length > 0 ? (
+            <div className="rounded-xl border border-amber/20 bg-amber-light px-4 py-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-amber mb-2">
+                Falhas
+              </div>
+              <div className="space-y-2">
+                {deliveryPanel.failed.map((item, index) => {
+                  const memberName =
+                    members.find((member) => member.id === item.userId)?.name || "Membro";
+                  return (
+                    <div key={`${item.userId}-${item.channel}-${index}`} className="text-xs text-amber break-words">
+                      <strong>{memberName}</strong> · {item.channel.toUpperCase()} · {item.error}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm text-ink-faint">Nenhuma falha registrada neste disparo.</div>
+          )}
         </div>
       )}
 

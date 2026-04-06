@@ -146,9 +146,9 @@ export interface MemberInvitation {
   phone: string | null;
   tracking_token: string | null;
   email_status: "pending" | "sent" | "failed";
-  whatsapp_status: "pending" | "sent" | "failed" | "skipped";
+  sms_status: "pending" | "sent" | "failed" | "skipped";
   email_error: string | null;
-  whatsapp_error: string | null;
+  sms_error: string | null;
   opened_at: string | null;
   open_count: number;
   sent_at: string | null;
@@ -223,5 +223,6 @@ export interface Session {
   name: string;
   role: Role;
   avatar_color: string;
+  photo_url?: string | null;
   expires_at: number;
 }

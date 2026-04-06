@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
+import { Avatar } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
-import { formatDate, getInitials } from "@/lib/utils/helpers";
+import { formatDate } from "@/lib/utils/helpers";
 import type { UnavailableDate, User, Event, Schedule } from "@/types";
 
 const MONTH_LABEL = new Intl.DateTimeFormat("pt-BR", {
@@ -495,12 +496,7 @@ export default function IndisponibilidadePage() {
                 className="flex items-center gap-3.5 px-5 py-3.5 border-b border-border-soft last:border-b-0"
               >
                 {!isMember && m && (
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
-                    style={{ background: m.avatar_color }}
-                  >
-                    {getInitials(m.name)}
-                  </div>
+                  <Avatar name={m.name} color={m.avatar_color} photoUrl={m.photo_url} size={32} />
                 )}
 
                 <div className="flex-1 min-w-0">
@@ -556,12 +552,7 @@ export default function IndisponibilidadePage() {
             return (
               <div key={ud.id} className="flex items-center gap-3 px-5 py-3 border-t border-border-soft opacity-50">
                 {!isMember && m && (
-                  <div
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"
-                    style={{ background: m.avatar_color }}
-                  >
-                    {getInitials(m.name)}
-                  </div>
+                  <Avatar name={m.name} color={m.avatar_color} photoUrl={m.photo_url} size={28} />
                 )}
 
                 <div className="flex-1 min-w-0 text-[12px] text-ink-muted">

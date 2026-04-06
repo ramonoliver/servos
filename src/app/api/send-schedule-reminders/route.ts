@@ -1,31 +1,26 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { sendScheduleReminderEmail } from "@/lib/email/send";
+import { requireApiActor } from "@/lib/auth/api-session";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { sendScheduleReminderAlerts } from "@/lib/server/schedule-notifications";
 
 type RouteBody = {
   scheduleId?: string;
 };
 
-function getSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl) {
-    throw new Error("NEXT_PUBLIC_SUPABASE_URL is required.");
-  }
-
-  if (!supabaseKey) {
-    throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY is required.");
-  }
-
-  return createClient(supabaseUrl, supabaseKey);
-}
-
 export async function POST(req: Request) {
   try {
-    const supabase = getSupabase();
+    const { actor, session, errorResponse } = await requireApiActor(req);
+    if (errorResponse) return errorResponse;
+
+    if (!actor || (actor.role !== "admin" && actor.role !== "leader")) {
+      return NextResponse.json({ error: "Sem permissao para enviar lembretes." }, { status: 403 });
+    }
+
+    const supabase = getSupabaseServerClient();
     const body = (await req.json().catch(() => ({}))) as RouteBody;
     const { scheduleId } = body;
+    const churchId = session!.church_id;
+    const actorId = session!.user_id;
 
     const now = new Date();
     const tomorrow = new Date();
@@ -34,6 +29,7 @@ export async function POST(req: Request) {
     let scheduleQuery = supabase
       .from("schedules")
       .select("*")
+      .eq("church_id", churchId)
       .eq("status", "active");
 
     if (scheduleId) {
@@ -48,53 +44,73 @@ export async function POST(req: Request) {
 
     if (schedulesError) throw schedulesError;
 
-    if (!schedules || schedules.length === 0) {
+    let visibleSchedules = schedules || [];
+
+    if (actor.role === "leader" && visibleSchedules.length > 0) {
+      const departmentIds = [...new Set(visibleSchedules.map((schedule) => schedule.department_id))];
+      const { data: departments, error: departmentsError } = await supabase
+        .from("departments")
+        .select("id, leader_ids, co_leader_ids")
+        .eq("church_id", churchId)
+        .in("id", departmentIds);
+
+      if (departmentsError) throw departmentsError;
+
+      const allowedDepartmentIds = new Set(
+        (departments || [])
+          .filter(
+            (department) =>
+              (department.leader_ids || []).includes(actorId) ||
+              (department.co_leader_ids || []).includes(actorId)
+          )
+          .map((department) => department.id)
+      );
+
+      visibleSchedules = visibleSchedules.filter((schedule) =>
+        allowedDepartmentIds.has(schedule.department_id)
+      );
+    }
+
+    if (!visibleSchedules || visibleSchedules.length === 0) {
       return NextResponse.json({ success: true, sentCount: 0, failedCount: 0, sent: [], failed: [] });
     }
 
-    const sent: Array<{ scheduleId: string; email: string }> = [];
-    const failed: Array<{ scheduleId: string; email: string; error: string }> = [];
+    const sent: Array<{ scheduleId: string; channel: "email" | "sms"; count: number }> = [];
+    const failed: Array<{ scheduleId: string; userId: string; channel: "email" | "sms"; error: string }> = [];
+    let emailSentCount = 0;
+    let smsSentCount = 0;
+    let emailSkippedCount = 0;
+    let smsSkippedCount = 0;
 
-    for (const sched of schedules) {
-      const [{ data: event }, { data: dept }, { data: members }] = await Promise.all([
-        supabase.from("events").select("*").eq("id", sched.event_id).maybeSingle(),
-        supabase.from("departments").select("*").eq("id", sched.department_id).maybeSingle(),
-        supabase.from("schedule_members").select("*").eq("schedule_id", sched.id),
-      ]);
+    for (const sched of visibleSchedules) {
+      const delivery = await sendScheduleReminderAlerts({
+        churchId,
+        scheduleId: sched.id,
+        onlyPending: true,
+      });
 
-      for (const sm of members || []) {
-        const { data: user } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", sm.user_id)
-          .maybeSingle();
+      emailSentCount += delivery.email.sent;
+      smsSentCount += delivery.sms.sent;
+      emailSkippedCount += delivery.email.skipped;
+      smsSkippedCount += delivery.sms.skipped;
 
-        if (!user?.email) continue;
-
-        try {
-          await sendScheduleReminderEmail({
-            to: user.email,
-            memberName: user.name,
-            eventName: event?.name || "Evento",
-            date: sched.date,
-            time: sched.time,
-            departmentName: dept?.name || "Ministério",
-          });
-
-          sent.push({ scheduleId: sched.id, email: user.email });
-        } catch (error) {
-          failed.push({
-            scheduleId: sched.id,
-            email: user.email,
-            error: error instanceof Error ? error.message : "Erro desconhecido",
-          });
-        }
+      if (delivery.email.sent > 0) {
+        sent.push({ scheduleId: sched.id, channel: "email", count: delivery.email.sent });
       }
+      if (delivery.sms.sent > 0) {
+        sent.push({ scheduleId: sched.id, channel: "sms", count: delivery.sms.sent });
+      }
+
+      failed.push(...delivery.failed.map((item) => ({ scheduleId: sched.id, ...item })));
     }
 
     return NextResponse.json({
       success: true,
-      sentCount: sent.length,
+      sentCount: emailSentCount + smsSentCount,
+      emailSentCount,
+      smsSentCount,
+      emailSkippedCount,
+      smsSkippedCount,
       failedCount: failed.length,
       sent,
       failed,
