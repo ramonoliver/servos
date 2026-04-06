@@ -273,6 +273,10 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
     return <div className="py-20 text-center text-ink-faint">Escala não encontrada.</div>;
   }
 
+  if (user.role === "leader" && !departments.some((department) => department.id === schedule.department_id)) {
+    return <div className="py-20 text-center text-ink-faint">Você não tem acesso a esta escala.</div>;
+  }
+
   const dept = departments.find((d) => d.id === schedule.department_id);
 
   const confirmed = sm.filter((m) => m.status === "confirmed").length;

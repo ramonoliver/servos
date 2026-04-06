@@ -182,7 +182,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     { href: "/escalas", label: "Escalas", icon: "calendar", show: isAdmin || isLeader },
     { href: "/minhas-escalas", label: "Minhas Escalas", icon: "check-square", show: isMember },
     { href: "/ministerios", label: "Ministérios", icon: "users", show: canDo("department.view") && !isMember },
-    { href: "/membros", label: "Membros", icon: "user", show: canDo("member.view") && !isMember },
+    { href: "/membros", label: "Membros", icon: "user", show: canDo("member.view") },
     { href: "/eventos", label: "Eventos", icon: "star", show: canDo("event.view") && !isMember },
     { href: "/calendario", label: "Calendário", icon: "calendar-days", show: true },
     { href: "/notificacoes", label: "Notificações", icon: "bell", show: true, badge: unreadNotifs || undefined },

@@ -18,6 +18,8 @@ export default function EscalasPage() {
   async function loadData() {
     setLoading(true);
 
+    const visibleDepartmentIds = departments.map((department) => department.id);
+
     const [
       { data: schedulesData, error: schedulesError },
       { data: eventsData, error: eventsError },
@@ -35,15 +37,23 @@ export default function EscalasPage() {
       return;
     }
 
-    setSchedules((schedulesData || []) as Schedule[]);
+    const scopedSchedules =
+      user.role === "admin"
+        ? ((schedulesData || []) as Schedule[])
+        : ((schedulesData || []) as Schedule[]).filter((schedule) =>
+            visibleDepartmentIds.includes(schedule.department_id)
+          );
+    const scopedScheduleIds = new Set(scopedSchedules.map((schedule) => schedule.id));
+
+    setSchedules(scopedSchedules);
     setEvents((eventsData || []) as Event[]);
-    setAllSM((smData || []) as ScheduleMember[]);
+    setAllSM(((smData || []) as ScheduleMember[]).filter((scheduleMember) => scopedScheduleIds.has(scheduleMember.schedule_id)));
     setLoading(false);
   }
 
   useEffect(() => {
     loadData();
-  }, [user.church_id]);
+  }, [user.church_id, departments.length]);
 
   const filtered = useMemo(() => {
     return schedules

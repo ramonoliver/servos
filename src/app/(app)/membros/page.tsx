@@ -56,16 +56,20 @@ export default function MembrosPage() {
   async function loadData() {
     setLoading(true);
 
+    const visibleDepartmentIds = departments.map((dept) => dept.id);
+
     const { data: usersData, error: usersError } = await supabase
       .from("users")
       .select("*")
       .eq("church_id", user.church_id)
       .eq("active", true);
 
-    const { data: dmData, error: dmError } = await supabase
-      .from("department_members")
-      .select("*")
-      .in("department_id", departments.map((dept) => dept.id));
+    const { data: dmData, error: dmError } = visibleDepartmentIds.length
+      ? await supabase
+          .from("department_members")
+          .select("*")
+          .in("department_id", visibleDepartmentIds)
+      : { data: [], error: null };
 
     const { data: inviteData, error: inviteError } = await supabase
       .from("member_invitations")
@@ -91,15 +95,25 @@ export default function MembrosPage() {
       console.error("Erro ao buscar convites dos membros:", inviteError);
     }
 
-    setMembers((usersData || []) as User[]);
-    setAllDM((dmData || []) as DepartmentMember[]);
+    const departmentLinks = (dmData || []) as DepartmentMember[];
+    const visibleUserIds =
+      user.role === "admin"
+        ? null
+        : new Set([...departmentLinks.map((dm) => dm.user_id), user.id]);
+
+    setMembers(
+      ((usersData || []) as User[]).filter((member) =>
+        visibleUserIds ? visibleUserIds.has(member.id) : true
+      )
+    );
+    setAllDM(departmentLinks);
     setLatestInvites(getLatestInvitesMap((inviteData || []) as MemberInvitation[]));
     setLoading(false);
   }
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user.church_id, departments.length]);
 
   const filtered = useMemo(() => {
     let result = [...members];

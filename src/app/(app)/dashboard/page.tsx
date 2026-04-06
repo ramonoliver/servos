@@ -11,6 +11,7 @@ import type { Schedule, ScheduleMember, Event, User, Notification } from "@/type
 export default function DashboardPage() {
   const { user, departments, canDo } = useApp();
   const verse = getVerseOfDay();
+  const visibleDepartmentIds = useMemo(() => departments.map((department) => department.id), [departments]);
 
   const [members, setMembers] = useState<User[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -32,19 +33,24 @@ export default function DashboardPage() {
       { data: schedulesData, error: schedulesError },
       { data: eventsData, error: eventsError },
       { data: notificationsData, error: notificationsError },
+      { data: departmentMembersData, error: departmentMembersError },
     ] = await Promise.all([
       supabase.from("users").select("*").eq("church_id", user.church_id).eq("active", true),
       supabase.from("schedules").select("*").eq("church_id", user.church_id).neq("status", "cancelled"),
       supabase.from("events").select("*").eq("church_id", user.church_id),
       supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false),
+      departments.length
+        ? supabase.from("department_members").select("*").in("department_id", visibleDepartmentIds)
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
-    if (membersError || schedulesError || eventsError || notificationsError) {
+    if (membersError || schedulesError || eventsError || notificationsError || departmentMembersError) {
       console.error({
         membersError,
         schedulesError,
         eventsError,
         notificationsError,
+        departmentMembersError,
       });
       setLoading(false);
       return;
@@ -61,9 +67,28 @@ export default function DashboardPage() {
       return;
     }
 
-    setMembers((membersData || []) as User[]);
-    setSchedules((schedulesData || []) as Schedule[]);
-    setAllSM((smData || []) as ScheduleMember[]);
+    const scopedSchedules =
+      user.role === "admin"
+        ? ((schedulesData || []) as Schedule[])
+        : ((schedulesData || []) as Schedule[]).filter((schedule) =>
+            visibleDepartmentIds.includes(schedule.department_id)
+          );
+    const scopedScheduleIds = new Set(scopedSchedules.map((schedule) => schedule.id));
+    const scopedDepartmentIds = new Set(visibleDepartmentIds);
+    const scopedMembers =
+      user.role === "admin"
+        ? ((membersData || []) as User[])
+        : ((membersData || []) as User[]).filter((member) =>
+            ((departmentMembersData || []) as Array<{ user_id: string; department_id: string }>).some(
+              (departmentMember) =>
+                departmentMember.user_id === member.id &&
+                scopedDepartmentIds.has(departmentMember.department_id)
+            )
+          );
+
+    setMembers(scopedMembers);
+    setSchedules(scopedSchedules);
+    setAllSM(((smData || []) as ScheduleMember[]).filter((scheduleMember) => scopedScheduleIds.has(scheduleMember.schedule_id)));
     setEvents((eventsData || []) as Event[]);
     setNotifications((notificationsData || []) as Notification[]);
     setLoading(false);

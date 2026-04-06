@@ -88,6 +88,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    const { data: departmentLinks, error: departmentLinksError } = await supabase
+      .from("department_members")
+      .select("department_id")
+      .eq("user_id", u.id);
+
+    if (departmentLinksError) {
+      console.error("Erro ao buscar vínculos do usuário:", departmentLinksError);
+      setLoading(false);
+      return;
+    }
+
     const leadDeptIds = (depts || [])
       .filter((d: any) =>
         (d.leader_ids || []).includes(u.id) ||
@@ -95,11 +106,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )
       .map((d: any) => d.id);
 
+    const memberDeptIds = ((departmentLinks || []) as Array<{ department_id: string }>).map(
+      (link) => link.department_id
+    );
+
+    const visibleDepartments =
+      u.role === "admin"
+        ? ((depts || []) as Department[])
+        : u.role === "leader"
+        ? ((depts || []) as Department[]).filter((dept) => leadDeptIds.includes(dept.id))
+        : ((depts || []) as Department[]).filter((dept) => memberDeptIds.includes(dept.id));
+
+    const permissionDeptIds =
+      u.role === "admin"
+        ? ((depts || []) as Department[]).map((dept) => dept.id)
+        : u.role === "leader"
+        ? leadDeptIds
+        : memberDeptIds;
+
     setUser(u as User);
     setSessionState(s);
     setChurch(c as Church);
-    setDepartments((depts || []) as Department[]);
-    setUserDeptIds(leadDeptIds);
+    setDepartments(visibleDepartments);
+    setUserDeptIds(permissionDeptIds);
     setLoading(false);
   }, [router]);
 

@@ -34,7 +34,7 @@ async function canAccessScheduleChat(params: {
   const { scheduleId, churchId, userId } = params;
   const supabase = getSupabaseServerClient();
 
-  const [{ data: member }, { data: scheduleMember }] = await Promise.all([
+  const [{ data: member }, { data: scheduleMember }, schedule] = await Promise.all([
     supabase
       .from("users")
       .select("id, role, church_id, active")
@@ -47,10 +47,33 @@ async function canAccessScheduleChat(params: {
       .eq("schedule_id", scheduleId)
       .eq("user_id", userId)
       .maybeSingle(),
+    supabase
+      .from("schedules")
+      .select("id, department_id")
+      .eq("id", scheduleId)
+      .eq("church_id", churchId)
+      .maybeSingle(),
   ]);
 
   if (!member?.active) return false;
-  if (member.role === "admin" || member.role === "leader") return true;
+  if (member.role === "admin") return true;
+
+  if (member.role === "leader") {
+    const { data: department, error: departmentError } = await supabase
+      .from("departments")
+      .select("id, leader_ids, co_leader_ids")
+      .eq("id", schedule.data?.department_id || "")
+      .eq("church_id", churchId)
+      .maybeSingle();
+
+    if (departmentError) throw departmentError;
+
+    return Boolean(
+      department &&
+        ((department.leader_ids || []).includes(userId) ||
+          (department.co_leader_ids || []).includes(userId))
+    );
+  }
 
   return Boolean(scheduleMember);
 }

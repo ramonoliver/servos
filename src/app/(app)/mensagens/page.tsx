@@ -5,7 +5,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { getInitials } from "@/lib/utils/helpers";
-import type { Message, User, DepartmentMember } from "@/types";
+import type { Message, User } from "@/types";
 
 function sortMessages(messages: Message[]) {
   return [...messages].sort(
@@ -20,7 +20,6 @@ export default function MensagensPage() {
   const [newMsg, setNewMsg] = useState("");
   const [allMessages, setAllMessages] = useState<Message[]>([]);
   const [members, setMembers] = useState<User[]>([]);
-  const [myDepartmentIds, setMyDepartmentIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [syncMode, setSyncMode] = useState<"idle" | "realtime" | "polling">("idle");
@@ -28,25 +27,19 @@ export default function MensagensPage() {
   async function loadData() {
     setLoading(true);
 
-    const [
-      { data: usersData, error: usersError },
-      { data: departmentMembersData, error: departmentMembersError },
-    ] = await Promise.all([
-      supabase.from("users").select("*").eq("church_id", user.church_id),
-      supabase.from("department_members").select("*").eq("user_id", user.id),
-    ]);
+    const { data: usersData, error: usersError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("church_id", user.church_id);
 
-    if (usersError || departmentMembersError) {
-      console.error({ usersError, departmentMembersError });
+    if (usersError) {
+      console.error({ usersError });
       toast("Erro ao carregar mensagens.");
       setLoading(false);
       return;
     }
 
     setMembers((usersData || []) as User[]);
-    setMyDepartmentIds(
-      ((departmentMembersData || []) as DepartmentMember[]).map((item) => item.department_id)
-    );
     setLoading(false);
   }
 
@@ -54,13 +47,7 @@ export default function MensagensPage() {
     loadData();
   }, [user.church_id]);
 
-  const visibleDepartments = useMemo(() => {
-    if (user.role === "admin" || user.role === "leader") {
-      return departments;
-    }
-
-    return departments.filter((dept) => myDepartmentIds.includes(dept.id));
-  }, [departments, myDepartmentIds, user.role]);
+  const visibleDepartments = useMemo(() => departments, [departments]);
 
   useEffect(() => {
     if (!selectedDept && visibleDepartments.length > 0) {

@@ -50,7 +50,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
       { data: eventsData, error: eventsError },
       { data: inviteData, error: inviteError },
     ] = await Promise.all([
-      supabase.from("users").select("*").eq("id", params.id).maybeSingle(),
+      supabase.from("users").select("*").eq("id", params.id).eq("church_id", user.church_id).maybeSingle(),
       supabase.from("users").select("*").eq("church_id", user.church_id),
       supabase.from("department_members").select("*").eq("user_id", params.id),
       supabase.from("schedules").select("*").eq("church_id", user.church_id),
@@ -80,9 +80,16 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
       return;
     }
 
-    setMember((memberData || null) as User | null);
+    const visibleDepartmentIds = new Set(departments.map((department) => department.id));
+    const targetDepartmentLinks = (dmsData || []) as DepartmentMember[];
+    const canViewTarget =
+      user.role === "admin" ||
+      params.id === user.id ||
+      targetDepartmentLinks.some((dm) => visibleDepartmentIds.has(dm.department_id));
+
+    setMember(canViewTarget ? ((memberData || null) as User | null) : null);
     setMembers((membersData || []) as User[]);
-    setDms((dmsData || []) as DepartmentMember[]);
+    setDms(targetDepartmentLinks);
     setSchedules((schedulesData || []) as Schedule[]);
     setAllSM((smData || []) as ScheduleMember[]);
     setEvents((eventsData || []) as Event[]);
@@ -92,7 +99,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
 
   useEffect(() => {
     loadData();
-  }, [params.id, user.church_id]);
+  }, [params.id, user.church_id, departments.length]);
 
   if (loading) {
     return <div className="py-20 text-center text-ink-faint">Carregando membro...</div>;
