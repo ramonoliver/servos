@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { formatInviteOpenedAt } from "@/lib/invitations";
@@ -53,6 +53,8 @@ export default function MembrosPage() {
   const [latestInvites, setLatestInvites] = useState<Record<string, MemberInvitation>>({});
   const [loading, setLoading] = useState(true);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [openActionsFor, setOpenActionsFor] = useState<string | null>(null);
+  const actionsMenuRef = useRef<HTMLDivElement | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -120,6 +122,18 @@ export default function MembrosPage() {
   useEffect(() => {
     loadData();
   }, [user.church_id, departments.length]);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (!actionsMenuRef.current) return;
+      if (!actionsMenuRef.current.contains(event.target as Node)) {
+        setOpenActionsFor(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
 
   const filtered = useMemo(() => {
     let result = [...members];
@@ -196,6 +210,7 @@ export default function MembrosPage() {
             ? `${m.name} excluido permanentemente.`
             : `${m.name} desativado.`)
       );
+      setOpenActionsFor(null);
       await loadData();
     } catch (error) {
       console.error("Erro ao atualizar membro:", error);
@@ -240,6 +255,7 @@ export default function MembrosPage() {
         toast("O convite foi recriado, mas os envios falharam.");
       }
 
+      setOpenActionsFor(null);
       await loadData();
     } catch (error) {
       console.error("Erro ao reenviar convite:", error);
@@ -311,7 +327,7 @@ export default function MembrosPage() {
         )}
       </div>
 
-      <div className="card">
+      <div className="card overflow-visible">
         {loading ? (
           <div className="px-5 py-12 text-center text-sm text-ink-faint">
             Carregando membros...
@@ -422,11 +438,20 @@ export default function MembrosPage() {
                     )}
                   </div>
 
-                  <details className="relative">
-                    <summary className="btn btn-ghost btn-sm list-none cursor-pointer">
+                  <div className="relative" ref={openActionsFor === m.id ? actionsMenuRef : null}>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setOpenActionsFor((current) => (current === m.id ? null : m.id));
+                      }}
+                      className="btn btn-ghost btn-sm"
+                    >
                       Ações
-                    </summary>
-                    <div className="absolute right-0 z-20 mt-2 min-w-[220px] rounded-2xl border border-border-soft bg-white shadow-soft p-2 flex flex-col gap-1">
+                    </button>
+
+                    {openActionsFor === m.id && (
+                      <div className="absolute right-0 z-20 mt-2 min-w-[220px] rounded-2xl border border-border-soft bg-white shadow-lg p-2 flex flex-col gap-1">
                       {canDo("member.invite") && m.must_change_password && (
                         <button
                           onClick={() => resendInvite(m)}
@@ -463,8 +488,9 @@ export default function MembrosPage() {
                           Excluir permanentemente
                         </button>
                       )}
-                    </div>
-                  </details>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
