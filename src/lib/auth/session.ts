@@ -3,7 +3,7 @@ import type { Session, User } from "@/types";
 const SESSION_KEY = "servos_session";
 const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
 
-export function createSession(user: User): Session {
+export function createSession(user: User, token?: string): Session {
   const session: Session = {
     user_id: user.id,
     church_id: user.church_id,
@@ -12,6 +12,7 @@ export function createSession(user: User): Session {
     role: user.role,
     avatar_color: user.avatar_color,
     photo_url: user.photo_url,
+    token,
     expires_at: Date.now() + SEVEN_DAYS,
   };
   if (typeof window !== "undefined") {

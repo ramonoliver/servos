@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionFromCookieHeader } from "@/lib/auth/server-session";
+import { decodeSessionToken, getSessionFromCookieHeader } from "@/lib/auth/server-session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 type RequireActorOptions = {
@@ -7,7 +7,9 @@ type RequireActorOptions = {
 };
 
 export function requireApiSession(req: Request) {
-  const session = getSessionFromCookieHeader(req.headers.get("cookie"));
+  const session =
+    getSessionFromCookieHeader(req.headers.get("cookie")) ||
+    decodeSessionToken(req.headers.get("x-servos-auth"));
 
   if (!session) {
     return {

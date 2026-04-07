@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
+import { getSession } from "@/lib/auth/session";
 import { formatInviteOpenedAt } from "@/lib/invitations";
 import { getInitials } from "@/lib/utils/helpers";
 import Link from "next/link";
@@ -181,6 +182,7 @@ export default function MembrosPage() {
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          ...(getSession()?.token ? { "x-servos-auth": getSession()!.token! } : {}),
         },
         body: JSON.stringify({
           targetUserId: m.id,
@@ -234,6 +236,7 @@ export default function MembrosPage() {
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          ...(getSession()?.token ? { "x-servos-auth": getSession()!.token! } : {}),
         },
         body: JSON.stringify({
           userId: member.id,

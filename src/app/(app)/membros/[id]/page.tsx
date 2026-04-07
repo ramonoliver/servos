@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/hooks/use-app";
+import { getSession } from "@/lib/auth/session";
 import { formatInviteDate, formatInviteOpenedAt } from "@/lib/invitations";
 import { supabase } from "@/lib/supabase/client";
 import { formatDate, formatShortDate } from "@/lib/utils/helpers";
@@ -191,6 +192,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          ...(getSession()?.token ? { "x-servos-auth": getSession()!.token! } : {}),
         },
         body: JSON.stringify({
           userId: member.id,
@@ -230,7 +232,10 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
       const response = await fetch("/api/members/deactivate", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(getSession()?.token ? { "x-servos-auth": getSession()!.token! } : {}),
+        },
         body: JSON.stringify({
           targetUserId: member.id,
           action,

@@ -88,7 +88,7 @@ export default function CadastroPage() {
         return;
       }
 
-      createSession(data.user);
+      createSession(data.user, data.token);
       router.push("/onboarding");
     } catch (err: any) {
       setError(err?.message || "Erro ao criar conta.");

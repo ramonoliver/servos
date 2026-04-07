@@ -35,7 +35,7 @@ export default function LoginPage() {
         return;
       }
 
-      createSession(data.user);
+      createSession(data.user, data.token);
       router.push("/dashboard");
     } catch (err: any) {
       setError(err?.message || "Erro ao entrar.");

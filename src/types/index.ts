@@ -237,5 +237,6 @@ export interface Session {
   role: Role;
   avatar_color: string;
   photo_url?: string | null;
+  token?: string;
   expires_at: number;
 }
