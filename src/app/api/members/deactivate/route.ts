@@ -71,10 +71,39 @@ export async function POST(req: Request) {
       const { error: reactivateError } = await supabase
         .from("users")
         .update({ active: true, status: target.status === "inactive" ? "active" : target.status })
+        .select("id, active, status")
         .eq("id", targetUserId)
         .eq("church_id", churchId);
 
-      if (reactivateError) throw reactivateError;
+      if (reactivateError) {
+        console.error("Erro ao reativar membro:", reactivateError);
+        return NextResponse.json(
+          { error: reactivateError.message || "Nao foi possivel reativar o membro." },
+          { status: 500 }
+        );
+      }
+
+      const { data: reactivatedUser, error: verifyReactivateError } = await supabase
+        .from("users")
+        .select("id, active, status")
+        .eq("id", targetUserId)
+        .eq("church_id", churchId)
+        .maybeSingle();
+
+      if (verifyReactivateError) {
+        console.error("Erro ao verificar reativacao do membro:", verifyReactivateError);
+        return NextResponse.json(
+          { error: verifyReactivateError.message || "Nao foi possivel confirmar a reativacao do membro." },
+          { status: 500 }
+        );
+      }
+
+      if (!reactivatedUser?.active) {
+        return NextResponse.json(
+          { error: "O membro nao foi reativado no banco de dados." },
+          { status: 500 }
+        );
+      }
 
       return NextResponse.json({ success: true, mode: "reactivate" });
     }

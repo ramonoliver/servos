@@ -31,6 +31,15 @@ function formatPhoneDisplay(value?: string | null) {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
+function parseResponsePayload(raw: string) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { error: raw };
+  }
+}
+
 export default function MembroDetailPage({ params }: { params: { id: string } }) {
   const { user, church, departments, canDo, toast } = useApp();
   const router = useRouter();
@@ -199,7 +208,8 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
         }),
       });
 
-      const data = await response.json().catch(() => null);
+      const raw = await response.text();
+      const data = parseResponsePayload(raw);
 
       if (!response.ok) {
         console.error("Erro ao reenviar convite:", data);
@@ -242,7 +252,8 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
         }),
       });
 
-      const data = await response.json().catch(() => null);
+      const raw = await response.text();
+      const data = parseResponsePayload(raw);
       if (!response.ok) {
         toast(
           data?.error ||

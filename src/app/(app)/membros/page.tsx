@@ -43,6 +43,15 @@ function getInviteBadge(invite?: MemberInvitation) {
   };
 }
 
+function parseResponsePayload(raw: string) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { error: raw };
+  }
+}
+
 export default function MembrosPage() {
   const { user, church, toast, canDo, departments } = useApp();
 
@@ -190,7 +199,8 @@ export default function MembrosPage() {
         }),
       });
 
-      const data = await response.json().catch(() => null);
+      const raw = await response.text();
+      const data = parseResponsePayload(raw);
 
       if (!response.ok) {
         console.error("Erro ao atualizar membro:", data);
@@ -243,7 +253,8 @@ export default function MembrosPage() {
         }),
       });
 
-      const data = await response.json().catch(() => null);
+      const raw = await response.text();
+      const data = parseResponsePayload(raw);
 
       if (!response.ok) {
         console.error("Erro ao reenviar convite:", data);
