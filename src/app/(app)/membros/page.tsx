@@ -273,7 +273,10 @@ export default function MembrosPage() {
               .map((dm) => departments.find((d) => d.id === dm.department_id)?.name)
               .filter(Boolean);
 
-            const func = mDepts[0]?.function_name || "";
+            const functionSummary = mDepts
+              .flatMap((dm) => dm.function_names?.length ? dm.function_names : dm.function_name ? [dm.function_name] : [])
+              .filter((value, index, array) => value && array.indexOf(value) === index)
+              .join(", ");
             const spouse = m.spouse_id ? members.find((s) => s.id === m.spouse_id) : null;
             const latestInvite = latestInvites[m.id];
             const inviteBadge = getInviteBadge(latestInvite);
@@ -312,9 +315,8 @@ export default function MembrosPage() {
                       {m.must_change_password ? " *" : ""}
                     </div>
                     <div className="text-[11px] text-ink-faint break-words leading-relaxed">
-                      {func}
-                      {deptNames.length ? " · " + deptNames.join(", ") : ""}
-                      {" · "}
+                      {functionSummary ? `${functionSummary} · ` : ""}
+                      {deptNames.length ? deptNames.join(", ") + " · " : ""}
                       {m.email}
                     </div>
                   </div>

@@ -11,6 +11,7 @@ type MemberStatus = "active" | "inactive" | "paused" | "vacation";
 type SelectedDepartment = {
   department_id: string;
   function_name: string;
+  function_names: string[];
 };
 
 interface MemberEditModalProps {
@@ -45,6 +46,7 @@ export function MemberEditModal({
     allDeptMembers.map((dm) => ({
       department_id: dm.department_id,
       function_name: dm.function_name || "",
+      function_names: dm.function_names || (dm.function_name ? [dm.function_name] : []),
     }))
   );
 
@@ -65,15 +67,42 @@ export function MemberEditModal({
         return prev.filter((d) => d.department_id !== departmentId);
       }
 
-      return [...prev, { department_id: departmentId, function_name: "" }];
+      return [...prev, { department_id: departmentId, function_name: "", function_names: [] }];
     });
   }
 
-  function updateDepartmentFunction(departmentId: string, functionName: string) {
+  function toggleDepartmentFunction(departmentId: string, functionName: string) {
     setSelectedDepartments((prev) =>
       prev.map((d) =>
         d.department_id === departmentId
-          ? { ...d, function_name: functionName }
+          ? {
+              ...d,
+              function_names: d.function_names.includes(functionName)
+                ? d.function_names.filter((item) => item !== functionName)
+                : [...d.function_names, functionName],
+              function_name: d.function_names.includes(functionName)
+                ? (d.function_names.filter((item) => item !== functionName)[0] || "")
+                : d.function_name || functionName,
+            }
+          : d
+      )
+    );
+  }
+
+  function updateDepartmentCustomFunctions(departmentId: string, rawValue: string) {
+    const normalized = rawValue
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    setSelectedDepartments((prev) =>
+      prev.map((d) =>
+        d.department_id === departmentId
+          ? {
+              ...d,
+              function_names: normalized,
+              function_name: normalized[0] || "",
+            }
           : d
       )
     );
@@ -260,23 +289,38 @@ export function MemberEditModal({
 
                   {selected && (
                     <div className="mt-3 pl-8">
-                      <label className="input-label">Função neste ministério</label>
+                      <label className="input-label">Funções neste ministério</label>
+                      {dept.function_names?.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {dept.function_names.map((functionName) => {
+                            const active = selectedDept?.function_names?.includes(functionName);
+                            return (
+                              <button
+                                key={functionName}
+                                type="button"
+                                onClick={() => toggleDepartmentFunction(dept.id, functionName)}
+                                className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-all ${
+                                  active ? "bg-brand text-white" : "bg-surface-alt text-ink-muted"
+                                }`}
+                              >
+                                {functionName}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+
                       <input
-                        list={`department-functions-${dept.id}`}
-                        className="input-field"
-                        value={selectedDept?.function_name || ""}
+                        className="input-field mt-2"
+                        value={(selectedDept?.function_names || []).join(", ")}
                         onChange={(e) =>
-                          updateDepartmentFunction(dept.id, e.target.value)
+                          updateDepartmentCustomFunctions(dept.id, e.target.value)
                         }
-                        placeholder="Ex: Vocal, Câmera, Recepção..."
+                        placeholder="Ex: Vocal, Câmera, Recepção"
                       />
-                      {dept.function_names?.length > 0 && (
-                        <datalist id={`department-functions-${dept.id}`}>
-                          {dept.function_names.map((functionName) => (
-                            <option key={functionName} value={functionName} />
-                          ))}
-                        </datalist>
-                      )}
+                      <div className="text-[11px] text-ink-faint mt-1">
+                        Você pode selecionar várias funções e também editar manualmente separando por vírgula.
+                      </div>
                     </div>
                   )}
                 </div>

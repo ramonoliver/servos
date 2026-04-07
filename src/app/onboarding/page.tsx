@@ -166,6 +166,7 @@ export default function OnboardingPage() {
             department_id: deptId,
             user_id: user.id,
             function_name: "Líder",
+            function_names: ["Líder"],
             joined_at: new Date().toISOString(),
           });
 

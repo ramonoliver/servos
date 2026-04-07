@@ -58,7 +58,8 @@ export interface DepartmentMember {
   id: string;
   department_id: string;
   user_id: string;
-  function_name: string; // "Vocal", "Guitarra", etc
+  function_name: string; // Primary function used in schedules and summaries
+  function_names: string[]; // Multiple functions inside the department
   joined_at: string;
 }
 

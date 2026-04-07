@@ -6,11 +6,14 @@ import { supabase } from "@/lib/supabase/client";
 import { getInitials, getIconEmoji } from "@/lib/utils/helpers";
 import { Modal } from "@/components/ui";
 import Link from "next/link";
-import type { User, DepartmentMember, Schedule, Event } from "@/types";
+import type { Department, User, DepartmentMember, Schedule, Event } from "@/types";
+
+const ICONS = ["music", "camera", "heart", "church", "cross", "flower", "flame", "star", "book", "baby", "pray"];
 
 export default function MinisterioDetailPage({ params }: { params: { id: string } }) {
-  const { user, departments, canDo, toast } = useApp();
+  const { user, departments, canDo, toast, refresh } = useApp();
   const [showAddMember, setShowAddMember] = useState(false);
+  const [showEditDept, setShowEditDept] = useState(false);
 
   const [allMembers, setAllMembers] = useState<User[]>([]);
   const [dms, setDms] = useState<DepartmentMember[]>([]);
@@ -86,7 +89,7 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
     [allMembers, deptMemberIds]
   );
 
-  async function addMembersToDept(selectedMembers: { userId: string; functionName: string }[]) {
+  async function addMembersToDept(selectedMembers: { userId: string; functionName: string; functionNames: string[] }[]) {
     if (!dept) return;
 
     try {
@@ -210,12 +213,17 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
             )}
 
             <p className="text-[12px] text-ink-faint mt-3 break-words">
-              Para ajustar as funções deste ministério, volte em <strong>Ministérios</strong> e use o botão de editar.
+              Ajuste nome, líderes, cor e funções por aqui sempre que precisar.
             </p>
           </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 self-start lg:self-auto">
+          {canDo("department.edit", dept.id) && (
+            <button onClick={() => setShowEditDept(true)} className="btn btn-secondary">
+              ✎ Editar ministério
+            </button>
+          )}
           {canDo("schedule.create", dept.id) && (
             <Link href={`/escalas/nova?departmentId=${dept.id}`} className="btn btn-secondary">
               + Nova escala
@@ -268,7 +276,7 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{member.name}</div>
                       <div className="text-[11px] text-ink-faint">
-                        {dm.function_name || "Sem função"} · {member.email}
+                        {(dm.function_names?.length ? dm.function_names : dm.function_name ? [dm.function_name] : ["Sem função"]).join(", ")} · {member.email}
                       </div>
                     </div>
                   </Link>
@@ -324,6 +332,21 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
           onSave={addMembersToDept}
         />
       )}
+
+      {showEditDept && (
+        <DepartmentFormModal
+          dept={dept}
+          members={allMembers}
+          userId={user.id}
+          toast={toast}
+          onClose={() => setShowEditDept(false)}
+          onSaved={async () => {
+            setShowEditDept(false);
+            await refresh();
+            await loadData();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -337,9 +360,9 @@ function AddMemberModal({
   availableToAdd: User[];
   functionOptions: string[];
   onClose: () => void;
-  onSave: (members: { userId: string; functionName: string }[]) => void;
+  onSave: (members: { userId: string; functionName: string; functionNames: string[] }[]) => void;
 }) {
-  const [selectedUsers, setSelectedUsers] = useState<Record<string, string>>({});
+  const [selectedUsers, setSelectedUsers] = useState<Record<string, string[]>>({});
 
   function toggleUser(userId: string) {
     setSelectedUsers((current) => {
@@ -347,16 +370,28 @@ function AddMemberModal({
       if (next[userId] !== undefined) {
         delete next[userId];
       } else {
-        next[userId] = "";
+        next[userId] = [];
       }
       return next;
     });
   }
 
-  function updateFunction(userId: string, functionName: string) {
+  function toggleFunction(userId: string, functionName: string) {
     setSelectedUsers((current) => ({
       ...current,
-      [userId]: functionName,
+      [userId]: current[userId]?.includes(functionName)
+        ? current[userId].filter((item) => item !== functionName)
+        : [...(current[userId] || []), functionName],
+    }));
+  }
+
+  function updateCustomFunctions(userId: string, rawValue: string) {
+    setSelectedUsers((current) => ({
+      ...current,
+      [userId]: rawValue
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
     }));
   }
 
@@ -377,7 +412,8 @@ function AddMemberModal({
               onSave(
                 selectedIds.map((userId) => ({
                   userId,
-                  functionName: selectedUsers[userId] || "",
+                  functionName: selectedUsers[userId]?.[0] || "",
+                  functionNames: selectedUsers[userId] || [],
                 }))
               )
             }
@@ -431,21 +467,36 @@ function AddMemberModal({
 
                       {selected && (
                         <div className="mt-3">
-                          <label className="input-label">Função no ministério</label>
+                          <label className="input-label">Funções no ministério</label>
+                          {functionOptions.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {functionOptions.map((functionName) => {
+                                const active = selectedUsers[member.id]?.includes(functionName);
+                                return (
+                                  <button
+                                    key={functionName}
+                                    type="button"
+                                    onClick={() => toggleFunction(member.id, functionName)}
+                                    className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-all ${
+                                      active ? "bg-brand text-white" : "bg-surface-alt text-ink-muted"
+                                    }`}
+                                  >
+                                    {functionName}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+
                           <input
-                            list={`department-functions-${member.id}`}
-                            className="input-field"
-                            value={selectedUsers[member.id]}
-                            onChange={(e) => updateFunction(member.id, e.target.value)}
-                            placeholder="Ex: Vocal, Camera, Recepcao..."
+                            className="input-field mt-2"
+                            value={(selectedUsers[member.id] || []).join(", ")}
+                            onChange={(e) => updateCustomFunctions(member.id, e.target.value)}
+                            placeholder="Ex: Vocal, Câmera, Recepção"
                           />
-                          {functionOptions.length > 0 && (
-                            <datalist id={`department-functions-${member.id}`}>
-                              {functionOptions.map((functionName) => (
-                                <option key={functionName} value={functionName} />
-                              ))}
-                            </datalist>
-                          )}
+                          <div className="text-[11px] text-ink-faint mt-1">
+                            Você pode selecionar várias funções e também editar manualmente separando por vírgula.
+                          </div>
                         </div>
                       )}
                     </div>
@@ -454,6 +505,267 @@ function AddMemberModal({
               );
             })
           )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function DepartmentFormModal({
+  dept,
+  members,
+  userId,
+  toast,
+  onClose,
+  onSaved,
+}: {
+  dept: Department;
+  members: User[];
+  userId: string;
+  toast: (msg: string) => void;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  const [name, setName] = useState(dept.name || "");
+  const [desc, setDesc] = useState(dept.description || "");
+  const [icon, setIcon] = useState(dept.icon || "church");
+  const [color, setColor] = useState(dept.color || "#7B9E87");
+  const [functionNames, setFunctionNames] = useState<string[]>(dept.function_names || []);
+  const [newFunctionName, setNewFunctionName] = useState("");
+  const [leaderIds, setLeaderIds] = useState<string[]>(dept.leader_ids || [userId]);
+  const [coLeaderIds, setCoLeaderIds] = useState<string[]>(dept.co_leader_ids || []);
+
+  function toggleList(list: string[], setList: (v: string[]) => void, id: string) {
+    setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+  }
+
+  function addFunctionName() {
+    const normalized = newFunctionName.trim();
+    if (!normalized) return;
+    if (functionNames.some((item) => item.toLowerCase() === normalized.toLowerCase())) {
+      setNewFunctionName("");
+      return;
+    }
+    setFunctionNames((current) => [...current, normalized]);
+    setNewFunctionName("");
+  }
+
+  function removeFunctionName(functionName: string) {
+    setFunctionNames((current) => current.filter((item) => item !== functionName));
+  }
+
+  async function save() {
+    if (!name.trim()) {
+      toast("Informe o nome.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/departments/manage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "update",
+          departmentId: dept.id,
+          data: {
+            name,
+            description: desc,
+            icon,
+            color,
+            function_names: functionNames,
+            leader_ids: leaderIds,
+            co_leader_ids: coLeaderIds,
+          },
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao salvar ministério:", payload);
+        toast(payload?.error || "Erro ao salvar ministério.");
+        return;
+      }
+
+      toast("Ministério atualizado!");
+      await onSaved();
+    } catch (error) {
+      console.error("Erro ao salvar ministério:", error);
+      toast("Erro ao salvar ministério.");
+    }
+  }
+
+  const eligibleLeaders = members.filter((m) => m.role === "admin" || m.role === "leader");
+
+  return (
+    <Modal
+      title="Editar ministério"
+      close={onClose}
+      width={520}
+      footer={
+        <>
+          <button onClick={onClose} className="btn btn-secondary">
+            Cancelar
+          </button>
+          <button onClick={save} className="btn btn-primary">
+            Salvar
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <label className="input-label">Nome</label>
+          <input className="input-field" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+
+        <div>
+          <label className="input-label">Descrição</label>
+          <textarea className="input-field min-h-[60px]" value={desc} onChange={(e) => setDesc(e.target.value)} />
+        </div>
+
+        <div>
+          <label className="input-label">Ícone</label>
+          <div className="flex flex-wrap gap-2">
+            {ICONS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setIcon(item)}
+                className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg border-2 transition-all ${
+                  icon === item ? "border-brand bg-brand-light" : "border-border-soft"
+                }`}
+              >
+                {getIconEmoji(item)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="input-label">Cor</label>
+          <input type="color" className="input-field h-10 p-1 cursor-pointer" value={color} onChange={(e) => setColor(e.target.value)} />
+        </div>
+
+        <div>
+          <label className="input-label">Funções do ministério</label>
+          <div className="rounded-[14px] border border-border-soft bg-surface-alt/50 p-3">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                className="input-field flex-1"
+                value={newFunctionName}
+                onChange={(e) => setNewFunctionName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addFunctionName();
+                  }
+                }}
+                placeholder="Ex: Câmera, Fotografia, Projeção..."
+              />
+              <button type="button" onClick={addFunctionName} className="btn btn-secondary sm:self-start">
+                Adicionar função
+              </button>
+            </div>
+
+            {functionNames.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {functionNames.map((functionName) => (
+                  <button
+                    key={functionName}
+                    type="button"
+                    onClick={() => removeFunctionName(functionName)}
+                    className="badge badge-secondary"
+                    title="Remover função"
+                  >
+                    {functionName} ×
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 text-xs text-ink-faint">
+                Cadastre as funções principais deste ministério para reaproveitar depois nos membros e nas escalas.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="input-label">Líderes</label>
+          <div className="space-y-1.5">
+            {eligibleLeaders.map((member) => (
+              <label
+                key={member.id}
+                className={`flex items-center gap-3 px-3 py-2 rounded-[10px] cursor-pointer transition-all border-[1.5px] ${
+                  leaderIds.includes(member.id)
+                    ? "border-brand bg-brand-light"
+                    : "border-border-soft hover:border-ink-ghost"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={leaderIds.includes(member.id)}
+                  onChange={() => toggleList(leaderIds, setLeaderIds, member.id)}
+                  className="sr-only"
+                />
+                <div
+                  className={`w-4 h-4 rounded border-2 flex items-center justify-center text-[10px] font-bold ${
+                    leaderIds.includes(member.id) ? "bg-brand border-brand text-white" : "border-border"
+                  }`}
+                >
+                  {leaderIds.includes(member.id) ? "\u2713" : ""}
+                </div>
+                <div
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0"
+                  style={{ background: member.avatar_color }}
+                >
+                  {getInitials(member.name)}
+                </div>
+                <span className="text-sm font-medium">{member.name}</span>
+                <span className="text-[10px] text-ink-faint ml-auto">
+                  {member.role === "admin" ? "Admin" : "Líder"}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="input-label">Co-líderes (opcional)</label>
+          <div className="space-y-1.5">
+            {members
+              .filter((member) => !leaderIds.includes(member.id))
+              .map((member) => (
+                <label
+                  key={member.id}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-[10px] cursor-pointer transition-all border-[1.5px] ${
+                    coLeaderIds.includes(member.id)
+                      ? "border-info bg-info-light"
+                      : "border-border-soft hover:border-ink-ghost"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={coLeaderIds.includes(member.id)}
+                    onChange={() => toggleList(coLeaderIds, setCoLeaderIds, member.id)}
+                    className="sr-only"
+                  />
+                  <div
+                    className={`w-4 h-4 rounded border-2 flex items-center justify-center text-[10px] font-bold ${
+                      coLeaderIds.includes(member.id) ? "bg-info border-info text-white" : "border-border"
+                    }`}
+                  >
+                    {coLeaderIds.includes(member.id) ? "\u2713" : ""}
+                  </div>
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0"
+                    style={{ background: member.avatar_color }}
+                  >
+                    {getInitials(member.name)}
+                  </div>
+                  <span className="text-sm font-medium">{member.name}</span>
+                </label>
+              ))}
+          </div>
         </div>
       </div>
     </Modal>

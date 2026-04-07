@@ -114,7 +114,7 @@ export default function MinisteriosPage() {
                   {getIconEmoji(d.icon)}
 
                   <div className="absolute top-2 right-2 flex items-center gap-1">
-                    {canDo("department.create") && (
+                    {canDo("department.edit", d.id) && (
                       <button
                         onClick={(e) => {
                           e.preventDefault();

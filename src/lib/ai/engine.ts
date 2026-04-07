@@ -97,7 +97,11 @@ export function scoreMember(
   }
 
   // 8. Function match
-  if (ctx.requiredFunction && deptMember?.function_name === ctx.requiredFunction) {
+  if (
+    ctx.requiredFunction &&
+    (deptMember?.function_name === ctx.requiredFunction ||
+      deptMember?.function_names?.includes(ctx.requiredFunction))
+  ) {
     score += 15;
     reasons.push({ factor: "function", label: `Funcao: ${ctx.requiredFunction}`, impact: 15, type: "positive" });
   }

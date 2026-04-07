@@ -8,6 +8,7 @@ import { genId } from "@/lib/utils/helpers";
 const selectedDepartmentSchema = z.object({
   department_id: z.string().min(1),
   function_name: z.string().default(""),
+  function_names: z.array(z.string().trim().min(1)).default([]),
 });
 
 const bodySchema = z.object({
@@ -158,13 +159,21 @@ export async function POST(req: Request) {
     if (deleteDMError) throw deleteDMError;
 
     if (selectedDepartments.length > 0) {
-      const payload = selectedDepartments.map((dept) => ({
+      const payload = selectedDepartments.map((dept) => {
+        const normalizedFunctionNames = dept.function_names.map((value) => value.trim()).filter(Boolean);
+        const primaryFunction = normalizedFunctionNames[0] || dept.function_name.trim();
+        const mergedFunctionNames = primaryFunction
+          ? [...new Set([primaryFunction, ...normalizedFunctionNames])]
+          : normalizedFunctionNames;
+        return {
         id: genId(),
         department_id: dept.department_id,
         user_id: memberId,
-        function_name: dept.function_name.trim(),
+        function_name: primaryFunction,
+        function_names: mergedFunctionNames,
         joined_at: new Date().toISOString(),
-      }));
+      };
+      });
 
       const { error: insertDMError } = await supabase
         .from("department_members")

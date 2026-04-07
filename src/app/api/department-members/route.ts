@@ -9,11 +9,13 @@ const postSchema = z.object({
   departmentId: z.string().min(1),
   userId: z.string().min(1).optional(),
   functionName: z.string().default(""),
+  functionNames: z.array(z.string().trim().min(1)).default([]),
   members: z
     .array(
       z.object({
         userId: z.string().min(1),
         functionName: z.string().default(""),
+        functionNames: z.array(z.string().trim().min(1)).default([]),
       })
     )
     .default([]),
@@ -72,7 +74,7 @@ export async function POST(req: Request) {
 
     const actorId = session!.user_id;
     const churchId = session!.church_id;
-    const { departmentId, userId, functionName, members } = parsed.data;
+    const { departmentId, userId, functionName, functionNames, members } = parsed.data;
     const supabase = getSupabaseServerClient();
 
     const allowed = await canManageDepartmentMember({ actorId, churchId, departmentId });
@@ -84,7 +86,7 @@ export async function POST(req: Request) {
       members.length > 0
         ? members
         : userId
-        ? [{ userId, functionName }]
+        ? [{ userId, functionName, functionNames }]
         : [];
 
     if (normalizedMembers.length === 0) {
@@ -122,13 +124,21 @@ export async function POST(req: Request) {
     }
 
     const { error } = await supabase.from("department_members").insert(
-      normalizedMembers.map((item) => ({
+      normalizedMembers.map((item) => {
+        const normalizedFunctionNames = item.functionNames.map((value) => value.trim()).filter(Boolean);
+        const primaryFunction = normalizedFunctionNames[0] || item.functionName.trim();
+        const mergedFunctionNames = primaryFunction
+          ? [...new Set([primaryFunction, ...normalizedFunctionNames])]
+          : normalizedFunctionNames;
+        return {
         id: genId(),
         department_id: departmentId,
         user_id: item.userId,
-        function_name: item.functionName.trim(),
+        function_name: primaryFunction,
+        function_names: mergedFunctionNames,
         joined_at: new Date().toISOString(),
-      }))
+      };
+      })
     );
 
     if (error) throw error;

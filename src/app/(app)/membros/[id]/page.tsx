@@ -21,6 +21,7 @@ import type {
 type SelectedDepartment = {
   department_id: string;
   function_name: string;
+  function_names: string[];
 };
 
 export default function MembroDetailPage({ params }: { params: { id: string } }) {
@@ -427,7 +428,9 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
                 return d ? (
                   <div key={dm.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3 py-1.5">
                     <span className="text-sm font-medium break-words">{d.name}</span>
-                    <span className="text-xs text-ink-faint text-left sm:text-right break-words">{dm.function_name}</span>
+                    <span className="text-xs text-ink-faint text-left sm:text-right break-words">
+                      {(dm.function_names?.length ? dm.function_names : dm.function_name ? [dm.function_name] : ["Sem função"]).join(", ")}
+                    </span>
                   </div>
                 ) : null;
               })

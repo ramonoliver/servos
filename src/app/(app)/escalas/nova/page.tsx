@@ -165,7 +165,9 @@ export default function NovaEscalaPage() {
   const filteredScored = useMemo(() => {
     if (activeFunctionFilter === "all") return scored;
     return scored.filter(
-      (item) => (item.dept_member?.function_name || "Sem função") === activeFunctionFilter
+      (item) =>
+        (item.dept_member?.function_name || "Sem função") === activeFunctionFilter ||
+        item.dept_member?.function_names?.includes(activeFunctionFilter)
     );
   }, [scored, activeFunctionFilter]);
 
@@ -250,7 +252,9 @@ export default function NovaEscalaPage() {
       for (const slot of coverageByFunction) {
         if (slot.desired <= 0) continue;
         const candidates = scored.filter(
-          (item) => (item.dept_member?.function_name || "Sem função") === slot.functionName
+          (item) =>
+            (item.dept_member?.function_name || "Sem função") === slot.functionName ||
+            item.dept_member?.function_names?.includes(slot.functionName)
         );
         for (const userId of autoSelectWithCouples(candidates, slot.desired)) {
           picks.add(userId);
@@ -269,7 +273,9 @@ export default function NovaEscalaPage() {
 
       for (const functionName of functionOptions) {
         const candidates = scored.filter(
-          (item) => (item.dept_member?.function_name || "") === functionName
+          (item) =>
+            (item.dept_member?.function_name || "") === functionName ||
+            item.dept_member?.function_names?.includes(functionName)
         );
         for (const userId of autoSelectWithCouples(candidates, 2)) {
           if (picks.size < 8) picks.add(userId);
