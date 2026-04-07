@@ -53,8 +53,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Sem permissao para editar membros." }, { status: 403 });
     }
 
-    if (!member?.active) {
+    if (!member) {
       return NextResponse.json({ error: "Membro nao encontrado." }, { status: 404 });
+    }
+
+    if (!member.active && actor.role !== "admin") {
+      return NextResponse.json({ error: "Somente administradores podem editar membros desativados." }, { status: 403 });
     }
 
     const departmentIds = selectedDepartments.map((dept) => dept.department_id);

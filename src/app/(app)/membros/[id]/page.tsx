@@ -519,8 +519,10 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
             try {
               const response = await fetch("/api/members/update", {
                 method: "POST",
+                credentials: "include",
                 headers: {
                   "Content-Type": "application/json",
+                  ...(getSession()?.token ? { "x-servos-auth": getSession()!.token! } : {}),
                 },
                 body: JSON.stringify({
                   memberId: member.id,
@@ -530,7 +532,8 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
                 }),
               });
 
-              const data = await response.json().catch(() => null);
+              const raw = await response.text();
+              const data = parseResponsePayload(raw);
 
               if (!response.ok) {
                 console.error("Erro ao atualizar membro:", data);
