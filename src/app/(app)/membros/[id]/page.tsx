@@ -188,6 +188,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
     try {
       const response = await fetch("/api/member-invitations/resend", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -228,6 +229,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
     try {
       const response = await fetch("/api/members/deactivate", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           targetUserId: member.id,

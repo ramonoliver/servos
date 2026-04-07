@@ -69,6 +69,7 @@ export default function CadastroPage() {
 
       const response = await fetch("/api/auth/register", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: f.name,
