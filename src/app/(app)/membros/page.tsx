@@ -422,43 +422,49 @@ export default function MembrosPage() {
                     )}
                   </div>
 
-                  {canDo("member.invite") && m.must_change_password && (
-                    <button
-                      onClick={() => resendInvite(m)}
-                      disabled={resendingId === m.id}
-                      className="btn btn-secondary btn-sm"
-                    >
-                      {resendingId === m.id ? "Reenviando..." : "Reenviar convite"}
-                    </button>
-                  )}
+                  <details className="relative">
+                    <summary className="btn btn-ghost btn-sm list-none cursor-pointer">
+                      Ações
+                    </summary>
+                    <div className="absolute right-0 z-20 mt-2 min-w-[220px] rounded-2xl border border-border-soft bg-white shadow-soft p-2 flex flex-col gap-1">
+                      {canDo("member.invite") && m.must_change_password && (
+                        <button
+                          onClick={() => resendInvite(m)}
+                          disabled={resendingId === m.id}
+                          className="w-full text-left rounded-xl px-3 py-2 text-sm hover:bg-brand-glow disabled:opacity-60"
+                        >
+                          {resendingId === m.id ? "Reenviando convite..." : "Reenviar convite"}
+                        </button>
+                      )}
 
-                  {canDo("member.remove") && m.id !== user.id && (
-                    <>
-                      {m.active ? (
+                      {canDo("member.remove") && m.id !== user.id && m.active && (
                         <button
                           onClick={() => changeMemberState(m, "deactivate")}
-                          className="btn btn-ghost btn-sm text-amber-700 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                          className="w-full text-left rounded-xl px-3 py-2 text-sm text-amber-700 hover:bg-amber-light"
                         >
-                          Desativar
+                          Desativar membro
                         </button>
-                      ) : (
+                      )}
+
+                      {canDo("member.remove") && m.id !== user.id && !m.active && (
                         <button
                           onClick={() => changeMemberState(m, "reactivate")}
-                          className="btn btn-ghost btn-sm text-success opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                          className="w-full text-left rounded-xl px-3 py-2 text-sm text-success hover:bg-success-light"
                         >
-                          Reativar
+                          Reativar membro
                         </button>
                       )}
-                      {user.role === "admin" && (
+
+                      {user.role === "admin" && canDo("member.remove") && m.id !== user.id && (
                         <button
                           onClick={() => changeMemberState(m, "hard_delete")}
-                          className="btn btn-ghost btn-sm text-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                          className="w-full text-left rounded-xl px-3 py-2 text-sm text-danger hover:bg-danger-light"
                         >
-                          Excluir permanente
+                          Excluir permanentemente
                         </button>
                       )}
-                    </>
-                  )}
+                    </div>
+                  </details>
                 </div>
               </div>
             );

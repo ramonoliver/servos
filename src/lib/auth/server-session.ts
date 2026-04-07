@@ -7,7 +7,6 @@ const SEVEN_DAYS = 7 * 24 * 60 * 60;
 function getSessionSecret() {
   return (
     process.env.AUTH_SESSION_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     "servos-dev-session-secret"
   );
