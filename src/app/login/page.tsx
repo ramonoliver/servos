@@ -121,10 +121,10 @@ export default function LoginPage() {
         </div>
 
         <div className="mt-6 bg-brand-glow border border-brand-light rounded-xl px-5 py-4 text-center">
-          <p className="text-xs font-semibold text-brand mb-1">Demo</p>
-          <p className="text-xs text-ink-muted">
-            Email: <strong className="text-ink">ramon@servosapp.com</strong> &middot; Senha:{" "}
-            <strong className="text-ink">servos2026</strong>
+          <p className="text-xs font-semibold text-brand mb-1">Ambiente local</p>
+          <p className="text-xs text-ink-muted leading-relaxed">
+            Este login usa os usuários reais do banco configurado no `.env.local`.
+            Entre com o seu email cadastrado ou use <strong className="text-ink">Esqueci minha senha</strong> para gerar uma nova senha.
           </p>
         </div>
       </div>
