@@ -47,6 +47,7 @@ export default function MembrosPage() {
 
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
   const [members, setMembers] = useState<User[]>([]);
   const [allDM, setAllDM] = useState<DepartmentMember[]>([]);
   const [latestInvites, setLatestInvites] = useState<Record<string, MemberInvitation>>({});
@@ -58,11 +59,16 @@ export default function MembrosPage() {
 
     const visibleDepartmentIds = departments.map((dept) => dept.id);
 
-    const { data: usersData, error: usersError } = await supabase
+    const usersQuery = supabase
       .from("users")
       .select("*")
-      .eq("church_id", user.church_id)
-      .eq("active", true);
+      .eq("church_id", user.church_id);
+
+    if (user.role !== "admin") {
+      usersQuery.eq("active", true);
+    }
+
+    const { data: usersData, error: usersError } = await usersQuery;
 
     const { data: dmData, error: dmError } = visibleDepartmentIds.length
       ? await supabase
@@ -135,11 +141,25 @@ export default function MembrosPage() {
       result = result.filter((m) => deptMemberIds.includes(m.id));
     }
 
-    return result;
-  }, [members, allDM, search, deptFilter]);
+    if (statusFilter !== "all") {
+      result = result.filter((m) => (statusFilter === "active" ? m.active : !m.active));
+    }
 
-  async function removeMember(m: User) {
-    if (!confirm(`Remover ${m.name}?`)) return;
+    return result;
+  }, [members, allDM, search, deptFilter, statusFilter]);
+
+  async function changeMemberState(
+    m: User,
+    action: "deactivate" | "reactivate" | "hard_delete"
+  ) {
+    const confirmationMessage =
+      action === "reactivate"
+        ? `Reativar ${m.name}?`
+        : action === "hard_delete"
+        ? `Excluir ${m.name} permanentemente e apagar os dados relacionados?`
+        : `Desativar ${m.name}?`;
+
+    if (!confirm(confirmationMessage)) return;
 
     try {
       const response = await fetch("/api/members/deactivate", {
@@ -149,22 +169,43 @@ export default function MembrosPage() {
         },
         body: JSON.stringify({
           targetUserId: m.id,
+          action,
         }),
       });
 
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        console.error("Erro ao remover membro:", data);
-        toast(data?.error || "Erro ao remover membro.");
+        console.error("Erro ao atualizar membro:", data);
+        toast(
+          data?.error ||
+            (action === "reactivate"
+              ? "Erro ao reativar membro."
+              : action === "hard_delete"
+              ? "Erro ao excluir membro."
+              : "Erro ao desativar membro.")
+        );
         return;
       }
 
-      toast(data?.warning || m.name + " removido.");
+      toast(
+        data?.warning ||
+          (action === "reactivate"
+            ? `${m.name} reativado.`
+            : action === "hard_delete"
+            ? `${m.name} excluido permanentemente.`
+            : `${m.name} desativado.`)
+      );
       await loadData();
     } catch (error) {
-      console.error("Erro ao remover membro:", error);
-      toast("Erro ao remover membro.");
+      console.error("Erro ao atualizar membro:", error);
+      toast(
+        action === "reactivate"
+          ? "Erro ao reativar membro."
+          : action === "hard_delete"
+          ? "Erro ao excluir membro."
+          : "Erro ao desativar membro."
+      );
     }
   }
 
@@ -244,11 +285,24 @@ export default function MembrosPage() {
           ))}
         </select>
 
-        {(search || deptFilter !== "all") && (
+        {user.role === "admin" && (
+          <select
+            className="input-field w-full lg:max-w-[200px]"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as "active" | "inactive" | "all")}
+          >
+            <option value="active">Somente ativos</option>
+            <option value="inactive">Somente desativados</option>
+            <option value="all">Todos</option>
+          </select>
+        )}
+
+        {(search || deptFilter !== "all" || statusFilter !== "active") && (
           <button
             onClick={() => {
               setSearch("");
               setDeptFilter("all");
+              setStatusFilter("active");
             }}
             className="btn btn-ghost btn-sm text-ink-faint"
           >
@@ -287,11 +341,16 @@ export default function MembrosPage() {
                 : m.role === "leader"
                 ? "bg-brand-light text-brand"
                 : "bg-success-light text-success";
+            const activityCls = m.active
+              ? "bg-success-light text-success"
+              : "bg-danger-light text-danger";
 
             return (
               <div
                 key={m.id}
-                className="flex flex-col sm:flex-row sm:items-center gap-3.5 px-5 py-3 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors group"
+                className={`flex flex-col sm:flex-row sm:items-center gap-3.5 px-5 py-3 border-t border-border-soft first:border-t-0 transition-colors group ${
+                  m.active ? "hover:bg-brand-glow" : "bg-slate-50/50"
+                }`}
               >
                 <Link href={`/membros/${m.id}`} className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
                   {m.photo_url ? (
@@ -325,6 +384,9 @@ export default function MembrosPage() {
                     <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${roleCls}`}>
                       {m.role === "admin" ? "Admin" : m.role === "leader" ? "Líder" : "Membro"}
                     </span>
+                    <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${activityCls}`}>
+                      {m.active ? "Ativo" : "Desativado"}
+                    </span>
 
                     {spouse && (
                       <span className="text-[9px] font-semibold text-brand bg-brand-light px-1.5 py-0.5 rounded-full">
@@ -344,6 +406,9 @@ export default function MembrosPage() {
                   <div className="flex sm:hidden flex-wrap items-center gap-2">
                     <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${roleCls}`}>
                       {m.role === "admin" ? "Admin" : m.role === "leader" ? "Líder" : "Membro"}
+                    </span>
+                    <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${activityCls}`}>
+                      {m.active ? "Ativo" : "Desativado"}
                     </span>
                     {spouse && (
                       <span className="text-[9px] font-semibold text-brand bg-brand-light px-1.5 py-0.5 rounded-full">
@@ -368,12 +433,31 @@ export default function MembrosPage() {
                   )}
 
                   {canDo("member.remove") && m.id !== user.id && (
-                    <button
-                      onClick={() => removeMember(m)}
-                      className="btn btn-ghost btn-sm text-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                    >
-                      &#10005;
-                    </button>
+                    <>
+                      {m.active ? (
+                        <button
+                          onClick={() => changeMemberState(m, "deactivate")}
+                          className="btn btn-ghost btn-sm text-amber-700 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        >
+                          Desativar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => changeMemberState(m, "reactivate")}
+                          className="btn btn-ghost btn-sm text-success opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        >
+                          Reativar
+                        </button>
+                      )}
+                      {user.role === "admin" && (
+                        <button
+                          onClick={() => changeMemberState(m, "hard_delete")}
+                          className="btn btn-ghost btn-sm text-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        >
+                          Excluir permanente
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

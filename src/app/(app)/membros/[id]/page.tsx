@@ -129,6 +129,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
     paused: "Pausa",
     vacation: "Férias",
   };
+  const displayStatus = member.active ? statusLabelMap[member.status] || member.status : "Desativado";
 
   const inviteTimeline = latestInvite
     ? [
@@ -213,12 +214,14 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
     }
   }
 
-  async function removeMember() {
+  async function changeMemberState(action: "deactivate" | "reactivate" | "hard_delete") {
     if (!member || !canDo("member.remove") || member.id === user.id) return;
     const confirmed = window.confirm(
-      user.role === "admin"
+      action === "reactivate"
+        ? `Reativar ${member.name}?`
+        : action === "hard_delete"
         ? `Excluir ${member.name} permanentemente e apagar os dados relacionados?`
-        : `Remover ${member.name} da igreja?`
+        : `Desativar ${member.name}?`
     );
     if (!confirmed) return;
 
@@ -228,23 +231,46 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           targetUserId: member.id,
+          action,
         }),
       });
 
       const data = await response.json().catch(() => null);
       if (!response.ok) {
-        toast(data?.error || "Não foi possível remover este membro.");
+        toast(
+          data?.error ||
+            (action === "reactivate"
+              ? "Não foi possível reativar este membro."
+              : action === "hard_delete"
+              ? "Não foi possível excluir este membro."
+              : "Não foi possível desativar este membro.")
+        );
         return;
       }
 
       toast(
         data?.warning ||
-          (user.role === "admin" ? "Usuario excluido com sucesso." : "Membro removido com sucesso.")
+          (action === "reactivate"
+            ? "Membro reativado com sucesso."
+            : action === "hard_delete"
+            ? "Usuário excluído com sucesso."
+            : "Membro desativado com sucesso.")
       );
-      router.push("/membros");
+      if (action === "hard_delete") {
+        router.push("/membros");
+        return;
+      }
+
+      await loadData();
     } catch (error) {
-      console.error("Erro ao remover membro:", error);
-      toast("Não foi possível remover este membro.");
+      console.error("Erro ao atualizar membro:", error);
+      toast(
+        action === "reactivate"
+          ? "Não foi possível reativar este membro."
+          : action === "hard_delete"
+          ? "Não foi possível excluir este membro."
+          : "Não foi possível desativar este membro."
+      );
     }
   }
 
@@ -284,9 +310,19 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
                   &#9998; Editar
                 </button>
               )}
-              {canDo("member.remove") && member.id !== user.id && (
-                <button onClick={removeMember} className="btn btn-danger btn-sm">
-                  Excluir usuario
+              {canDo("member.remove") && member.id !== user.id && member.active && (
+                <button onClick={() => changeMemberState("deactivate")} className="btn btn-secondary btn-sm">
+                  Desativar membro
+                </button>
+              )}
+              {canDo("member.remove") && member.id !== user.id && !member.active && (
+                <button onClick={() => changeMemberState("reactivate")} className="btn btn-primary btn-sm">
+                  Reativar membro
+                </button>
+              )}
+              {canDo("member.remove") && member.id !== user.id && user.role === "admin" && (
+                <button onClick={() => changeMemberState("hard_delete")} className="btn btn-danger btn-sm">
+                  Excluir permanente
                 </button>
               )}
             </div>
@@ -347,7 +383,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
                 ["Telefone", formatPhoneDisplay(member.phone)],
                 ["Escalas", String(member.total_schedules)],
                 ["Confirmação", member.confirm_rate + "%"],
-                ["Status", statusLabelMap[member.status] || member.status],
+                ["Status", displayStatus],
                 ["Desde", member.joined_at ? formatDate(member.joined_at.split("T")[0]) : "-"],
               ].map(([l, v], i) => (
                 <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-4 py-1.5 border-t border-border-soft first:border-t-0">

@@ -6,6 +6,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({
   targetUserId: z.string().min(1),
+  action: z.enum(["deactivate", "reactivate", "hard_delete"]).default("deactivate"),
 });
 
 function isIgnorableCleanupError(error: unknown) {
@@ -36,15 +37,15 @@ export async function POST(req: Request) {
     const actorId = session!.user_id;
     const churchId = session!.church_id;
     const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
-    const { targetUserId } = parsed.data;
+    const { targetUserId, action } = parsed.data;
     if (actorId === targetUserId) {
-      return NextResponse.json({ error: "Voce nao pode remover a propria conta." }, { status: 400 });
+      return NextResponse.json({ error: "Voce nao pode alterar a propria conta por esta acao." }, { status: 400 });
     }
 
     const supabase = getSupabaseServerClient();
     const { data: target, error: targetError } = await supabase
         .from("users")
-        .select("id, church_id, spouse_id, active")
+        .select("id, church_id, spouse_id, active, status")
         .eq("id", targetUserId)
         .eq("church_id", churchId)
         .maybeSingle();
@@ -54,11 +55,39 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Sem permissao para remover membros." }, { status: 403 });
     }
 
-    if (!target?.active) {
+    if (!target) {
       return NextResponse.json({ error: "Membro nao encontrado." }, { status: 404 });
     }
 
-    if (actor.role === "admin") {
+    if (action === "reactivate") {
+      if (actor.role !== "admin") {
+        return NextResponse.json({ error: "Somente administradores podem reativar membros." }, { status: 403 });
+      }
+
+      if (target.active) {
+        return NextResponse.json({ error: "Este membro ja esta ativo." }, { status: 400 });
+      }
+
+      const { error: reactivateError } = await supabase
+        .from("users")
+        .update({ active: true, status: target.status === "inactive" ? "active" : target.status })
+        .eq("id", targetUserId)
+        .eq("church_id", churchId);
+
+      if (reactivateError) throw reactivateError;
+
+      return NextResponse.json({ success: true, mode: "reactivate" });
+    }
+
+    if (!target.active && action !== "hard_delete") {
+      return NextResponse.json({ error: "Este membro ja esta desativado." }, { status: 400 });
+    }
+
+    if (action === "hard_delete" && actor.role !== "admin") {
+      return NextResponse.json({ error: "Somente administradores podem excluir permanentemente." }, { status: 403 });
+    }
+
+    if (action === "hard_delete") {
       if (target.spouse_id) {
         const { error: spouseCleanupError } = await supabase
           .from("users")
@@ -191,7 +220,7 @@ export async function POST(req: Request) {
       if (remainingUser) {
         const { error: fallbackDeactivateError } = await supabase
           .from("users")
-          .update({ active: false })
+          .update({ active: false, status: "inactive" })
           .eq("id", targetUserId)
           .eq("church_id", churchId);
 
@@ -211,7 +240,7 @@ export async function POST(req: Request) {
 
     const { error: updateError } = await supabase
       .from("users")
-      .update({ active: false })
+      .update({ active: false, status: "inactive" })
       .eq("id", targetUserId)
       .eq("church_id", churchId);
 
