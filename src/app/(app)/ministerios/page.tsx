@@ -79,7 +79,9 @@ export default function MinisteriosPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="page-title">Ministérios</h1>
-          <p className="page-subtitle">{departments.length} departamentos</p>
+          <p className="page-subtitle">
+            {departments.length} departamentos · edite cada ministério para ajustar líderes e funções
+          </p>
         </div>
 
         {canDo("department.create") && (
@@ -111,18 +113,35 @@ export default function MinisteriosPage() {
                 >
                   {getIconEmoji(d.icon)}
 
-                  {canDo("department.delete") && (
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setModal({ type: "delete", dept: d });
-                      }}
-                      className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 shadow-sm flex items-center justify-center text-xs text-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                    >
-                      &#10005;
-                    </button>
-                  )}
+                  <div className="absolute top-2 right-2 flex items-center gap-1">
+                    {canDo("department.create") && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setModal({ type: "form", dept: d });
+                        }}
+                        className="w-8 h-8 rounded-full bg-white/90 shadow-sm flex items-center justify-center text-xs text-ink opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        title="Editar ministério"
+                      >
+                        &#9998;
+                      </button>
+                    )}
+
+                    {canDo("department.delete") && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setModal({ type: "delete", dept: d });
+                        }}
+                        className="w-8 h-8 rounded-full bg-white/90 shadow-sm flex items-center justify-center text-xs text-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        title="Excluir ministério"
+                      >
+                        &#10005;
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="p-4 space-y-1">

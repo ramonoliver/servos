@@ -4,14 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { Avatar } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
-import type { User, Schedule, ScheduleMember } from "@/types";
+import type { User, Schedule, ScheduleMember, ScheduleSlot } from "@/types";
 
 export default function RelatóriosPage() {
-  const { user } = useApp();
+  const { user, departments } = useApp();
 
   const [members, setMembers] = useState<User[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [allSM, setAllSM] = useState<ScheduleMember[]>([]);
+  const [allSlots, setAllSlots] = useState<ScheduleSlot[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function loadData() {
@@ -32,12 +33,16 @@ export default function RelatóriosPage() {
     }
 
     const scheduleIds = ((schedulesData || []) as Schedule[]).map((schedule) => schedule.id);
-    const { data: smData, error: smError } = scheduleIds.length
-      ? await supabase.from("schedule_members").select("*").in("schedule_id", scheduleIds)
-      : { data: [], error: null };
+    const [{ data: smData, error: smError }, { data: slotsData, error: slotsError }] =
+      scheduleIds.length
+        ? await Promise.all([
+            supabase.from("schedule_members").select("*").in("schedule_id", scheduleIds),
+            supabase.from("schedule_slots").select("*").in("schedule_id", scheduleIds),
+          ])
+        : [{ data: [], error: null }, { data: [], error: null }];
 
-    if (smError) {
-      console.error({ smError });
+    if (smError || slotsError) {
+      console.error({ smError, slotsError });
       setLoading(false);
       return;
     }
@@ -45,6 +50,7 @@ export default function RelatóriosPage() {
     setMembers((usersData || []) as User[]);
     setSchedules((schedulesData || []) as Schedule[]);
     setAllSM((smData || []) as ScheduleMember[]);
+    setAllSlots((slotsData || []) as ScheduleSlot[]);
     setLoading(false);
   }
 
@@ -73,6 +79,38 @@ export default function RelatóriosPage() {
 
   const totalAll = allSM.length;
   const confirmRate = totalAll ? Math.round((totalConfirmed / totalAll) * 100) : 0;
+  const totalPlannedSlots = useMemo(
+    () => allSlots.reduce((sum, slot) => sum + slot.quantity, 0),
+    [allSlots]
+  );
+  const totalFilledSlots = useMemo(
+    () => allSlots.reduce((sum, slot) => sum + slot.filled, 0),
+    [allSlots]
+  );
+  const totalCoverageRate = totalPlannedSlots
+    ? Math.round((Math.min(totalFilledSlots, totalPlannedSlots) / totalPlannedSlots) * 100)
+    : 0;
+  const uncoveredFunctions = useMemo(() => {
+    const map = new Map<string, { key: string; departmentName: string; functionName: string; missing: number }>();
+
+    for (const slot of allSlots) {
+      const missing = Math.max(0, slot.quantity - slot.filled);
+      if (missing <= 0) continue;
+      const schedule = schedules.find((item) => item.id === slot.schedule_id);
+      const departmentName =
+        departments.find((department) => department.id === schedule?.department_id)?.name || "Ministério";
+      const key = `${schedule?.department_id || "unknown"}::${slot.function_name}`;
+      const current = map.get(key);
+      map.set(key, {
+        key,
+        departmentName,
+        functionName: slot.function_name,
+        missing: (current?.missing || 0) + missing,
+      });
+    }
+
+    return [...map.values()].sort((a, b) => b.missing - a.missing).slice(0, 6);
+  }, [allSlots, schedules, departments]);
 
   return (
     <div>
@@ -81,7 +119,7 @@ export default function RelatóriosPage() {
         <p className="page-subtitle">Insights do seu ministério</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         <div className="bg-surface border border-border-soft rounded-[14px] px-5 py-4">
           <div className="font-display text-[28px] text-brand">
             {loading ? "..." : schedules.length}
@@ -101,6 +139,13 @@ export default function RelatóriosPage() {
             {loading ? "..." : members.length}
           </div>
           <div className="text-xs text-ink-muted">Membros ativos</div>
+        </div>
+
+        <div className="bg-surface border border-border-soft rounded-[14px] px-5 py-4">
+          <div className="font-display text-[28px] text-amber">
+            {loading ? "..." : `${totalCoverageRate}%`}
+          </div>
+          <div className="text-xs text-ink-muted">Cobertura das funções</div>
         </div>
       </div>
 
@@ -148,6 +193,33 @@ export default function RelatóriosPage() {
                 >
                   {m.confirm_rate}%
                 </span>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="card">
+          <div className="px-5 pt-4 pb-3">
+            <span className="font-display text-[17px]">Funções mais descobertas</span>
+          </div>
+
+          {loading ? (
+            <div className="px-5 py-6 text-sm text-ink-faint text-center">Carregando...</div>
+          ) : uncoveredFunctions.length === 0 ? (
+            <div className="px-5 py-6 text-sm text-ink-faint text-center">
+              Nenhuma lacuna de cobertura nas funções planejadas.
+            </div>
+          ) : (
+            uncoveredFunctions.map((item) => (
+              <div
+                key={item.key}
+                className="flex items-start justify-between gap-3 px-5 py-3 border-t border-border-soft"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium break-words">{item.functionName}</div>
+                  <div className="text-[11px] text-ink-faint break-words">{item.departmentName}</div>
+                </div>
+                <span className="text-sm font-semibold text-amber shrink-0">-{item.missing}</span>
               </div>
             ))
           )}

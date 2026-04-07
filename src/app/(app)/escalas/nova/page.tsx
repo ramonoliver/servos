@@ -318,6 +318,16 @@ export default function NovaEscalaPage() {
       return;
     }
 
+    if (publish && missingFunctions.length > 0) {
+      const confirmed = window.confirm(
+        `Ainda faltam vagas nas funções: ${missingFunctions
+          .map((item) => `${item.functionName} (${item.missing})`)
+          .join(", ")}. Deseja publicar mesmo assim?`
+      );
+
+      if (!confirmed) return;
+    }
+
     try {
       const response = await fetch("/api/schedules/create", {
         method: "POST",
@@ -622,6 +632,18 @@ export default function NovaEscalaPage() {
         {aiRan && (
           <div className="text-xs text-brand font-semibold mb-3 flex items-center gap-1">
             &#129302; IA selecionou com base em disponibilidade, rodizio, casais e aderência às funções do ministério.
+          </div>
+        )}
+
+        {missingFunctions.length > 0 && (
+          <div className="mb-4 rounded-[16px] border border-amber/25 bg-amber-light px-4 py-3">
+            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber mb-1">
+              Atenção na cobertura
+            </div>
+            <div className="text-sm text-amber">
+              Ainda faltam pessoas em <strong>{missingFunctions.map((item) => item.functionName).join(", ")}</strong>.
+              Se quiser, você ainda pode publicar assim, mas o alerta vai aparecer antes da confirmação.
+            </div>
           </div>
         )}
 

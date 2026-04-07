@@ -415,6 +415,9 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
 
           <div className="card p-5">
             <div className="font-display text-lg mb-3">Ministérios</div>
+            <p className="text-sm text-ink-muted mb-3">
+              Use <strong>Editar</strong> para ajustar em quais ministérios este membro está e qual função ele exerce em cada um.
+            </p>
 
             {dms.length === 0 ? (
               <p className="text-sm text-ink-faint">Nenhum ministério.</p>

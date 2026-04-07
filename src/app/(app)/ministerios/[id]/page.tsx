@@ -208,6 +208,10 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
                 ))}
               </div>
             )}
+
+            <p className="text-[12px] text-ink-faint mt-3 break-words">
+              Para ajustar as funções deste ministério, volte em <strong>Ministérios</strong> e use o botão de editar.
+            </p>
           </div>
         </div>
 
