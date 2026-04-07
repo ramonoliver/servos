@@ -46,12 +46,15 @@ export function encodeSessionToken(session: Session) {
 export function decodeSessionToken(token?: string | null): Session | null {
   if (!token) return null;
 
-  const [payload, signature] = token.split(".");
+  const normalizedToken = token.trim().replace(/^Bearer\s+/i, "");
+  if (!normalizedToken) return null;
+
+  const [payload, signature] = normalizedToken.split(".");
   if (!payload || !signature) return null;
 
   const expectedSignature = sign(payload);
-  const receivedBuffer = Buffer.from(signature);
-  const expectedBuffer = Buffer.from(expectedSignature);
+  const receivedBuffer = Buffer.from(signature, "utf8");
+  const expectedBuffer = Buffer.from(expectedSignature, "utf8");
 
   if (
     receivedBuffer.length !== expectedBuffer.length ||
@@ -87,5 +90,5 @@ export function getSessionFromCookieHeader(cookieHeader?: string | null) {
     .find((part) => part.startsWith(`${AUTH_COOKIE_NAME}=`));
 
   if (!cookie) return null;
-  return decodeSessionToken(cookie.slice(AUTH_COOKIE_NAME.length + 1));
+  return decodeSessionToken(cookie.slice(AUTH_COOKIE_NAME.length + 1).trim());
 }

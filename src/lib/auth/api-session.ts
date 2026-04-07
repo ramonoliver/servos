@@ -7,9 +7,11 @@ type RequireActorOptions = {
 };
 
 export function requireApiSession(req: Request) {
-  const session =
-    getSessionFromCookieHeader(req.headers.get("cookie")) ||
-    decodeSessionToken(req.headers.get("x-servos-auth"));
+  const cookieHeader = req.headers.get("cookie");
+  const tokenHeader = req.headers.get("x-servos-auth");
+  const cookieSession = getSessionFromCookieHeader(cookieHeader);
+  const headerSession = decodeSessionToken(tokenHeader);
+  const session = cookieSession || headerSession;
 
   if (!session) {
     return {
