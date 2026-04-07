@@ -85,6 +85,38 @@ async function canManageSchedule(params: { actorId: string; churchId: string; sc
   return { allowed: true, schedule };
 }
 
+async function refreshScheduleSlotCounts(scheduleId: string) {
+  const supabase = getSupabaseServerClient();
+  const [{ data: slots, error: slotsError }, { data: scheduleMembers, error: membersError }] =
+    await Promise.all([
+      supabase.from("schedule_slots").select("id, function_name").eq("schedule_id", scheduleId),
+      supabase.from("schedule_members").select("function_name").eq("schedule_id", scheduleId),
+    ]);
+
+  if (slotsError) throw slotsError;
+  if (membersError) throw membersError;
+
+  if (!slots?.length) return;
+
+  const counts = (scheduleMembers || []).reduce<Record<string, number>>((acc, member) => {
+    const functionName = member.function_name?.trim() || "Sem função";
+    acc[functionName] = (acc[functionName] || 0) + 1;
+    return acc;
+  }, {});
+
+  const updates = await Promise.all(
+    slots.map((slot) =>
+      supabase
+        .from("schedule_slots")
+        .update({ filled: counts[slot.function_name?.trim() || "Sem função"] || 0 })
+        .eq("id", slot.id)
+    )
+  );
+
+  const failedUpdate = updates.find((result) => result.error);
+  if (failedUpdate?.error) throw failedUpdate.error;
+}
+
 export async function POST(req: Request) {
   try {
     const parsed = postSchema.safeParse(await req.json().catch(() => ({})));
@@ -155,6 +187,8 @@ export async function POST(req: Request) {
 
     if (error) throw error;
 
+    await refreshScheduleSlotCounts(scheduleId);
+
     const notifications = await sendScheduleAssignmentAlerts({
       churchId,
       scheduleId,
@@ -203,6 +237,8 @@ export async function DELETE(req: Request) {
       .eq("schedule_id", scheduleId);
 
     if (error) throw error;
+
+    await refreshScheduleSlotCounts(scheduleId);
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -339,6 +375,8 @@ export async function PATCH(req: Request) {
       .eq("schedule_id", scheduleId);
 
     if (updateError) throw updateError;
+
+    await refreshScheduleSlotCounts(scheduleId);
 
     const notifications = await sendScheduleAssignmentAlerts({
       churchId,

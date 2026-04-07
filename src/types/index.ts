@@ -47,6 +47,7 @@ export interface Department {
   description: string;
   icon: string;
   color: string;
+  function_names: string[];
   leader_ids: string[];      // Multiple leaders
   co_leader_ids: string[];   // Multiple co-leaders
   active: boolean;

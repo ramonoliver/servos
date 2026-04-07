@@ -194,7 +194,20 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
                 </span>
               )}
               <span className="badge badge-secondary">{dms.length} membros</span>
+              {dept.function_names?.length > 0 && (
+                <span className="badge badge-secondary">{dept.function_names.length} funções</span>
+              )}
             </div>
+
+            {dept.function_names?.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {dept.function_names.map((functionName) => (
+                  <span key={functionName} className="badge badge-secondary">
+                    {functionName}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -302,6 +315,7 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
       {showAddMember && (
         <AddMemberModal
           availableToAdd={availableToAdd}
+          functionOptions={dept.function_names || []}
           onClose={() => setShowAddMember(false)}
           onSave={addMembersToDept}
         />
@@ -312,10 +326,12 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
 
 function AddMemberModal({
   availableToAdd,
+  functionOptions,
   onClose,
   onSave,
 }: {
   availableToAdd: User[];
+  functionOptions: string[];
   onClose: () => void;
   onSave: (members: { userId: string; functionName: string }[]) => void;
 }) {
@@ -413,11 +429,19 @@ function AddMemberModal({
                         <div className="mt-3">
                           <label className="input-label">Função no ministério</label>
                           <input
+                            list={`department-functions-${member.id}`}
                             className="input-field"
                             value={selectedUsers[member.id]}
                             onChange={(e) => updateFunction(member.id, e.target.value)}
                             placeholder="Ex: Vocal, Camera, Recepcao..."
                           />
+                          {functionOptions.length > 0 && (
+                            <datalist id={`department-functions-${member.id}`}>
+                              {functionOptions.map((functionName) => (
+                                <option key={functionName} value={functionName} />
+                              ))}
+                            </datalist>
+                          )}
                         </div>
                       )}
                     </div>

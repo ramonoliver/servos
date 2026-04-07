@@ -262,6 +262,7 @@ export function MemberEditModal({
                     <div className="mt-3 pl-8">
                       <label className="input-label">Função neste ministério</label>
                       <input
+                        list={`department-functions-${dept.id}`}
                         className="input-field"
                         value={selectedDept?.function_name || ""}
                         onChange={(e) =>
@@ -269,6 +270,13 @@ export function MemberEditModal({
                         }
                         placeholder="Ex: Vocal, Câmera, Recepção..."
                       />
+                      {dept.function_names?.length > 0 && (
+                        <datalist id={`department-functions-${dept.id}`}>
+                          {dept.function_names.map((functionName) => (
+                            <option key={functionName} value={functionName} />
+                          ))}
+                        </datalist>
+                      )}
                     </div>
                   )}
                 </div>

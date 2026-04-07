@@ -15,6 +15,7 @@ const bodySchema = z.object({
   instructions: z.string().default(""),
   publish: z.boolean(),
   selectedIds: z.array(z.string()).default([]),
+  functionTargets: z.record(z.string(), z.number().int().min(0)).default({}),
 });
 
 export async function POST(req: Request) {
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
       instructions,
       publish,
       selectedIds,
+      functionTargets,
     } = parsed.data;
 
     const { actor, session, errorResponse } = await requireApiActor(req);
@@ -87,6 +89,17 @@ export async function POST(req: Request) {
 
     const linkMap = new Map((departmentLinks || []).map((link) => [link.user_id, link.function_name || ""]));
     const validSelectedIds = selectedIds.filter((userId) => linkMap.has(userId));
+    const normalizedFunctionTargets = Object.entries(functionTargets)
+      .map(([functionName, quantity]) => ({
+        function_name: functionName.trim() || "Sem função",
+        quantity,
+      }))
+      .filter((slot) => slot.quantity > 0);
+    const filledCounts = validSelectedIds.reduce<Record<string, number>>((acc, userId) => {
+      const functionName = (linkMap.get(userId) || "").trim() || "Sem função";
+      acc[functionName] = (acc[functionName] || 0) + 1;
+      return acc;
+    }, {});
 
     const now = new Date().toISOString();
     const scheduleId = genId();
@@ -108,6 +121,20 @@ export async function POST(req: Request) {
     });
 
     if (scheduleError) throw scheduleError;
+
+    if (normalizedFunctionTargets.length > 0) {
+      const { error: slotError } = await supabase.from("schedule_slots").insert(
+        normalizedFunctionTargets.map((slot) => ({
+          id: genId(),
+          schedule_id: scheduleId,
+          function_name: slot.function_name,
+          quantity: slot.quantity,
+          filled: filledCounts[slot.function_name] || 0,
+        }))
+      );
+
+      if (slotError) throw slotError;
+    }
 
     if (validSelectedIds.length > 0) {
       const payload = validSelectedIds.map((userId) => ({

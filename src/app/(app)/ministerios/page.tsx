@@ -130,6 +130,20 @@ export default function MinisteriosPage() {
                   <div className="text-xs text-ink-muted break-words leading-relaxed">
                     {count} membros{leaderNames.length ? " · " + leaderNames.join(", ") : ""}
                   </div>
+                  {d.function_names?.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {d.function_names.slice(0, 3).map((functionName) => (
+                        <span key={functionName} className="badge badge-secondary">
+                          {functionName}
+                        </span>
+                      ))}
+                      {d.function_names.length > 3 && (
+                        <span className="text-[10px] text-ink-faint self-center">
+                          +{d.function_names.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {d.description && (
                     <div className="text-xs text-ink-faint leading-relaxed line-clamp-2 break-words">{d.description}</div>
                   )}
@@ -186,11 +200,28 @@ function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
   const [desc, setDesc] = useState(dept?.description || "");
   const [icon, setIcon] = useState(dept?.icon || "church");
   const [color, setColor] = useState(dept?.color || "#7B9E87");
+  const [functionNames, setFunctionNames] = useState<string[]>(dept?.function_names || []);
+  const [newFunctionName, setNewFunctionName] = useState("");
   const [leaderIds, setLeaderIds] = useState<string[]>(dept?.leader_ids || [user.id]);
   const [coLeaderIds, setCoLeaderIds] = useState<string[]>(dept?.co_leader_ids || []);
 
   function toggleList(list: string[], setList: (v: string[]) => void, id: string) {
     setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+  }
+
+  function addFunctionName() {
+    const normalized = newFunctionName.trim();
+    if (!normalized) return;
+    if (functionNames.some((item) => item.toLowerCase() === normalized.toLowerCase())) {
+      setNewFunctionName("");
+      return;
+    }
+    setFunctionNames((current) => [...current, normalized]);
+    setNewFunctionName("");
+  }
+
+  function removeFunctionName(functionName: string) {
+    setFunctionNames((current) => current.filter((item) => item !== functionName));
   }
 
   async function save() {
@@ -204,6 +235,7 @@ function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
       description: desc,
       icon,
       color,
+      function_names: functionNames,
       leader_ids: leaderIds,
       co_leader_ids: coLeaderIds,
     };
@@ -284,6 +316,49 @@ function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
         <div>
           <label className="input-label">Cor</label>
           <input type="color" className="input-field h-10 p-1 cursor-pointer" value={color} onChange={(e) => setColor(e.target.value)} />
+        </div>
+
+        <div>
+          <label className="input-label">Funções do ministério</label>
+          <div className="rounded-[14px] border border-border-soft bg-surface-alt/50 p-3">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                className="input-field flex-1"
+                value={newFunctionName}
+                onChange={(e) => setNewFunctionName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addFunctionName();
+                  }
+                }}
+                placeholder="Ex: Câmera, Fotografia, Projeção..."
+              />
+              <button type="button" onClick={addFunctionName} className="btn btn-secondary sm:self-start">
+                Adicionar função
+              </button>
+            </div>
+
+            {functionNames.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {functionNames.map((functionName) => (
+                  <button
+                    key={functionName}
+                    type="button"
+                    onClick={() => removeFunctionName(functionName)}
+                    className="badge badge-secondary"
+                    title="Remover função"
+                  >
+                    {functionName} ×
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 text-xs text-ink-faint">
+                Cadastre as funções principais deste ministério para reaproveitar depois nos membros e nas escalas.
+              </div>
+            )}
+          </div>
         </div>
 
         <div>

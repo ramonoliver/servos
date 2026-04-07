@@ -37,6 +37,8 @@ export default function NovaEscalaPage() {
   const [instructions, setInstructions] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [aiRan, setAiRan] = useState(false);
+  const [activeFunctionFilter, setActiveFunctionFilter] = useState<string>("all");
+  const [functionTargets, setFunctionTargets] = useState<Record<string, number>>({});
 
   async function loadData() {
     setLoading(true);
@@ -118,6 +120,26 @@ export default function NovaEscalaPage() {
     () => allDM.filter((dm) => dm.department_id === deptId),
     [deptId, allDM]
   );
+  const selectedDepartment = useMemo(
+    () => departments.find((department) => department.id === deptId) || null,
+    [departments, deptId]
+  );
+  const functionOptions = useMemo(
+    () => selectedDepartment?.function_names || [],
+    [selectedDepartment]
+  );
+
+  useEffect(() => {
+    setFunctionTargets((prev) => {
+      if (functionOptions.length === 0) return {};
+
+      const next: Record<string, number> = {};
+      for (const functionName of functionOptions) {
+        next[functionName] = prev[functionName] || 0;
+      }
+      return next;
+    });
+  }, [functionOptions]);
 
   const deptMemberIds = deptMembers.map((dm) => dm.user_id);
 
@@ -140,16 +162,138 @@ export default function NovaEscalaPage() {
     });
   }, [date, deptId, members, deptMembers, allUD, allSchedules, allSM]);
 
+  const filteredScored = useMemo(() => {
+    if (activeFunctionFilter === "all") return scored;
+    return scored.filter(
+      (item) => (item.dept_member?.function_name || "Sem função") === activeFunctionFilter
+    );
+  }, [scored, activeFunctionFilter]);
+
+  const groupedScored = useMemo(() => {
+    const groups: Record<string, typeof scored> = {};
+    for (const item of scored) {
+      const key = item.dept_member?.function_name || "Sem função";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    }
+    return groups;
+  }, [scored]);
+
+  const selectedCountByFunction = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const item of scored) {
+      if (!selectedIds.includes(item.user.id)) continue;
+      const key = item.dept_member?.function_name || "Sem função";
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    return counts;
+  }, [scored, selectedIds]);
+
+  const desiredCountByFunction = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const functionName of functionOptions) {
+      counts[functionName] = Math.max(0, functionTargets[functionName] || 0);
+    }
+    return counts;
+  }, [functionOptions, functionTargets]);
+
+  const totalDesiredCount = useMemo(
+    () => Object.values(desiredCountByFunction).reduce((sum, quantity) => sum + quantity, 0),
+    [desiredCountByFunction]
+  );
+
+  const coverageByFunction = useMemo(
+    () =>
+      functionOptions.map((functionName) => {
+        const desired = desiredCountByFunction[functionName] || 0;
+        const selected = selectedCountByFunction[functionName] || 0;
+        return {
+          functionName,
+          desired,
+          selected,
+          missing: Math.max(0, desired - selected),
+          extra: Math.max(0, selected - desired),
+        };
+      }),
+    [functionOptions, desiredCountByFunction, selectedCountByFunction]
+  );
+
+  const missingFunctions = useMemo(
+    () => coverageByFunction.filter((item) => item.missing > 0),
+    [coverageByFunction]
+  );
+
+  function adjustFunctionTarget(functionName: string, delta: number) {
+    setFunctionTargets((prev) => ({
+      ...prev,
+      [functionName]: Math.max(0, (prev[functionName] || 0) + delta),
+    }));
+    setAiRan(false);
+  }
+
   function runAI() {
     if (!date) {
       toast("Selecione a data primeiro.");
       return;
     }
 
-    const auto = autoSelectWithCouples(scored, 8);
+    let auto: string[] = [];
+
+    if (activeFunctionFilter !== "all") {
+      auto = autoSelectWithCouples(
+        filteredScored,
+        Math.max(1, desiredCountByFunction[activeFunctionFilter] || 4)
+      );
+    } else if (totalDesiredCount > 0) {
+      const picks = new Set<string>();
+
+      for (const slot of coverageByFunction) {
+        if (slot.desired <= 0) continue;
+        const candidates = scored.filter(
+          (item) => (item.dept_member?.function_name || "Sem função") === slot.functionName
+        );
+        for (const userId of autoSelectWithCouples(candidates, slot.desired)) {
+          picks.add(userId);
+        }
+      }
+
+      if (picks.size < totalDesiredCount) {
+        for (const userId of autoSelectWithCouples(scored, totalDesiredCount)) {
+          if (picks.size < totalDesiredCount) picks.add(userId);
+        }
+      }
+
+      auto = [...picks];
+    } else if (functionOptions.length > 0) {
+      const picks = new Set<string>();
+
+      for (const functionName of functionOptions) {
+        const candidates = scored.filter(
+          (item) => (item.dept_member?.function_name || "") === functionName
+        );
+        for (const userId of autoSelectWithCouples(candidates, 2)) {
+          if (picks.size < 8) picks.add(userId);
+        }
+      }
+
+      if (picks.size < 8) {
+        for (const userId of autoSelectWithCouples(scored, 8)) {
+          if (picks.size < 8) picks.add(userId);
+        }
+      }
+
+      auto = [...picks];
+    } else {
+      auto = autoSelectWithCouples(scored, 8);
+    }
+
     setSelectedIds(auto);
     setAiRan(true);
-    toast(`IA sugeriu ${auto.length} membros!`);
+    toast(
+      activeFunctionFilter === "all"
+        ? `IA sugeriu ${auto.length} membros com equilibrio entre funções.`
+        : `IA sugeriu ${auto.length} membros para ${activeFunctionFilter}.`
+    );
   }
 
   function toggleMember(id: string) {
@@ -187,6 +331,7 @@ export default function NovaEscalaPage() {
           instructions,
           publish,
           selectedIds,
+          functionTargets: desiredCountByFunction,
         }),
       });
 
@@ -261,6 +406,7 @@ export default function NovaEscalaPage() {
                 setDeptId(e.target.value);
                 setSelectedIds([]);
                 setAiRan(false);
+                setActiveFunctionFilter("all");
               }}
             >
               {departments.map((d) => (
@@ -315,9 +461,167 @@ export default function NovaEscalaPage() {
           </button>
         </div>
 
+        {functionOptions.length > 0 && (
+          <div className="mb-5 space-y-4">
+            <div className="rounded-[18px] border border-border-soft bg-surface-alt/70 p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
+                    Cobertura por função
+                  </div>
+                  <div className="text-sm text-ink-soft mt-1">
+                    Defina quantas pessoas você quer por função e acompanhe a cobertura da equipe em tempo real.
+                  </div>
+                </div>
+                <div className="text-xs font-medium text-ink-faint">
+                  {totalDesiredCount > 0
+                    ? `${selectedIds.length} de ${totalDesiredCount} vagas sugeridas preenchidas`
+                    : "Defina as quantidades desejadas para orientar melhor a escala"}
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {coverageByFunction.map((item) => (
+                  <div
+                    key={item.functionName}
+                    className={`rounded-[14px] border px-3.5 py-3 ${
+                      item.missing > 0
+                        ? "border-amber/35 bg-amber-light"
+                        : item.desired > 0
+                        ? "border-success/25 bg-success-light"
+                        : "border-border-soft bg-white/70"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold truncate">{item.functionName}</div>
+                        <div className="text-[11px] text-ink-faint mt-1">
+                          {item.desired > 0
+                            ? `${item.selected} selecionado(s) para ${item.desired} vaga(s)`
+                            : "Nenhuma vaga definida ainda"}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => adjustFunctionTarget(item.functionName, -1)}
+                          className="w-8 h-8 rounded-full border border-border-soft bg-surface text-sm font-bold"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min={0}
+                          value={item.desired}
+                          onChange={(e) =>
+                            {
+                              setFunctionTargets((prev) => ({
+                                ...prev,
+                                [item.functionName]: Math.max(0, Number(e.target.value) || 0),
+                              }));
+                              setAiRan(false);
+                            }
+                          }
+                          className="input-field w-[72px] text-center"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => adjustFunctionTarget(item.functionName, 1)}
+                          className="w-8 h-8 rounded-full border border-border-soft bg-surface text-sm font-bold"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <div className="h-2 flex-1 rounded-full bg-white/80 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            item.missing > 0 ? "bg-amber" : "bg-success"
+                          }`}
+                          style={{
+                            width: `${
+                              item.desired > 0
+                                ? Math.min(100, Math.round((item.selected / item.desired) * 100))
+                                : item.selected > 0
+                                ? 100
+                                : 0
+                            }%`,
+                          }}
+                        />
+                      </div>
+                      <div
+                        className={`text-[11px] font-semibold ${
+                          item.missing > 0 ? "text-amber" : "text-success"
+                        }`}
+                      >
+                        {item.missing > 0
+                          ? `Faltam ${item.missing}`
+                          : item.extra > 0
+                          ? `+${item.extra} extra`
+                          : item.desired > 0
+                          ? "Coberto"
+                          : "Livre"}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {missingFunctions.length > 0 && (
+                <div className="mt-4 rounded-[14px] border border-amber/25 bg-white/70 px-3.5 py-3 text-sm text-amber">
+                  Faltando cobertura em:{" "}
+                  <strong>{missingFunctions.map((item) => item.functionName).join(", ")}</strong>.
+                </div>
+              )}
+            </div>
+
+            <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint mb-2">
+              Funções do ministério
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveFunctionFilter("all")}
+                className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-all ${
+                  activeFunctionFilter === "all"
+                    ? "bg-brand text-white"
+                    : "bg-surface-alt text-ink-muted"
+                }`}
+              >
+                Todas
+              </button>
+              {functionOptions.map((functionName) => (
+                <button
+                  key={functionName}
+                  type="button"
+                  onClick={() => setActiveFunctionFilter(functionName)}
+                  className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-all ${
+                    activeFunctionFilter === functionName
+                      ? "bg-brand text-white"
+                      : "bg-surface-alt text-ink-muted"
+                  }`}
+                >
+                  {functionName}
+                  {selectedCountByFunction[functionName]
+                    ? ` (${selectedCountByFunction[functionName]})`
+                    : ""}
+                  {desiredCountByFunction[functionName]
+                    ? ` / ${desiredCountByFunction[functionName]}`
+                    : ""}
+                </button>
+              ))}
+            </div>
+          </div>
+          </div>
+        )}
+
         {aiRan && (
           <div className="text-xs text-brand font-semibold mb-3 flex items-center gap-1">
-            &#129302; IA selecionou com base em disponibilidade, rodizio e casais.
+            &#129302; IA selecionou com base em disponibilidade, rodizio, casais e aderência às funções do ministério.
           </div>
         )}
 
@@ -325,13 +629,98 @@ export default function NovaEscalaPage() {
           <p className="text-sm text-ink-faint py-8 text-center">
             Selecione uma data para ver os membros disponiveis.
           </p>
-        ) : scored.length === 0 ? (
+        ) : filteredScored.length === 0 ? (
           <p className="text-sm text-ink-faint py-8 text-center">
-            Nenhum membro neste ministério.
+            {activeFunctionFilter === "all"
+              ? "Nenhum membro neste ministério."
+              : `Nenhum membro com a função ${activeFunctionFilter}.`}
           </p>
+        ) : activeFunctionFilter === "all" && functionOptions.length > 0 ? (
+          <div className="space-y-4">
+            {[
+              ...functionOptions.filter((functionName) => groupedScored[functionName]?.length),
+              ...Object.keys(groupedScored).filter(
+                (functionName) => !functionOptions.includes(functionName)
+              ),
+            ].map((functionName) => (
+              <div key={functionName} className="rounded-[16px] border border-border-soft overflow-hidden">
+                <div className="px-4 py-2.5 bg-surface-alt border-b border-border-soft flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold">{functionName}</div>
+                  <span className="text-[11px] text-ink-faint">
+                    {selectedCountByFunction[functionName] || 0} selecionado(s)
+                  </span>
+                </div>
+                <div className="space-y-2 p-3">
+                  {groupedScored[functionName].map((item) => {
+                    const isSelected = selectedIds.includes(item.user.id);
+                    const spouse = item.user.spouse_id
+                      ? members.find((m) => m.id === item.user.spouse_id)
+                      : null;
+
+                    return (
+                      <div key={item.user.id}>
+                        <div
+                          onClick={() => item.available && toggleMember(item.user.id)}
+                          className={`flex items-center gap-3 px-3.5 py-2.5 rounded-[10px] border-[1.5px] transition-all ${
+                            !item.available
+                              ? "opacity-35 cursor-not-allowed border-transparent bg-surface-alt"
+                              : isSelected
+                              ? "border-success bg-success-light cursor-pointer"
+                              : "border-border-soft cursor-pointer hover:border-ink-ghost"
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center text-[10px] font-bold transition-all ${
+                              isSelected ? "bg-ink border-ink text-white" : "border-border"
+                            }`}
+                          >
+                            {isSelected ? "\u2713" : ""}
+                          </div>
+
+                          <Avatar
+                            name={item.user.name}
+                            color={item.user.avatar_color}
+                            photoUrl={item.user.photo_url}
+                            size={28}
+                          />
+
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] font-medium truncate">{item.user.name}</div>
+                            <div className="text-[10px] text-ink-faint">
+                              {item.user.total_schedules} escalas &middot; Score: {item.score}
+                            </div>
+                          </div>
+
+                          {spouse && deptMemberIds.includes(spouse.id) && (
+                            <span className="text-[9px] font-semibold text-brand bg-brand-light px-1.5 py-0.5 rounded-full">
+                              &#128145; {spouse.name.split(" ")[0]}
+                            </span>
+                          )}
+
+                          <div className={`w-2 h-2 rounded-full ${item.available ? "bg-success" : "bg-danger"}`} />
+                        </div>
+
+                        {!item.available && (
+                          <div className="text-[10px] text-danger font-medium ml-9 mt-0.5">
+                            &#9888; {item.reasons[0]?.label}
+                          </div>
+                        )}
+
+                        {item.alerts.length > 0 && item.available && (
+                          <div className="text-[10px] text-amber font-medium ml-9 mt-0.5">
+                            &#9888; {item.alerts.join(", ")}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="space-y-2">
-            {scored.map((item) => {
+            {filteredScored.map((item) => {
               const isSelected = selectedIds.includes(item.user.id);
               const spouse = item.user.spouse_id
                 ? members.find((m) => m.id === item.user.spouse_id)
@@ -416,7 +805,8 @@ export default function NovaEscalaPage() {
           Salvar rascunho
         </button>
         <button onClick={() => save(true)} className="btn btn-primary">
-          Publicar e notificar &middot; {selectedIds.length}
+          Publicar e notificar &middot;{" "}
+          {totalDesiredCount > 0 ? `${selectedIds.length}/${totalDesiredCount}` : selectedIds.length}
         </button>
       </div>
     </div>

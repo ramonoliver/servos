@@ -10,6 +10,7 @@ const departmentDataSchema = z.object({
   description: z.string().default(""),
   icon: z.string().min(1),
   color: z.string().min(1),
+  function_names: z.array(z.string().trim().min(1)).default([]),
   leader_ids: z.array(z.string()).default([]),
   co_leader_ids: z.array(z.string()).default([]),
 });

@@ -11,6 +11,7 @@ import Link from "next/link";
 import type {
   Schedule,
   ScheduleMember,
+  ScheduleSlot,
   Event,
   User,
   DepartmentMember,
@@ -88,6 +89,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   const [allUD, setAllUD] = useState<UnavailableDate[]>([]);
   const [allSchedules, setAllSchedules] = useState<Schedule[]>([]);
   const [allSM, setAllSM] = useState<ScheduleMember[]>([]);
+  const [slots, setSlots] = useState<ScheduleSlot[]>([]);
   const [attachments, setAttachments] = useState<ScheduleAttachment[]>([]);
   const [chatMessages, setChatMessages] = useState<ScheduleChat[]>([]);
   const [chatAvailable, setChatAvailable] = useState(true);
@@ -207,6 +209,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
     const [
       { data: eventData, error: eventError },
       { data: smData, error: smError },
+      { data: slotsData, error: slotsError },
       { data: usersData, error: usersError },
       { data: deptMembersData, error: deptMembersError },
       { data: unavailableData, error: unavailableError },
@@ -215,6 +218,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
     ] = await Promise.all([
       supabase.from("events").select("*").eq("id", scheduleData.event_id).maybeSingle(),
       supabase.from("schedule_members").select("*").eq("schedule_id", scheduleData.id),
+      supabase.from("schedule_slots").select("*").eq("schedule_id", scheduleData.id),
       supabase.from("users").select("*").eq("church_id", user.church_id).eq("active", true),
       supabase.from("department_members").select("*").eq("department_id", scheduleData.department_id),
       supabase.from("unavailable_dates").select("*"),
@@ -225,6 +229,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
     if (
       eventError ||
       smError ||
+      slotsError ||
       usersError ||
       deptMembersError ||
       unavailableError ||
@@ -234,6 +239,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
       console.error({
         eventError,
         smError,
+        slotsError,
         usersError,
         deptMembersError,
         unavailableError,
@@ -248,6 +254,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
     setSchedule(scheduleData as Schedule);
     setEv((eventData || null) as Event | null);
     setSm((smData || []) as ScheduleMember[]);
+    setSlots((slotsData || []) as ScheduleSlot[]);
     setMembers((usersData || []) as User[]);
     setDeptMembers((deptMembersData || []) as DepartmentMember[]);
     setAllUD((unavailableData || []) as UnavailableDate[]);
@@ -393,6 +400,16 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
     const fn = item.function_name || "Sem função";
     if (!byFunction[fn]) byFunction[fn] = [];
     byFunction[fn].push(item);
+  });
+
+  const slotCoverage = slots.map((slot) => {
+    const assigned = byFunction[slot.function_name]?.length || 0;
+    return {
+      ...slot,
+      assigned,
+      missing: Math.max(0, slot.quantity - assigned),
+      extra: Math.max(0, assigned - slot.quantity),
+    };
   });
 
   async function addMemberToSchedule(userId: string) {
@@ -1099,6 +1116,69 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
 
       {activeTab === "escalados" && (
         <div className="card mb-5">
+          {slotCoverage.length > 0 && (
+            <div className="px-5 pt-4 pb-3 border-b border-border-soft">
+              <div className="flex flex-col gap-1 mb-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="font-display text-[15px]">Cobertura por função</div>
+                <div className="text-[11px] text-ink-faint">
+                  {slotCoverage.reduce((sum, slot) => sum + slot.assigned, 0)} pessoa(s) para{" "}
+                  {slotCoverage.reduce((sum, slot) => sum + slot.quantity, 0)} vaga(s) planejadas
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {slotCoverage.map((slot) => (
+                  <div
+                    key={slot.id}
+                    className={`rounded-[14px] border px-3.5 py-3 ${
+                      slot.missing > 0
+                        ? "border-amber/35 bg-amber-light"
+                        : "border-success/25 bg-success-light"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold truncate">{slot.function_name}</div>
+                        <div className="text-[11px] text-ink-faint mt-1">
+                          {slot.assigned} escalado(s) para {slot.quantity} vaga(s)
+                        </div>
+                      </div>
+                      <div
+                        className={`text-[11px] font-semibold ${
+                          slot.missing > 0 ? "text-amber" : "text-success"
+                        }`}
+                      >
+                        {slot.missing > 0
+                          ? `Faltam ${slot.missing}`
+                          : slot.extra > 0
+                          ? `+${slot.extra} extra`
+                          : "Coberto"}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 h-2 rounded-full bg-white/80 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          slot.missing > 0 ? "bg-amber" : "bg-success"
+                        }`}
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            slot.quantity > 0
+                              ? Math.round((slot.assigned / slot.quantity) * 100)
+                              : slot.assigned > 0
+                              ? 100
+                              : 0
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {sm.length === 0 ? (
             <div className="px-5 py-16 text-center text-sm text-ink-faint">Nenhum membro escalado.</div>
           ) : groupByFunction ? (

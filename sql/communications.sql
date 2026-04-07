@@ -170,6 +170,25 @@ alter table public.password_reset_tokens disable row level security;
 grant select, insert, update, delete on public.password_reset_tokens to anon;
 grant select, insert, update, delete on public.password_reset_tokens to authenticated;
 
+create table if not exists public.schedule_slots (
+  id text primary key,
+  schedule_id text not null,
+  function_name text not null,
+  quantity integer not null check (quantity >= 0),
+  filled integer not null default 0 check (filled >= 0)
+);
+
+create index if not exists schedule_slots_schedule_id_idx
+  on public.schedule_slots (schedule_id);
+
+create unique index if not exists schedule_slots_schedule_id_function_name_idx
+  on public.schedule_slots (schedule_id, function_name);
+
+alter table public.schedule_slots disable row level security;
+
+grant select, insert, update, delete on public.schedule_slots to anon;
+grant select, insert, update, delete on public.schedule_slots to authenticated;
+
 create table if not exists public.schedule_attachments (
   id text primary key,
   schedule_id text not null,
@@ -188,5 +207,24 @@ alter table public.schedule_attachments disable row level security;
 
 grant select, insert, update, delete on public.schedule_attachments to anon;
 grant select, insert, update, delete on public.schedule_attachments to authenticated;
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.tables
+    where table_schema = 'public'
+      and table_name = 'departments'
+  ) and not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'departments'
+      and column_name = 'function_names'
+  ) then
+    alter table public.departments
+      add column function_names text[] not null default '{}';
+  end if;
+end $$;
 
 commit;
