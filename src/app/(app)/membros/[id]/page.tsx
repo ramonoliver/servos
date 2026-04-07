@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useApp } from "@/hooks/use-app";
 import { formatInviteDate, formatInviteOpenedAt } from "@/lib/invitations";
 import { supabase } from "@/lib/supabase/client";
-import { formatShortDate } from "@/lib/utils/helpers";
+import { formatDate, formatShortDate } from "@/lib/utils/helpers";
 import { MemberEditModal } from "@/components/shared/member-edit-modal";
 import { AvailabilityGrid, Avatar } from "@/components/ui";
 import Link from "next/link";
@@ -23,6 +23,12 @@ type SelectedDepartment = {
   function_name: string;
   function_names: string[];
 };
+
+function formatPhoneDisplay(value?: string | null) {
+  const digits = (value || "").replace(/\D/g, "").slice(0, 11);
+  if (digits.length !== 11) return value || "-";
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
 
 export default function MembroDetailPage({ params }: { params: { id: string } }) {
   const { user, church, departments, canDo, toast } = useApp();
@@ -117,6 +123,12 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
       : member.role === "leader"
       ? "bg-brand-light text-brand"
       : "bg-success-light text-success";
+  const statusLabelMap: Record<string, string> = {
+    active: "Ativo",
+    inactive: "Inativo",
+    paused: "Pausa",
+    vacation: "Férias",
+  };
 
   const inviteTimeline = latestInvite
     ? [
@@ -225,7 +237,10 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
         return;
       }
 
-      toast(user.role === "admin" ? "Usuario excluido com sucesso." : "Membro removido com sucesso.");
+      toast(
+        data?.warning ||
+          (user.role === "admin" ? "Usuario excluido com sucesso." : "Membro removido com sucesso.")
+      );
       router.push("/membros");
     } catch (error) {
       console.error("Erro ao remover membro:", error);
@@ -329,11 +344,11 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
 
             <div className="space-y-2 text-sm">
               {[
-                ["Telefone", member.phone || "-"],
+                ["Telefone", formatPhoneDisplay(member.phone)],
                 ["Escalas", String(member.total_schedules)],
                 ["Confirmação", member.confirm_rate + "%"],
-                ["Status", member.status],
-                ["Desde", member.joined_at?.split("T")[0] || "-"],
+                ["Status", statusLabelMap[member.status] || member.status],
+                ["Desde", member.joined_at ? formatDate(member.joined_at.split("T")[0]) : "-"],
               ].map(([l, v], i) => (
                 <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-4 py-1.5 border-t border-border-soft first:border-t-0">
                   <span className="text-ink-muted">{l}</span>

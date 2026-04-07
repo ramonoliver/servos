@@ -8,6 +8,20 @@ const bodySchema = z.object({
   targetUserId: z.string().min(1),
 });
 
+function isIgnorableCleanupError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String((error as { code?: unknown }).code || "") : "";
+  const message =
+    "message" in error ? String((error as { message?: unknown }).message || "").toLowerCase() : "";
+
+  return (
+    code === "42P01" ||
+    message.includes("does not exist") ||
+    message.includes("relation") && message.includes("does not exist") ||
+    message.includes("column") && message.includes("does not exist")
+  );
+}
+
 export async function POST(req: Request) {
   try {
     const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
@@ -21,6 +35,7 @@ export async function POST(req: Request) {
 
     const actorId = session!.user_id;
     const churchId = session!.church_id;
+    const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
     const { targetUserId } = parsed.data;
     if (actorId === targetUserId) {
       return NextResponse.json({ error: "Voce nao pode remover a propria conta." }, { status: 400 });
@@ -147,6 +162,10 @@ export async function POST(req: Request) {
       for (const step of cleanupSteps) {
         const result = await step.run();
         if (result.error) {
+          if (isIgnorableCleanupError(result.error)) {
+            console.warn(`Ignorando limpeza opcional em ${step.label}:`, result.error);
+            continue;
+          }
           console.error(`Erro ao limpar ${step.label}:`, result.error);
           throw new Error(`Nao foi possivel excluir o usuario por causa de ${step.label}.`);
         }
@@ -159,6 +178,33 @@ export async function POST(req: Request) {
         .eq("church_id", churchId);
 
       if (deleteUserError) throw deleteUserError;
+
+      const { data: remainingUser, error: verifyDeleteError } = await supabase
+        .from("users")
+        .select("id, active")
+        .eq("id", targetUserId)
+        .eq("church_id", churchId)
+        .maybeSingle();
+
+      if (verifyDeleteError) throw verifyDeleteError;
+
+      if (remainingUser) {
+        const { error: fallbackDeactivateError } = await supabase
+          .from("users")
+          .update({ active: false })
+          .eq("id", targetUserId)
+          .eq("church_id", churchId);
+
+        if (fallbackDeactivateError) throw fallbackDeactivateError;
+
+        return NextResponse.json({
+          success: true,
+          mode: "deactivate_fallback",
+          warning: hasServiceRole
+            ? "O usuário não pôde ser apagado fisicamente, mas foi desativado."
+            : "O ambiente não possui SUPABASE_SERVICE_ROLE_KEY. O usuário foi desativado e saiu da listagem, mas não pôde ser apagado fisicamente do banco.",
+        });
+      }
 
       return NextResponse.json({ success: true, mode: "hard_delete" });
     }

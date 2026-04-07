@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Modal } from "@/components/ui";
+import { formatPhoneInput } from "@/lib/invitations";
 import { getInitials, getIconEmoji } from "@/lib/utils/helpers";
 import type { User, Department, DepartmentMember } from "@/types";
 
@@ -167,7 +168,7 @@ export function MemberEditModal({
             <input
               className="input-field"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
               placeholder="(00) 00000-0000"
             />
           </div>

@@ -160,7 +160,7 @@ export default function MembrosPage() {
         return;
       }
 
-      toast(m.name + " removido.");
+      toast(data?.warning || m.name + " removido.");
       await loadData();
     } catch (error) {
       console.error("Erro ao remover membro:", error);
