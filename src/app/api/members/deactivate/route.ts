@@ -80,22 +80,77 @@ export async function POST(req: Request) {
         }
       }
 
-      const cleanupTasks = [
-        supabase.from("member_invitations").delete().eq("user_id", targetUserId).eq("church_id", churchId),
-        supabase.from("password_reset_tokens").delete().eq("user_id", targetUserId).eq("church_id", churchId),
-        supabase.from("notifications").delete().eq("user_id", targetUserId).eq("church_id", churchId),
-        supabase.from("unavailable_dates").delete().eq("user_id", targetUserId).eq("church_id", churchId),
-        supabase.from("department_members").delete().eq("user_id", targetUserId),
-        supabase.from("messages").delete().eq("sender_id", targetUserId),
-        supabase.from("schedule_chats").delete().eq("sender_id", targetUserId),
-        supabase.from("schedule_members").delete().eq("user_id", targetUserId),
-        supabase.from("schedule_members").update({ substitute_id: null }).eq("substitute_id", targetUserId),
-        supabase.from("schedule_members").update({ substitute_for: null }).eq("substitute_for", targetUserId),
+      const cleanupSteps: Array<{ label: string; run: () => Promise<{ error: any }> }> = [
+        {
+          label: "member_invitations.user_id",
+          run: async () =>
+            supabase.from("member_invitations").delete().eq("user_id", targetUserId).eq("church_id", churchId),
+        },
+        {
+          label: "member_invitations.invited_by_user_id",
+          run: async () =>
+            supabase.from("member_invitations").update({ invited_by_user_id: null }).eq("invited_by_user_id", targetUserId),
+        },
+        {
+          label: "password_reset_tokens",
+          run: async () =>
+            supabase.from("password_reset_tokens").delete().eq("user_id", targetUserId).eq("church_id", churchId),
+        },
+        {
+          label: "notifications",
+          run: async () =>
+            supabase.from("notifications").delete().eq("user_id", targetUserId).eq("church_id", churchId),
+        },
+        {
+          label: "unavailable_dates",
+          run: async () =>
+            supabase.from("unavailable_dates").delete().eq("user_id", targetUserId).eq("church_id", churchId),
+        },
+        {
+          label: "department_members",
+          run: async () => supabase.from("department_members").delete().eq("user_id", targetUserId),
+        },
+        {
+          label: "messages",
+          run: async () => supabase.from("messages").delete().eq("sender_id", targetUserId),
+        },
+        {
+          label: "schedule_chats",
+          run: async () => supabase.from("schedule_chats").delete().eq("sender_id", targetUserId),
+        },
+        {
+          label: "schedule_attachments",
+          run: async () => supabase.from("schedule_attachments").delete().eq("uploaded_by_user_id", targetUserId),
+        },
+        {
+          label: "schedule_members.user_id",
+          run: async () => supabase.from("schedule_members").delete().eq("user_id", targetUserId),
+        },
+        {
+          label: "schedule_members.substitute_id",
+          run: async () => supabase.from("schedule_members").update({ substitute_id: null }).eq("substitute_id", targetUserId),
+        },
+        {
+          label: "schedule_members.substitute_for",
+          run: async () => supabase.from("schedule_members").update({ substitute_for: null }).eq("substitute_for", targetUserId),
+        },
+        {
+          label: "schedules.created_by",
+          run: async () => supabase.from("schedules").update({ created_by: actorId }).eq("created_by", targetUserId),
+        },
+        {
+          label: "songs.created_by",
+          run: async () => supabase.from("songs").update({ created_by: actorId }).eq("created_by", targetUserId),
+        },
       ];
 
-      const cleanupResults = await Promise.all(cleanupTasks);
-      const cleanupError = cleanupResults.find((result) => result.error)?.error;
-      if (cleanupError) throw cleanupError;
+      for (const step of cleanupSteps) {
+        const result = await step.run();
+        if (result.error) {
+          console.error(`Erro ao limpar ${step.label}:`, result.error);
+          throw new Error(`Nao foi possivel excluir o usuario por causa de ${step.label}.`);
+        }
+      }
 
       const { error: deleteUserError } = await supabase
         .from("users")

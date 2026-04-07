@@ -89,25 +89,6 @@ export function MemberEditModal({
     );
   }
 
-  function updateDepartmentCustomFunctions(departmentId: string, rawValue: string) {
-    const normalized = rawValue
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-
-    setSelectedDepartments((prev) =>
-      prev.map((d) =>
-        d.department_id === departmentId
-          ? {
-              ...d,
-              function_names: normalized,
-              function_name: normalized[0] || "",
-            }
-          : d
-      )
-    );
-  }
-
   function handleSave() {
     if (!name.trim()) return;
     if (!email.trim()) return;
@@ -308,19 +289,11 @@ export function MemberEditModal({
                             );
                           })}
                         </div>
-                      ) : null}
-
-                      <input
-                        className="input-field mt-2"
-                        value={(selectedDept?.function_names || []).join(", ")}
-                        onChange={(e) =>
-                          updateDepartmentCustomFunctions(dept.id, e.target.value)
-                        }
-                        placeholder="Ex: Vocal, Câmera, Recepção"
-                      />
-                      <div className="text-[11px] text-ink-faint mt-1">
-                        Você pode selecionar várias funções e também editar manualmente separando por vírgula.
-                      </div>
+                      ) : (
+                        <div className="rounded-xl border border-border-soft bg-surface-alt px-3 py-2 text-[11px] text-ink-faint">
+                          Este ministério ainda não tem funções cadastradas. Edite o ministério primeiro para liberar a seleção.
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
