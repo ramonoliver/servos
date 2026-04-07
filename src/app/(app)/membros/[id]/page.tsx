@@ -255,6 +255,18 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
       const raw = await response.text();
       const data = parseResponsePayload(raw);
       if (!response.ok) {
+        if (
+          (action === "reactivate" && data?.error === "Este membro ja esta ativo.") ||
+          (action === "deactivate" && data?.error === "Este membro ja esta desativado.")
+        ) {
+          await loadData();
+          toast(
+            action === "reactivate"
+              ? "Este membro ja estava ativo. A tela foi sincronizada."
+              : "Este membro ja estava desativado. A tela foi sincronizada."
+          );
+          return;
+        }
         toast(
           data?.error ||
             (action === "reactivate"

@@ -25,6 +25,66 @@ const bodySchema = z.object({
   spouseId: z.string().default(""),
 });
 
+function isMissingColumnError(error: unknown, columnName: string) {
+  if (!error || typeof error !== "object") return false;
+  const message =
+    "message" in error ? String((error as { message?: unknown }).message || "").toLowerCase() : "";
+  return message.includes("column") && message.includes(columnName.toLowerCase()) && message.includes("does not exist");
+}
+
+function normalizeDepartmentSelection(
+  items: Array<{
+    department_id: string;
+    function_name?: string;
+    function_names?: string[];
+  }>
+) {
+  return items
+    .map((item) => {
+      const functionNames = (item.function_names || [])
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const primaryFunction = item.function_name?.trim() || functionNames[0] || "";
+      const mergedFunctionNames = primaryFunction
+        ? [...new Set([primaryFunction, ...functionNames])].sort((a, b) => a.localeCompare(b))
+        : [...new Set(functionNames)].sort((a, b) => a.localeCompare(b));
+
+      return {
+        department_id: item.department_id,
+        function_name: primaryFunction,
+        function_names: mergedFunctionNames,
+      };
+    })
+    .sort((a, b) => a.department_id.localeCompare(b.department_id));
+}
+
+function sameDepartmentSelection(
+  currentItems: Array<{
+    department_id: string;
+    function_name?: string;
+    function_names?: string[];
+  }>,
+  nextItems: Array<{
+    department_id: string;
+    function_name?: string;
+    function_names?: string[];
+  }>
+) {
+  const current = normalizeDepartmentSelection(currentItems);
+  const next = normalizeDepartmentSelection(nextItems);
+
+  if (current.length !== next.length) return false;
+
+  return current.every((item, index) => {
+    const other = next[index];
+    return (
+      item.department_id === other.department_id &&
+      item.function_name === other.function_name &&
+      item.function_names.join("|") === other.function_names.join("|")
+    );
+  });
+}
+
 export async function POST(req: Request) {
   try {
     const parsed = bodySchema.safeParse(await req.json().catch(() => ({})));
@@ -40,14 +100,27 @@ export async function POST(req: Request) {
     const churchId = session!.church_id;
     const { memberId, updates, selectedDepartments, spouseId } = parsed.data;
     const supabase = getSupabaseServerClient();
+    const requestedDepartmentSelection = selectedDepartments as Array<{
+      department_id: string;
+      function_name?: string;
+      function_names?: string[];
+    }>;
 
-    const { data: member, error: memberError } = await supabase
+    const [{ data: member, error: memberError }, { data: currentDepartmentMembers, error: currentDepartmentMembersError }] =
+      await Promise.all([
+        supabase
         .from("users")
         .select("id, church_id, spouse_id, active, role")
         .eq("id", memberId)
         .eq("church_id", churchId)
-        .maybeSingle();
+        .maybeSingle(),
+        supabase
+          .from("department_members")
+          .select("department_id, function_name, function_names")
+          .eq("user_id", memberId),
+      ]);
     if (memberError) throw memberError;
+    if (currentDepartmentMembersError) throw currentDepartmentMembersError;
 
     if (!actor?.active || !can(actor.role, "member.edit")) {
       return NextResponse.json({ error: "Sem permissao para editar membros." }, { status: 403 });
@@ -132,7 +205,7 @@ export async function POST(req: Request) {
     if (spouseId) {
       const { data: spouse, error: spouseError } = await supabase
         .from("users")
-        .select("id, church_id, active")
+        .select("id, church_id, active, spouse_id")
         .eq("id", spouseId)
         .eq("church_id", churchId)
         .maybeSingle();
@@ -140,6 +213,15 @@ export async function POST(req: Request) {
       if (spouseError) throw spouseError;
       if (!spouse?.active) {
         return NextResponse.json({ error: "Conjuge informado nao foi encontrado." }, { status: 404 });
+      }
+      if (spouse.id === memberId) {
+        return NextResponse.json({ error: "Um membro nao pode ser vinculado a si mesmo." }, { status: 400 });
+      }
+      if (spouse.spouse_id && spouse.spouse_id !== memberId) {
+        return NextResponse.json(
+          { error: "O conjuge selecionado ja esta vinculado a outra pessoa." },
+          { status: 409 }
+        );
       }
     }
 
@@ -155,35 +237,60 @@ export async function POST(req: Request) {
 
     if (updateUserError) throw updateUserError;
 
-    const { error: deleteDMError } = await supabase
-      .from("department_members")
-      .delete()
-      .eq("user_id", memberId);
+    const currentDepartmentSelection = (currentDepartmentMembers || []) as Array<{
+      department_id: string;
+      function_name?: string;
+      function_names?: string[];
+    }>;
 
-    if (deleteDMError) throw deleteDMError;
-
-    if (selectedDepartments.length > 0) {
-      const payload = selectedDepartments.map((dept) => {
-        const normalizedFunctionNames = dept.function_names.map((value) => value.trim()).filter(Boolean);
-        const primaryFunction = normalizedFunctionNames[0] || dept.function_name.trim();
-        const mergedFunctionNames = primaryFunction
-          ? [...new Set([primaryFunction, ...normalizedFunctionNames])]
-          : normalizedFunctionNames;
-        return {
-        id: genId(),
-        department_id: dept.department_id,
-        user_id: memberId,
-        function_name: primaryFunction,
-        function_names: mergedFunctionNames,
-        joined_at: new Date().toISOString(),
-      };
-      });
-
-      const { error: insertDMError } = await supabase
+    if (!sameDepartmentSelection(currentDepartmentSelection, requestedDepartmentSelection)) {
+      const { error: deleteDMError } = await supabase
         .from("department_members")
-        .insert(payload);
+        .delete()
+        .eq("user_id", memberId);
 
-      if (insertDMError) throw insertDMError;
+      if (deleteDMError) throw deleteDMError;
+
+      if (requestedDepartmentSelection.length > 0) {
+        const payload = normalizeDepartmentSelection(requestedDepartmentSelection).map((dept) => ({
+          id: genId(),
+          department_id: dept.department_id,
+          user_id: memberId,
+          function_name: dept.function_name,
+          function_names: dept.function_names,
+          joined_at: new Date().toISOString(),
+        }));
+
+        let insertDMError = (
+          await supabase
+            .from("department_members")
+            .insert(payload)
+        ).error;
+
+        if (insertDMError && isMissingColumnError(insertDMError, "function_names")) {
+          insertDMError = (
+            await supabase
+              .from("department_members")
+              .insert(
+                payload.map(({ function_names, ...dept }) => dept)
+              )
+          ).error;
+        }
+
+        if (insertDMError) throw insertDMError;
+      }
+    }
+
+    if (member.spouse_id && member.spouse_id !== spouseId) {
+      const { error: previousSpouseClearError } = await supabase
+        .from("users")
+        .update({ spouse_id: null })
+        .eq("id", member.spouse_id)
+        .eq("church_id", churchId);
+
+      if (previousSpouseClearError) {
+        console.error("Erro ao desvincular conjuge anterior:", previousSpouseClearError);
+      }
     }
 
     if (spouseId && spouseId !== member.spouse_id) {

@@ -204,6 +204,19 @@ export default function MembrosPage() {
 
       if (!response.ok) {
         console.error("Erro ao atualizar membro:", data);
+        if (
+          (action === "reactivate" && data?.error === "Este membro ja esta ativo.") ||
+          (action === "deactivate" && data?.error === "Este membro ja esta desativado.")
+        ) {
+          await loadData();
+          setOpenActionsFor(null);
+          toast(
+            action === "reactivate"
+              ? `${m.name} ja estava ativo. A lista foi sincronizada.`
+              : `${m.name} ja estava desativado. A lista foi sincronizada.`
+          );
+          return;
+        }
         toast(
           data?.error ||
             (action === "reactivate"

@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import { getSession, clearSession } from "@/lib/auth/session";
+import { getSession, clearSession, updateSession } from "@/lib/auth/session";
 import { can, type Action } from "@/lib/auth/permissions";
 import type { User, Church, Department, Session } from "@/types";
 
@@ -45,12 +45,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refresh = useCallback(async () => {
-    const s = getSession();
+    const localSession = getSession();
 
-    if (!s) {
+    if (!localSession) {
       router.replace("/login");
       return;
     }
+
+    const sessionResponse = await fetch("/api/auth/session", {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        ...(localSession.token ? { "x-servos-auth": localSession.token } : {}),
+      },
+    });
+
+    const sessionPayload = await sessionResponse.json().catch(() => null);
+
+    if (!sessionResponse.ok || !sessionPayload?.authenticated || !sessionPayload?.session) {
+      clearSession();
+      router.replace("/login");
+      return;
+    }
+
+    const s = {
+      ...localSession,
+      ...sessionPayload.session,
+      token: sessionPayload.token || localSession.token,
+    } as Session;
+
+    updateSession({
+      ...sessionPayload.session,
+      token: sessionPayload.token || localSession.token,
+    });
 
     // ===== USER =====
     const { data: u, error: userError } = await supabase
