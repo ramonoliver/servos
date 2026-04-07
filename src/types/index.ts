@@ -163,6 +163,17 @@ export interface Message {
   created_at: string;
 }
 
+export interface ScheduleAttachment {
+  id: string;
+  schedule_id: string;
+  uploaded_by_user_id: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  content_base64: string;
+  created_at: string;
+}
+
 export interface AuditLog {
   id: string;
   church_id: string;

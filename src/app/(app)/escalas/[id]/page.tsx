@@ -15,6 +15,7 @@ import type {
   User,
   DepartmentMember,
   UnavailableDate,
+  ScheduleAttachment,
 } from "@/types";
 
 type ScheduleChat = {
@@ -34,6 +35,20 @@ type DeliveryPanelState = {
   failed: Array<{ userId: string; channel: "email" | "sms"; error: string }>;
 } | null;
 
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function attachmentIcon(mimeType: string) {
+  if (mimeType.includes("pdf")) return "PDF";
+  if (mimeType.includes("powerpoint") || mimeType.includes("presentation")) return "PPT";
+  if (mimeType.includes("word")) return "DOC";
+  if (mimeType.includes("image")) return "IMG";
+  return "ARQ";
+}
+
 function isChatInfrastructureError(errorMessage?: string | null) {
   if (!errorMessage) return false;
   const normalized = errorMessage.toLowerCase();
@@ -50,7 +65,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   const { user, toast, canDo, departments } = useApp();
 
   const [showAddMember, setShowAddMember] = useState(false);
-  const [activeTab, setActiveTab] = useState<"escalados" | "chat">("escalados");
+  const [activeTab, setActiveTab] = useState<"escalados" | "anexos" | "chat">("escalados");
   const [groupByFunction, setGroupByFunction] = useState(true);
   const [chatMsg, setChatMsg] = useState("");
   const [loading, setLoading] = useState(true);
@@ -63,17 +78,42 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   const [allUD, setAllUD] = useState<UnavailableDate[]>([]);
   const [allSchedules, setAllSchedules] = useState<Schedule[]>([]);
   const [allSM, setAllSM] = useState<ScheduleMember[]>([]);
+  const [attachments, setAttachments] = useState<ScheduleAttachment[]>([]);
   const [chatMessages, setChatMessages] = useState<ScheduleChat[]>([]);
   const [chatAvailable, setChatAvailable] = useState(true);
   const [chatInfrastructureMissing, setChatInfrastructureMissing] = useState(false);
   const [chatErrorMessage, setChatErrorMessage] = useState<string | null>(null);
   const [sendingChat, setSendingChat] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [chatSyncMode, setChatSyncMode] = useState<"idle" | "realtime" | "polling">("idle");
   const [responding, setResponding] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
   const [deliveryPanel, setDeliveryPanel] = useState<DeliveryPanelState>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+
+  async function loadAttachments(scheduleId: string) {
+    try {
+      const response = await fetch(
+        `/api/schedule-attachments?scheduleId=${encodeURIComponent(scheduleId)}`
+      );
+      const payload = (await response.json().catch(() => null)) as
+        | { attachments?: ScheduleAttachment[]; error?: string }
+        | null;
+
+      if (!response.ok) {
+        console.error("Erro ao carregar anexos:", payload || response.statusText);
+        setAttachments([]);
+        return;
+      }
+
+      setAttachments((payload?.attachments || []) as ScheduleAttachment[]);
+    } catch (error) {
+      console.error("Erro ao carregar anexos:", error);
+      setAttachments([]);
+    }
+  }
 
   async function loadChatMessages(scheduleId: string, silent = false) {
     try {
@@ -202,6 +242,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
     setAllUD((unavailableData || []) as UnavailableDate[]);
     setAllSchedules((allSchedulesData || []) as Schedule[]);
     setAllSM((allSMData || []) as ScheduleMember[]);
+    await loadAttachments(scheduleData.id);
     await loadChatMessages(scheduleData.id);
     setLoading(false);
   }
@@ -302,6 +343,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   const isParticipant = scheduledUserIds.includes(user.id);
   const canAccessScheduleChat = user.role === "admin" || user.role === "leader" || isParticipant;
   const myScheduleMember = sm.find((item) => item.user_id === user.id) || null;
+  const canManageAttachments = canDo("schedule.edit");
 
   function openDeliveryPanel(
     title: string,
@@ -501,6 +543,106 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
 
     setChatMsg("");
     setSendingChat(false);
+  }
+
+  async function uploadAttachment(file: File) {
+    if (!canManageAttachments || !schedule) return;
+
+    const allowedExtensions = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".jpg", ".jpeg", ".png"];
+    const fileNameLower = file.name.toLowerCase();
+    const matchesExtension = allowedExtensions.some((extension) => fileNameLower.endsWith(extension));
+
+    if (!matchesExtension) {
+      toast("Arquivo não permitido. Use PDF, DOC, PPT ou JPG.");
+      return;
+    }
+
+    if (file.size > 4 * 1024 * 1024) {
+      toast("Arquivo muito grande. Limite de 4MB.");
+      return;
+    }
+
+    setUploadingAttachment(true);
+
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = typeof reader.result === "string" ? reader.result : "";
+          resolve(result.split(",")[1] || "");
+        };
+        reader.onerror = () => reject(new Error("Falha ao ler arquivo."));
+        reader.readAsDataURL(file);
+      });
+
+      const response = await fetch("/api/schedule-attachments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduleId: schedule.id,
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          sizeBytes: file.size,
+          contentBase64: base64,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { attachment?: ScheduleAttachment; error?: string }
+        | null;
+
+      if (!response.ok) {
+        console.error("Erro ao enviar anexo:", payload || response.statusText);
+        toast(payload?.error || "Não foi possível anexar o arquivo.");
+        setUploadingAttachment(false);
+        return;
+      }
+
+      if (payload?.attachment) {
+        setAttachments((current) => [payload.attachment as ScheduleAttachment, ...current]);
+      } else {
+        await loadAttachments(schedule.id);
+      }
+
+      toast("Arquivo anexado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao enviar anexo:", error);
+      toast("Não foi possível anexar o arquivo.");
+    }
+
+    setUploadingAttachment(false);
+    if (attachmentInputRef.current) {
+      attachmentInputRef.current.value = "";
+    }
+  }
+
+  async function removeAttachment(attachment: ScheduleAttachment) {
+    if (!schedule || !canManageAttachments) return;
+    if (!confirm(`Remover o anexo "${attachment.file_name}"?`)) return;
+
+    try {
+      const params = new URLSearchParams({
+        scheduleId: schedule.id,
+        attachmentId: attachment.id,
+      });
+
+      const response = await fetch(`/api/schedule-attachments?${params.toString()}`, {
+        method: "DELETE",
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.error("Erro ao remover anexo:", payload || response.statusText);
+        toast(payload?.error || "Não foi possível remover o anexo.");
+        return;
+      }
+
+      setAttachments((current) => current.filter((item) => item.id !== attachment.id));
+      toast("Anexo removido.");
+    } catch (error) {
+      console.error("Erro ao remover anexo:", error);
+      toast("Não foi possível remover o anexo.");
+    }
   }
 
   async function respondToSchedule(status: "confirmed" | "declined") {
@@ -912,8 +1054,8 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
         </div>
       )}
 
-      <div className="flex gap-1 mb-4 bg-surface-alt rounded-[10px] p-0.5 w-fit">
-        {(["escalados", "chat"] as const).map((tab) => (
+      <div className="flex gap-1 mb-4 bg-surface-alt rounded-[10px] p-0.5 w-fit max-w-full flex-wrap">
+        {(["escalados", "anexos", "chat"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -923,6 +1065,8 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
           >
             {tab === "escalados"
               ? `Escalados (${sm.length})`
+              : tab === "anexos"
+              ? `📎 Anexos ${attachments.length > 0 ? `(${attachments.length})` : ""}`
               : `💬 Chat ${chatMessages.length > 0 ? `(${chatMessages.length})` : ""}`}
           </button>
         ))}
@@ -956,6 +1100,108 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
           ) : (
             sm.map((item) => <MemberRow key={item.id} item={item} showFn={true} />)
           )}
+        </div>
+      )}
+
+      {activeTab === "anexos" && (
+        <div className="card mb-5">
+          <div className="px-5 pt-4 pb-3 border-b border-border-soft flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="font-display text-[15px]">Anexos da escala</div>
+              <p className="text-[11px] text-ink-faint mt-0.5">
+                Documentos, apresentações e imagens de apoio desta escala.
+              </p>
+            </div>
+
+            {canManageAttachments && (
+              <div className="flex items-center gap-2">
+                <input
+                  ref={attachmentInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      void uploadAttachment(file);
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => attachmentInputRef.current?.click()}
+                  disabled={uploadingAttachment}
+                  className="btn btn-primary btn-sm"
+                >
+                  {uploadingAttachment ? "Enviando..." : "+ Anexar arquivo"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="px-5 py-4">
+            <div className="text-[11px] text-ink-faint mb-4">
+              Tipos permitidos: PDF, DOC, DOCX, PPT, PPTX, JPG e PNG. Limite de 4MB por arquivo.
+            </div>
+
+            {attachments.length === 0 ? (
+              <div className="py-12 text-center text-sm text-ink-faint">
+                Nenhum anexo foi enviado para esta escala ainda.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {attachments.map((attachment) => {
+                  const uploader = members.find((member) => member.id === attachment.uploaded_by_user_id);
+                  const href = `data:${attachment.mime_type};base64,${attachment.content_base64}`;
+
+                  return (
+                    <div
+                      key={attachment.id}
+                      className="rounded-[14px] border border-border-soft bg-surface-alt/50 px-4 py-3"
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-[12px] border border-border-soft bg-white text-[11px] font-bold tracking-[0.12em] text-brand">
+                          {attachmentIcon(attachment.mime_type)}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold break-words">{attachment.file_name}</div>
+                          <div className="text-[11px] text-ink-faint leading-relaxed break-words">
+                            {formatFileSize(attachment.size_bytes)}
+                            {uploader ? ` • Enviado por ${uploader.name}` : ""}
+                            {` • ${new Date(attachment.created_at).toLocaleDateString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}`}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <a
+                            href={href}
+                            download={attachment.file_name}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            Baixar
+                          </a>
+                          {canManageAttachments && (
+                            <button
+                              onClick={() => removeAttachment(attachment)}
+                              className="btn btn-danger btn-sm"
+                            >
+                              Remover
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
