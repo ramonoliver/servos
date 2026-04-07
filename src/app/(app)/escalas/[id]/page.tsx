@@ -49,6 +49,16 @@ function attachmentIcon(mimeType: string) {
   return "ARQ";
 }
 
+function canPreviewAttachment(mimeType: string) {
+  return mimeType.includes("pdf") || mimeType.includes("image");
+}
+
+function attachmentPreviewLabel(mimeType: string) {
+  if (mimeType.includes("pdf")) return "PDF";
+  if (mimeType.includes("image")) return "Imagem";
+  return "Arquivo";
+}
+
 function isChatInfrastructureError(errorMessage?: string | null) {
   if (!errorMessage) return false;
   const normalized = errorMessage.toLowerCase();
@@ -85,6 +95,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   const [chatErrorMessage, setChatErrorMessage] = useState<string | null>(null);
   const [sendingChat, setSendingChat] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [previewAttachmentId, setPreviewAttachmentId] = useState<string | null>(null);
   const [chatSyncMode, setChatSyncMode] = useState<"idle" | "realtime" | "polling">("idle");
   const [responding, setResponding] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -344,6 +355,8 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
   const canAccessScheduleChat = user.role === "admin" || user.role === "leader" || isParticipant;
   const myScheduleMember = sm.find((item) => item.user_id === user.id) || null;
   const canManageAttachments = canDo("schedule.edit");
+  const previewAttachment =
+    attachments.find((attachment) => attachment.id === previewAttachmentId) || attachments[0] || null;
 
   function openDeliveryPanel(
     title: string,
@@ -599,7 +612,9 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
       }
 
       if (payload?.attachment) {
-        setAttachments((current) => [payload.attachment as ScheduleAttachment, ...current]);
+        const nextAttachment = payload.attachment as ScheduleAttachment;
+        setAttachments((current) => [nextAttachment, ...current]);
+        setPreviewAttachmentId(nextAttachment.id);
       } else {
         await loadAttachments(schedule.id);
       }
@@ -638,6 +653,7 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
       }
 
       setAttachments((current) => current.filter((item) => item.id !== attachment.id));
+      setPreviewAttachmentId((current) => (current === attachment.id ? null : current));
       toast("Anexo removido.");
     } catch (error) {
       console.error("Erro ao remover anexo:", error);
@@ -1148,57 +1164,186 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
                 Nenhum anexo foi enviado para esta escala ainda.
               </div>
             ) : (
-              <div className="space-y-2">
-                {attachments.map((attachment) => {
-                  const uploader = members.find((member) => member.id === attachment.uploaded_by_user_id);
-                  const href = `data:${attachment.mime_type};base64,${attachment.content_base64}`;
-
-                  return (
-                    <div
-                      key={attachment.id}
-                      className="rounded-[14px] border border-border-soft bg-surface-alt/50 px-4 py-3"
-                    >
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-[12px] border border-border-soft bg-white text-[11px] font-bold tracking-[0.12em] text-brand">
-                          {attachmentIcon(attachment.mime_type)}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold break-words">{attachment.file_name}</div>
-                          <div className="text-[11px] text-ink-faint leading-relaxed break-words">
-                            {formatFileSize(attachment.size_bytes)}
-                            {uploader ? ` • Enviado por ${uploader.name}` : ""}
-                            {` • ${new Date(attachment.created_at).toLocaleDateString("pt-BR", {
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}`}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          <a
-                            href={href}
-                            download={attachment.file_name}
-                            className="btn btn-secondary btn-sm"
-                          >
-                            Baixar
-                          </a>
-                          {canManageAttachments && (
-                            <button
-                              onClick={() => removeAttachment(attachment)}
-                              className="btn btn-danger btn-sm"
-                            >
-                              Remover
-                            </button>
-                          )}
-                        </div>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+                <div className="rounded-[18px] border border-border-soft bg-white overflow-hidden">
+                  <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border-soft bg-surface-alt/40">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint mb-1">
+                        Visualização
+                      </div>
+                      <div className="text-sm font-semibold text-ink-soft">
+                        {previewAttachment ? previewAttachment.file_name : "Selecione um anexo"}
                       </div>
                     </div>
-                  );
-                })}
+                    {previewAttachment && canPreviewAttachment(previewAttachment.mime_type) && (
+                      <button
+                        onClick={() => setPreviewAttachmentId(previewAttachment.id)}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        Em destaque
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="p-4">
+                    {!previewAttachment ? (
+                      <div className="min-h-[280px] rounded-[16px] border border-dashed border-border-soft bg-surface-alt/40 flex items-center justify-center text-sm text-ink-faint text-center px-6">
+                        Escolha um anexo para visualizar melhor os detalhes.
+                      </div>
+                    ) : canPreviewAttachment(previewAttachment.mime_type) ? (
+                      previewAttachment.mime_type.includes("image") ? (
+                        <div className="rounded-[16px] border border-border-soft bg-surface-alt/30 p-3">
+                          <img
+                            src={`data:${previewAttachment.mime_type};base64,${previewAttachment.content_base64}`}
+                            alt={previewAttachment.file_name}
+                            className="w-full max-h-[420px] object-contain rounded-[12px] bg-white"
+                          />
+                        </div>
+                      ) : (
+                        <div className="rounded-[16px] border border-border-soft overflow-hidden bg-white">
+                          <iframe
+                            title={previewAttachment.file_name}
+                            src={`data:${previewAttachment.mime_type};base64,${previewAttachment.content_base64}`}
+                            className="w-full h-[420px]"
+                          />
+                        </div>
+                      )
+                    ) : (
+                      <div className="min-h-[280px] rounded-[16px] border border-dashed border-border-soft bg-surface-alt/40 flex flex-col items-center justify-center text-center px-6">
+                        <div className="w-14 h-14 rounded-[16px] border border-border-soft bg-white flex items-center justify-center text-sm font-bold tracking-[0.14em] text-brand mb-4">
+                          {attachmentIcon(previewAttachment.mime_type)}
+                        </div>
+                        <div className="font-display text-lg leading-tight mb-2">
+                          Visualização externa necessária
+                        </div>
+                        <p className="text-sm text-ink-muted leading-relaxed max-w-[340px]">
+                          {attachmentPreviewLabel(previewAttachment.mime_type)} disponível para download. Para arquivos
+                          do Word e PowerPoint, o melhor caminho é baixar e abrir no aplicativo apropriado.
+                        </p>
+                      </div>
+                    )}
+
+                    {previewAttachment && (
+                      <div className="mt-4 rounded-[16px] border border-border-soft bg-surface-alt/50 px-4 py-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint mb-2">
+                          Detalhes do arquivo
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                              Tipo
+                            </div>
+                            <div className="text-sm font-medium text-ink-soft mt-1">
+                              {attachmentPreviewLabel(previewAttachment.mime_type)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                              Tamanho
+                            </div>
+                            <div className="text-sm font-medium text-ink-soft mt-1">
+                              {formatFileSize(previewAttachment.size_bytes)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                              Enviado em
+                            </div>
+                            <div className="text-sm font-medium text-ink-soft mt-1">
+                              {new Date(previewAttachment.created_at).toLocaleDateString("pt-BR", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {attachments.map((attachment) => {
+                    const uploader = members.find((member) => member.id === attachment.uploaded_by_user_id);
+                    const href = `data:${attachment.mime_type};base64,${attachment.content_base64}`;
+                    const isSelected = previewAttachment?.id === attachment.id;
+
+                    return (
+                      <div
+                        key={attachment.id}
+                        className={`rounded-[16px] border px-4 py-3 transition-colors ${
+                          isSelected
+                            ? "border-brand/30 bg-brand-glow"
+                            : "border-border-soft bg-surface-alt/50"
+                        }`}
+                      >
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-start gap-3">
+                            <button
+                              onClick={() => setPreviewAttachmentId(attachment.id)}
+                              className="flex h-11 w-11 items-center justify-center rounded-[12px] border border-border-soft bg-white text-[11px] font-bold tracking-[0.12em] text-brand shrink-0"
+                            >
+                              {attachmentIcon(attachment.mime_type)}
+                            </button>
+
+                            <div className="min-w-0 flex-1">
+                              <button
+                                onClick={() => setPreviewAttachmentId(attachment.id)}
+                                className="text-left w-full"
+                              >
+                                <div className="text-sm font-semibold break-words">{attachment.file_name}</div>
+                              </button>
+                              <div className="text-[11px] text-ink-faint leading-relaxed break-words mt-1">
+                                {formatFileSize(attachment.size_bytes)}
+                                {uploader ? ` • Enviado por ${uploader.name}` : ""}
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {canPreviewAttachment(attachment.mime_type) && (
+                                  <button
+                                    onClick={() => setPreviewAttachmentId(attachment.id)}
+                                    className="badge badge-brand"
+                                  >
+                                    Visualizar
+                                  </button>
+                                )}
+                                {!canPreviewAttachment(attachment.mime_type) && (
+                                  <span className="badge badge-secondary">Download recomendado</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <a
+                              href={href}
+                              download={attachment.file_name}
+                              className="btn btn-secondary btn-sm"
+                            >
+                              Baixar
+                            </a>
+                            {canPreviewAttachment(attachment.mime_type) && (
+                              <button
+                                onClick={() => setPreviewAttachmentId(attachment.id)}
+                                className="btn btn-primary btn-sm"
+                              >
+                                Abrir visualização
+                              </button>
+                            )}
+                            {canManageAttachments && (
+                              <button
+                                onClick={() => removeAttachment(attachment)}
+                                className="btn btn-danger btn-sm"
+                              >
+                                Remover
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
