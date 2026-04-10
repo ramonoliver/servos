@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Modal } from "@/components/ui";
+import { useApp } from "@/hooks/use-app";
 
 interface SupportModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface SupportModalProps {
 }
 
 export function SupportModal({ isOpen, onClose }: SupportModalProps) {
+  const { toast } = useApp();
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,16 +28,16 @@ export function SupportModal({ isOpen, onClose }: SupportModalProps) {
       });
 
       if (response.ok) {
-        alert("Mensagem enviada com sucesso!");
+        toast("Mensagem enviada com sucesso!");
         setSubject("");
         setMessage("");
         onClose();
       } else {
-        alert("Erro ao enviar mensagem. Tente novamente.");
+        toast("Erro ao enviar mensagem. Tente novamente.");
       }
     } catch (error) {
       console.error("Erro:", error);
-      alert("Erro ao enviar mensagem. Tente novamente.");
+      toast("Erro ao enviar mensagem. Tente novamente.");
     } finally {
       setLoading(false);
     }
