@@ -37,6 +37,15 @@ type PasswordResetInput = {
   churchName?: string;
 };
 
+type SupportEmailInput = {
+  to: string;
+  userName: string;
+  churchName: string;
+  userEmail: string;
+  subject: string;
+  message: string;
+};
+
 function normalizeSmtpHost(value?: string) {
   if (!value) return "smtp-relay.sendinblue.com";
   if (value === "smtp-relay.brevo.com") return "smtp-relay.sendinblue.com";
@@ -332,5 +341,42 @@ export async function sendSmsScheduleReminder({
       `Ministério: ${departmentName}.`,
       "Se ainda não respondeu, confirme no app.",
     ].join("\n"),
+  });
+}
+
+export async function sendSupportEmail({
+  to,
+  userName,
+  churchName,
+  userEmail,
+  subject,
+  message,
+}: SupportEmailInput) {
+  const transporter = getTransporter();
+  const safeUserName = escapeHtml(userName);
+  const safeChurchName = escapeHtml(churchName);
+  const safeUserEmail = escapeHtml(userEmail);
+  const safeSubject = escapeHtml(subject);
+  const safeMessage = escapeHtml(message);
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
+      <h2>Nova mensagem de suporte - Servos</h2>
+      <p><strong>Usuário:</strong> ${safeUserName}</p>
+      <p><strong>Email:</strong> ${safeUserEmail}</p>
+      <p><strong>Igreja:</strong> ${safeChurchName}</p>
+      <p><strong>Assunto:</strong> ${safeSubject}</p>
+      <div style="background:#f3f4f6;padding:16px;border-radius:12px;margin:16px 0;">
+        <p style="margin:0;"><strong>Mensagem:</strong></p>
+        <p style="margin:8px 0 0;white-space:pre-wrap;">${safeMessage}</p>
+      </div>
+    </div>
+  `;
+
+  return transporter.sendMail({
+    from,
+    to,
+    subject: `Suporte - ${subject} - ${userName} (${churchName})`,
+    html,
   });
 }

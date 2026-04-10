@@ -7,6 +7,7 @@ import { AppProvider, useApp } from "@/hooks/use-app";
 import { Avatar } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
 import { getIconEmoji } from "@/lib/utils/helpers";
+import { SupportButton } from "@/components/shared/support-button";
 import type { User } from "@/types";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -347,6 +348,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           <div className="mx-auto w-full max-w-[1400px]">{children}</div>
         </main>
       </div>
+
+      <SupportButton />
     </div>
   );
 }
