@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useApp } from "@/hooks/use-app";
 import { Avatar } from "@/components/ui";
+import { MentionInput } from "@/components/ui/mention-input";
 import { supabase } from "@/lib/supabase/client";
 import { useSearchParams } from "next/navigation";
 import type { Message, User } from "@/types";
@@ -356,21 +357,18 @@ export default function MensagensPage() {
           )}
         </div>
 
-        <div className="px-5 py-3 border-t border-border-soft flex flex-col sm:flex-row gap-2">
-          <textarea
+        <div className="px-5 py-3 border-t border-border-soft flex gap-2">
+          <MentionInput
             value={newMsg}
-            onChange={(e) => setNewMsg(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void send();
-              }
-            }}
-            placeholder="Digite sua mensagem..."
-            rows={1}
-            className="input-field flex-1 min-h-[46px] max-h-36 resize-y sm:resize-none !rounded-[18px]"
+            onChange={setNewMsg}
+            onSend={send}
+            placeholder="Digite @ para mencionar alguém..."
+            disabled={sending || !selectedDept}
+            scheduleId={selectedDept}
+            churchId={user.church_id}
+            mode="department"
           />
-          <button onClick={send} disabled={sending || !selectedDept} className="btn btn-primary sm:self-auto">
+          <button onClick={send} disabled={sending || !selectedDept} className="btn btn-primary self-center">
             {sending ? "..." : "Enviar"}
           </button>
         </div>

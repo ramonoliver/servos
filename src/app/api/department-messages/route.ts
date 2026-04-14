@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireApiSession } from "@/lib/auth/api-session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { notifyDepartmentChatMessage } from "@/lib/server/chat-notifications";
+import { sendUserNotification } from "@/lib/server/notification-service";
 import { genId } from "@/lib/utils/helpers";
 
 const getSchema = z.object({
@@ -49,6 +50,78 @@ async function canAccessDepartmentMessages(params: {
   if ((department.co_leader_ids || []).includes(userId)) return true;
 
   return Boolean(departmentMember);
+}
+
+async function processMentions(content: string, departmentId: string, senderId: string, churchId: string, senderName: string) {
+  const supabase = getSupabaseServerClient();
+
+  // Extract @mentions from content (format: @username)
+  const mentionRegex = /@(\w+)/g;
+  const mentions = [];
+  let match;
+  while ((match = mentionRegex.exec(content)) !== null) {
+    mentions.push(match[1]); // username without @
+  }
+
+  if (mentions.length === 0) return;
+
+  // Get all department members and leaders
+  const [{ data: deptMembers }, { data: department }] = await Promise.all([
+    supabase
+      .from("department_members")
+      .select("user_id")
+      .eq("department_id", departmentId),
+    supabase
+      .from("departments")
+      .select("leader_ids, co_leader_ids")
+      .eq("id", departmentId)
+      .single()
+  ]);
+
+  const memberIds = deptMembers?.map(m => m.user_id) || [];
+  const leaderIds = [
+    ...(department?.leader_ids || []),
+    ...(department?.co_leader_ids || [])
+  ];
+  const allUserIds = [...new Set([...memberIds, ...leaderIds])];
+
+  // Get user details for mentioned usernames
+  const { data: users } = await supabase
+    .from("users")
+    .select("id, name")
+    .eq("church_id", churchId)
+    .in("id", allUserIds);
+
+  if (!users) return;
+
+  // Create a map of username to user ID
+  const usernameToUserId = new Map<string, string>();
+  users.forEach(user => {
+    const username = user.name?.toLowerCase().replace(/\s+/g, '') || '';
+    if (username) {
+      usernameToUserId.set(username, user.id);
+    }
+  });
+
+  // Send notifications to mentioned users
+  const mentionedUserIds = mentions
+    .map(username => usernameToUserId.get(username.toLowerCase()))
+    .filter((id): id is string => id !== undefined && id !== senderId); // Don't notify sender
+
+  for (const mentionedUserId of mentionedUserIds) {
+    try {
+      await sendUserNotification({
+        userId: mentionedUserId,
+        churchId,
+        title: "Você foi mencionado",
+        body: `${senderName} te mencionou em uma mensagem do ministério.`,
+        actionUrl: `/mensagens?departmentId=${departmentId}`,
+        type: "info",
+      });
+    } catch (error) {
+      console.error(`Failed to send mention notification to user ${mentionedUserId}:`, error);
+    }
+  }
 }
 
 export async function GET(req: Request) {
@@ -155,6 +228,9 @@ export async function POST(req: Request) {
         senderName: sender?.name || "Alguém do time",
         content,
       });
+
+      // Process mentions and send notifications
+      await processMentions(content, departmentId, senderId, churchId, sender?.name || "Alguém do time");
     } catch (notificationError) {
       console.error("API department-messages notification error:", notificationError);
     }

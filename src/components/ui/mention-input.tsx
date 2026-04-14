@@ -19,6 +19,7 @@ interface MentionInputProps {
   disabled?: boolean;
   scheduleId: string;
   churchId: string;
+  mode?: 'schedule' | 'department'; // schedule for schedule chat, department for department messages
 }
 
 export function MentionInput({
@@ -29,6 +30,7 @@ export function MentionInput({
   disabled = false,
   scheduleId,
   churchId,
+  mode = 'schedule',
 }: MentionInputProps) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<User[]>([]);
@@ -40,37 +42,61 @@ export function MentionInput({
   // Load potential mentionable users
   const loadMentionableUsers = useCallback(async () => {
     try {
-      // Get schedule participants and leaders
-      const [{ data: scheduleMembers }, { data: department }] = await Promise.all([
-        supabase
-          .from("schedule_members")
-          .select("user_id")
-          .eq("schedule_id", scheduleId),
-        supabase
-          .from("schedules")
-          .select("department_id")
-          .eq("id", scheduleId)
-          .single()
-      ]);
+      let allUserIds: string[] = [];
 
-      const participantIds = scheduleMembers?.map(m => m.user_id) || [];
+      if (mode === 'schedule') {
+        // Get schedule participants and leaders
+        const [{ data: scheduleMembers }, { data: department }] = await Promise.all([
+          supabase
+            .from("schedule_members")
+            .select("user_id")
+            .eq("schedule_id", scheduleId),
+          supabase
+            .from("schedules")
+            .select("department_id")
+            .eq("id", scheduleId)
+            .single()
+        ]);
 
-      // Get department leaders
-      let leaderIds: string[] = [];
-      if (department?.department_id) {
-        const { data: dept } = await supabase
-          .from("departments")
-          .select("leader_ids, co_leader_ids")
-          .eq("id", department.department_id)
-          .single();
+        const participantIds = scheduleMembers?.map(m => m.user_id) || [];
 
-        leaderIds = [
-          ...(dept?.leader_ids || []),
-          ...(dept?.co_leader_ids || [])
+        // Get department leaders
+        let leaderIds: string[] = [];
+        if (department?.department_id) {
+          const { data: dept } = await supabase
+            .from("departments")
+            .select("leader_ids, co_leader_ids")
+            .eq("id", department.department_id)
+            .single();
+
+          leaderIds = [
+            ...(dept?.leader_ids || []),
+            ...(dept?.co_leader_ids || [])
+          ];
+        }
+
+        allUserIds = [...new Set([...participantIds, ...leaderIds])];
+      } else {
+        // mode === 'department' - Get department members and leaders
+        const [{ data: deptMembers }, { data: department }] = await Promise.all([
+          supabase
+            .from("department_members")
+            .select("user_id")
+            .eq("department_id", scheduleId), // scheduleId is used as departmentId in this mode
+          supabase
+            .from("departments")
+            .select("leader_ids, co_leader_ids")
+            .eq("id", scheduleId)
+            .single()
+        ]);
+
+        const memberIds = deptMembers?.map(m => m.user_id) || [];
+        const leaderIds = [
+          ...(department?.leader_ids || []),
+          ...(department?.co_leader_ids || [])
         ];
+        allUserIds = [...new Set([...memberIds, ...leaderIds])];
       }
-
-      const allUserIds = [...new Set([...participantIds, ...leaderIds])];
 
       // Get user details
       const { data: users } = await supabase
@@ -85,7 +111,7 @@ export function MentionInput({
       console.error("Error loading mentionable users:", error);
       setSuggestions([]);
     }
-  }, [scheduleId, churchId]);
+  }, [scheduleId, churchId, mode]);
 
   useEffect(() => {
     loadMentionableUsers();
@@ -165,7 +191,7 @@ export function MentionInput({
   );
 
   return (
-    <div className="relative">
+    <div className="relative flex-1">
       <textarea
         ref={inputRef}
         value={value}
@@ -173,8 +199,8 @@ export function MentionInput({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         disabled={disabled}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-        rows={3}
+        className="w-full h-12 px-3 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:bg-gray-100 text-sm"
+        rows={1}
       />
 
       {showSuggestions && filteredSuggestions.length > 0 && (
