@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiSession } from "@/lib/auth/api-session";
 import { notifyScheduleChatMessage } from "@/lib/server/chat-notifications";
+import { sendUserNotification } from "@/lib/server/notification-service";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { genId } from "@/lib/utils/helpers";
 
@@ -77,6 +78,90 @@ async function canAccessScheduleChat(params: {
   }
 
   return Boolean(scheduleMember);
+}
+
+async function processMentions(content: string, scheduleId: string, senderId: string, churchId: string, senderName: string) {
+  const supabase = getSupabaseServerClient();
+
+  // Extract @mentions from content (format: @username)
+  const mentionRegex = /@(\w+)/g;
+  const mentions = [];
+  let match;
+  while ((match = mentionRegex.exec(content)) !== null) {
+    mentions.push(match[1]); // username without @
+  }
+
+  if (mentions.length === 0) return;
+
+  // Get all users in the schedule (participants and leaders)
+  const [{ data: scheduleMembers }, { data: department }] = await Promise.all([
+    supabase
+      .from("schedule_members")
+      .select("user_id")
+      .eq("schedule_id", scheduleId),
+    supabase
+      .from("schedules")
+      .select("department_id")
+      .eq("id", scheduleId)
+      .single()
+  ]);
+
+  const participantIds = scheduleMembers?.map(m => m.user_id) || [];
+
+  // Get department leaders
+  let leaderIds: string[] = [];
+  if (department?.department_id) {
+    const { data: dept } = await supabase
+      .from("departments")
+      .select("leader_ids, co_leader_ids")
+      .eq("id", department.department_id)
+      .single();
+
+    leaderIds = [
+      ...(dept?.leader_ids || []),
+      ...(dept?.co_leader_ids || [])
+    ];
+  }
+
+  const allUserIds = [...new Set([...participantIds, ...leaderIds])];
+
+  // Get user details for mentioned usernames
+  const { data: users } = await supabase
+    .from("users")
+    .select("id, name")
+    .eq("church_id", churchId)
+    .in("id", allUserIds);
+
+  if (!users) return;
+
+  // Create a map of username to user ID
+  const usernameToUserId = new Map<string, string>();
+  users.forEach(user => {
+    const username = user.name?.toLowerCase().replace(/\s+/g, '') || '';
+    if (username) {
+      usernameToUserId.set(username, user.id);
+    }
+  });
+
+  // Send notifications to mentioned users
+  const mentionedUserIds = mentions
+    .map(username => usernameToUserId.get(username.toLowerCase()))
+    .filter((id): id is string => id !== undefined && id !== senderId); // Don't notify sender
+
+  for (const mentionedUserId of mentionedUserIds) {
+    try {
+      await sendUserNotification({
+        userId: mentionedUserId,
+        churchId,
+        title: "Você foi mencionado",
+        body: `${senderName} te mencionou em uma mensagem no chat da escala.`,
+        actionUrl: `/escalas/${scheduleId}?tab=chat`,
+        type: "info",
+      });
+    } catch (error) {
+      console.error(`Failed to send mention notification to user ${mentionedUserId}:`, error);
+    }
+  }
 }
 
 export async function GET(req: Request) {
@@ -194,6 +279,8 @@ export async function POST(req: Request) {
 
     if (error) throw error;
 
+    if (error) throw error;
+
     try {
       const { data: sender } = await supabase
         .from("users")
@@ -209,9 +296,14 @@ export async function POST(req: Request) {
         senderName: sender?.name || "Alguém da equipe",
         content,
       });
+
+      // Process mentions and send notifications
+      await processMentions(content, scheduleId, senderId, churchId, sender?.name || "Alguém da equipe");
     } catch (notificationError) {
       console.error("API schedule-chats notification error:", notificationError);
     }
+
+    return NextResponse.json({ success: true, message: data || message });
 
     return NextResponse.json({ success: true, message: data || message });
   } catch (error) {

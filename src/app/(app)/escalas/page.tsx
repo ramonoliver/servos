@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { getDayName, formatShortDate } from "@/lib/utils/helpers";
+import { ConfirmDialog } from "@/components/ui";
 import Link from "next/link";
 import type { Schedule, ScheduleMember, Event } from "@/types";
 
@@ -14,6 +15,7 @@ export default function EscalasPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [allSM, setAllSM] = useState<ScheduleMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -62,8 +64,6 @@ export default function EscalasPage() {
   }, [schedules, filter]);
 
   async function deleteSchedule(id: string) {
-    if (!confirm("Excluir esta escala?")) return;
-
     try {
       const response = await fetch("/api/schedules/delete", {
         method: "POST",
@@ -83,11 +83,13 @@ export default function EscalasPage() {
         return;
       }
 
-      toast("Escala excluida.");
+      toast("Escala excluída.");
       await loadData();
     } catch (error) {
       console.error("Erro ao excluir escala:", error);
       toast("Erro ao excluir escala.");
+    } finally {
+      setScheduleToDelete(null);
     }
   }
 
@@ -191,9 +193,10 @@ export default function EscalasPage() {
 
                 {canDo("schedule.delete") && (
                   <button
-                    onClick={() => deleteSchedule(s.id)}
+                    onClick={() => setScheduleToDelete(s.id)}
                     className="btn btn-ghost btn-sm text-danger self-start sm:self-auto opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                     title="Excluir"
+                    aria-label="Excluir escala"
                   >
                     &#10005;
                   </button>
@@ -203,6 +206,15 @@ export default function EscalasPage() {
           })
         )}
       </div>
+      {scheduleToDelete && (
+        <ConfirmDialog
+          title="Excluir escala"
+          message="Esta ação remove a escala e não pode ser desfeita."
+          confirmLabel="Excluir"
+          onCancel={() => setScheduleToDelete(null)}
+          onConfirm={() => void deleteSchedule(scheduleToDelete)}
+        />
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { getSession, clearSession, updateSession } from "@/lib/auth/session";
 import { can, type Action } from "@/lib/auth/permissions";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
 import type { User, Church, Department, Session } from "@/types";
 
 interface AppContextType {
@@ -13,6 +14,12 @@ interface AppContextType {
   church: Church;
   departments: Department[];
   userDeptIds: string[];
+  unreadNotifications: number;
+  pushPermission: NotificationPermission | "unsupported";
+  pushEnabled: boolean;
+  registeringPush: boolean;
+  enablePushNotifications: () => Promise<boolean>;
+  retryPushNotifications: () => Promise<boolean>;
   toast: (msg: string) => void;
   canDo: (action: Action, deptId?: string) => boolean;
   refresh: () => void;
@@ -38,6 +45,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const unreadNotificationCountRef = useRef<number | null>(null);
   const lastUnreadNotificationIdRef = useRef<string | null>(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const toast = useCallback((msg: string) => {
     setToastMsg(msg);
@@ -174,6 +182,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [user, userDeptIds]);
 
+  const {
+    permission: pushPermission,
+    pushEnabled,
+    registering: registeringPush,
+    requestPermissionAndEnable: enablePushNotifications,
+    retryPushRegistration: retryPushNotifications,
+  } = usePushNotifications(user?.id || null, toast);
+
   useEffect(() => {
     refresh();
   }, [refresh]);
@@ -203,6 +219,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const unread = data || [];
       const unreadCount = unread.length;
       const latestUnread = unread[0] as { id: string; title: string; type: string } | undefined;
+      setUnreadNotifications(unreadCount);
 
       if (unreadNotificationCountRef.current === null) {
         unreadNotificationCountRef.current = unreadCount;
@@ -259,6 +276,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         church,
         departments,
         userDeptIds,
+        unreadNotifications,
+        pushPermission,
+        pushEnabled,
+        registeringPush,
+        enablePushNotifications,
+        retryPushNotifications,
         toast,
         canDo,
         refresh,

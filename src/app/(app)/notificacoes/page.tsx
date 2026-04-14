@@ -33,13 +33,7 @@ export default function NotificaçõesPage() {
   }
 
   useEffect(() => {
-    loadData();
-
-    const interval = setInterval(() => {
-      void loadData();
-    }, 12000);
-
-    return () => clearInterval(interval);
+    void loadData();
   }, [user.id]);
 
   const hasUnread = useMemo(
@@ -147,35 +141,71 @@ export default function NotificaçõesPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {notifications.map((n) => (
-            <Link
-              key={n.id}
-              href={n.action_url || "#"}
-              onClick={() => markRead(n.id, n.read)}
-              className={`block card p-4 transition-colors ${
-                !n.read ? "border-brand/20 bg-brand-glow" : ""
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="w-4 h-4 rounded bg-gradient-to-br from-brand to-brand-deep flex-shrink-0" />
-                <span className="text-[10px] font-bold text-ink-faint uppercase tracking-wide">
-                  Servos
-                </span>
-                {!n.read && <span className="w-2 h-2 rounded-full bg-brand" />}
-                <span className="text-[10px] text-ink-faint ml-auto text-right shrink-0">
-                  {new Date(n.created_at).toLocaleDateString("pt-BR", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-              </div>
+          {notifications.map((n) =>
+            n.action_url ? (
+              <Link
+                key={n.id}
+                href={n.action_url}
+                onClick={() => markRead(n.id, n.read)}
+                className={`block card p-4 transition-colors ${
+                  !n.read ? "border-brand/20 bg-brand-glow" : ""
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="w-4 h-4 rounded bg-gradient-to-br from-brand to-brand-deep flex-shrink-0" />
+                  <span className="text-[10px] font-bold text-ink-faint uppercase tracking-wide">
+                    Servos
+                  </span>
+                  {!n.read && <span className="w-2 h-2 rounded-full bg-brand" />}
+                  <span className="text-[10px] text-ink-faint ml-auto text-right shrink-0">
+                    {new Date(n.created_at).toLocaleDateString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
 
-              <div className="text-[13px] font-semibold mb-0.5 break-words">{n.title}</div>
-              <div className="text-xs text-ink-muted leading-relaxed break-words">{n.body}</div>
-            </Link>
-          ))}
+                <div className="text-[13px] font-semibold mb-0.5 break-words">{n.title}</div>
+                <div className="text-xs text-ink-muted leading-relaxed break-words">{n.body}</div>
+              </Link>
+            ) : (
+              <div
+                key={n.id}
+                className={`card p-4 transition-colors ${
+                  !n.read ? "border-brand/20 bg-brand-glow" : ""
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="w-4 h-4 rounded bg-gradient-to-br from-brand to-brand-deep flex-shrink-0" />
+                  <span className="text-[10px] font-bold text-ink-faint uppercase tracking-wide">
+                    Servos
+                  </span>
+                  {!n.read && <span className="w-2 h-2 rounded-full bg-brand" />}
+                  <span className="text-[10px] text-ink-faint ml-auto text-right shrink-0">
+                    {new Date(n.created_at).toLocaleDateString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+                <div className="text-[13px] font-semibold mb-0.5 break-words">{n.title}</div>
+                <div className="text-xs text-ink-muted leading-relaxed break-words">{n.body}</div>
+                {!n.read && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm mt-3"
+                    onClick={() => void markRead(n.id, n.read)}
+                  >
+                    Marcar como lida
+                  </button>
+                )}
+              </div>
+            )
+          )}
         </div>
       )}
     </div>

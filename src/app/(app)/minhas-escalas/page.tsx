@@ -28,6 +28,7 @@ export default function MinhasEscalasPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [members, setMembers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bulkConfirming, setBulkConfirming] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -167,6 +168,45 @@ export default function MinhasEscalasPage() {
     }
   }
 
+  async function confirmAllPending() {
+    if (pendingCount === 0 || bulkConfirming) return;
+    setBulkConfirming(true);
+    const pendingItems = upcoming.filter((item) => item.sm.status === "pending");
+    let success = 0;
+    let failed = 0;
+
+    for (const item of pendingItems) {
+      try {
+        const response = await fetch("/api/schedule-members", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "respond",
+            scheduleMemberId: item.sm.id,
+            status: "confirmed",
+            declineReason: "",
+          }),
+        });
+        if (response.ok) {
+          success += 1;
+        } else {
+          failed += 1;
+        }
+      } catch {
+        failed += 1;
+      }
+    }
+
+    if (success > 0) {
+      toast(`${success} ${success === 1 ? "escala confirmada" : "escalas confirmadas"} com sucesso.`);
+    }
+    if (failed > 0) {
+      toast(`${failed} ${failed === 1 ? "escala não pôde ser confirmada" : "escalas não puderam ser confirmadas"}.`);
+    }
+    await loadData();
+    setBulkConfirming(false);
+  }
+
   return (
     <div>
       <div className="mb-6 rounded-[24px] border border-border-soft bg-[linear-gradient(135deg,rgba(189,149,90,0.14),rgba(255,255,255,0.96))] p-5 sm:p-6">
@@ -276,6 +316,22 @@ export default function MinhasEscalasPage() {
           Passadas ({past.length})
         </button>
       </div>
+
+      {tab === "upcoming" && pendingCount > 1 && (
+        <div className="mb-5 flex items-center justify-between gap-3 rounded-[14px] border border-brand/20 bg-brand-glow px-4 py-3">
+          <p className="text-sm text-ink-soft">
+            Você tem <strong>{pendingCount}</strong> confirmações pendentes.
+          </p>
+          <button
+            type="button"
+            className="btn btn-green btn-sm"
+            onClick={() => void confirmAllPending()}
+            disabled={bulkConfirming}
+          >
+            {bulkConfirming ? "Confirmando..." : "Confirmar todas"}
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="card px-5 py-16 text-center">

@@ -10,12 +10,32 @@ export function Modal({
 }: {
   title: string; children: React.ReactNode; footer?: React.ReactNode; close: () => void; width?: number;
 }) {
+  const closeButtonRef = React.useRef<HTMLButtonElement | null>(null);
+  const previousFocusRef = React.useRef<HTMLElement | null>(null);
+
+  React.useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previousFocusRef.current?.focus();
+    };
+  }, [close]);
+
   return (
-    <div className="fixed inset-0 bg-ink/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && close()}>
-      <div className="bg-white rounded-xl w-full shadow-xl max-h-[90vh] overflow-y-auto animate-in" style={{ maxWidth: width }}>
+    <div
+      className="fixed inset-0 bg-ink/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={e => e.target === e.currentTarget && close()}
+      role="presentation"
+    >
+      <div className="bg-white rounded-xl w-full shadow-xl max-h-[90vh] overflow-y-auto animate-in" style={{ maxWidth: width }} role="dialog" aria-modal="true" aria-label={title}>
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border-soft sticky top-0 bg-white z-[1] rounded-t-xl">
           <span className="font-display text-xl">{title}</span>
-          <button onClick={close} className="w-8 h-8 rounded-full bg-surface-alt flex items-center justify-center hover:bg-border text-ink-muted transition-colors">&times;</button>
+          <button ref={closeButtonRef} onClick={close} className="w-8 h-8 rounded-full bg-surface-alt flex items-center justify-center hover:bg-border text-ink-muted transition-colors" aria-label="Fechar modal">&times;</button>
         </div>
         <div className="px-6 py-5">{children}</div>
         {footer && <div className="px-6 py-4 border-t border-border-soft flex gap-2 justify-end">{footer}</div>}
@@ -177,14 +197,17 @@ export function AvailabilityEditor({ availability, onChange }: { availability: b
   return (
     <div className="grid grid-cols-7 gap-2">
       {DAYS.map((d, i) => (
-        <div key={i} onClick={() => toggle(i)}
+        <button key={i} type="button" onClick={() => toggle(i)}
           className={cn(
             "flex flex-col items-center gap-1 py-3 rounded-[10px] cursor-pointer transition-all",
             availability?.[i] ? "bg-success-light border border-success/20" : "bg-surface-alt border border-border-soft hover:border-ink-ghost"
-          )}>
+          )}
+          aria-pressed={Boolean(availability?.[i])}
+          aria-label={`${d} ${availability?.[i] ? "disponível" : "indisponível"}`}
+        >
           <span className={cn("text-[10px] font-bold", availability?.[i] ? "text-success" : "text-ink-faint")}>{d}</span>
           <div className={cn("w-3 h-3 rounded-full transition-colors", availability?.[i] ? "bg-success" : "bg-ink-ghost")} />
-        </div>
+        </button>
       ))}
     </div>
   );

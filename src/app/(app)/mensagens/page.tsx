@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useApp } from "@/hooks/use-app";
 import { Avatar } from "@/components/ui";
@@ -26,6 +26,7 @@ export default function MensagensPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [syncMode, setSyncMode] = useState<"idle" | "realtime" | "polling">("idle");
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -242,6 +243,12 @@ export default function MensagensPage() {
     setSending(false);
   }
 
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+  }, [messages.length, selectedDept]);
+
   return (
     <div>
       <div className="mb-6">
@@ -298,7 +305,7 @@ export default function MensagensPage() {
           )}
         </div>
 
-        <div className="flex-1 p-5 space-y-3 overflow-y-auto">
+        <div ref={messagesContainerRef} className="flex-1 p-5 space-y-3 overflow-y-auto">
           {loading ? (
             <div className="text-center py-16 text-ink-faint text-sm">Carregando mensagens...</div>
           ) : messages.length === 0 ? (

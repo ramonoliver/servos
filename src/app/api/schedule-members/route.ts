@@ -4,6 +4,12 @@ import { requireApiActor } from "@/lib/auth/api-session";
 import { can } from "@/lib/auth/permissions";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { sendScheduleAssignmentAlerts } from "@/lib/server/schedule-notifications";
+import {
+  awardConfirmationPoints,
+  awardSubstitutionPoints,
+  evaluateBadgesForUser,
+} from "@/lib/server/scoring-service";
+import { sendUserNotification } from "@/lib/server/notification-service";
 import { genId } from "@/lib/utils/helpers";
 
 const postSchema = z.object({
@@ -195,6 +201,32 @@ export async function POST(req: Request) {
       userIds: [userId],
     });
 
+    // Send in-app notification to the added member
+    try {
+      const { data: scheduleInfo } = await supabase
+        .from("schedules")
+        .select("title, date, events(title)")
+        .eq("id", scheduleId)
+        .single();
+
+      const eventTitle = Array.isArray(scheduleInfo?.events) 
+        ? (scheduleInfo.events[0] as any)?.title || "Evento"
+        : (scheduleInfo?.events as any)?.title || "Evento";
+      const scheduleDate = new Date(scheduleInfo?.date || "").toLocaleDateString("pt-BR");
+
+      await sendUserNotification({
+        userId,
+        churchId,
+        title: "Adicionado à escala",
+        body: `Você foi adicionado à escala "${scheduleInfo?.title || "Escala"}" do evento "${eventTitle}" em ${scheduleDate}.`,
+        actionUrl: `/escalas/${scheduleId}`,
+        type: "confirmation",
+      });
+    } catch (notificationError) {
+      console.error("Error sending in-app notification for schedule assignment:", notificationError);
+      // Don't fail the request if notification fails
+    }
+
     return NextResponse.json({ success: true, notifications });
   } catch (error) {
     console.error("API schedule-members POST error:", error);
@@ -267,7 +299,7 @@ export async function PATCH(req: Request) {
       const { scheduleMemberId, status, declineReason } = parsed.data;
       const { data: scheduleMember, error: scheduleMemberError } = await supabase
         .from("schedule_members")
-        .select("id, user_id")
+        .select("id, user_id, status, schedule_id")
         .eq("id", scheduleMemberId)
         .maybeSingle();
 
@@ -302,6 +334,32 @@ export async function PATCH(req: Request) {
         .eq("id", scheduleMemberId);
 
       if (error) throw error;
+
+      if (status === "confirmed" && scheduleMember.status !== "confirmed") {
+        await awardConfirmationPoints(actorId, churchId, scheduleMember.schedule_id);
+
+        await sendUserNotification({
+          userId: actorId,
+          churchId,
+          title: "Presença confirmada ✅",
+          body: "Perfeito! Você ganhou +5 pontos 🎉",
+          actionUrl: `/escalas/${encodeURIComponent(scheduleMember.schedule_id)}`,
+          type: "confirmation",
+        });
+
+        const badges = await evaluateBadgesForUser(actorId, churchId);
+        for (const badge of badges) {
+          await sendUserNotification({
+            userId: actorId,
+            churchId,
+            title: "Nova conquista desbloqueada 🏅",
+            body: `Você conquistou: '${badge.name}'`,
+            actionUrl: "/perfil",
+            type: "badge",
+          });
+        }
+      }
+
       return NextResponse.json({ success: true });
     }
 
@@ -377,6 +435,28 @@ export async function PATCH(req: Request) {
     if (updateError) throw updateError;
 
     await refreshScheduleSlotCounts(scheduleId);
+
+    await awardSubstitutionPoints(substituteId, churchId, scheduleId);
+    await sendUserNotification({
+      userId: substituteId,
+      churchId,
+      title: "Você ganhou pontos 🎉",
+      body: "+15 pontos por substituir alguém! Continue assim 🙌",
+      actionUrl: `/escalas/${encodeURIComponent(scheduleId)}`,
+      type: "points",
+    });
+
+    const badges = await evaluateBadgesForUser(substituteId, churchId);
+    for (const badge of badges) {
+      await sendUserNotification({
+        userId: substituteId,
+        churchId,
+        title: "Nova conquista desbloqueada 🏅",
+        body: `Você conquistou: '${badge.name}'`,
+        actionUrl: "/perfil",
+        type: "badge",
+      });
+    }
 
     const notifications = await sendScheduleAssignmentAlerts({
       churchId,

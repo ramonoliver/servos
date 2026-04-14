@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { updateSession } from "@/lib/auth/session";
 import { getInitials } from "@/lib/utils/helpers";
-import { AvailabilityEditor } from "@/components/ui";
+import { AvailabilityEditor, Skeleton } from "@/components/ui";
 
 export default function PerfilPage() {
-  const { user, toast, refresh } = useApp();
+  const { user, toast, refresh, pushPermission, pushEnabled, registeringPush, enablePushNotifications, retryPushNotifications } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState<"perfil" | "senha">(
     user.must_change_password ? "senha" : "perfil"
@@ -28,6 +28,13 @@ export default function PerfilPage() {
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [profileSummary, setProfileSummary] = useState<{
+    monthPoints: number;
+    badges: Array<{ id: string; name: string; description: string; icon: string; unlockedAt: string }>;
+    pushEnabled: boolean;
+  } | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState("");
 
   function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -50,6 +57,33 @@ export default function PerfilPage() {
     setPhotoUrl("");
   }
 
+  useEffect(() => {
+    async function loadProfileSummary() {
+      setSummaryLoading(true);
+      setSummaryError("");
+      try {
+        const authToken = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("servos_session") || "null")?.token : null;
+        const response = await fetch("/api/profile/summary", {
+          credentials: "include",
+          headers: authToken ? { "x-servos-auth": authToken } : undefined,
+        });
+        const data = await response.json().catch(() => null);
+        if (response.ok && data?.success) {
+          setProfileSummary(data.profile);
+        } else {
+          setSummaryError("Não foi possível carregar seu resumo agora.");
+        }
+      } catch (error) {
+        console.error("Erro ao carregar resumo do perfil:", error);
+        setSummaryError("Não foi possível carregar seu resumo agora.");
+      } finally {
+        setSummaryLoading(false);
+      }
+    }
+
+    void loadProfileSummary();
+  }, []);
+
   async function saveProfile() {
     if (!name.trim()) {
       toast("Informe seu nome.");
@@ -57,12 +91,14 @@ export default function PerfilPage() {
     }
 
     setSavingProfile(true);
-
     try {
+      const authToken = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("servos_session") || "null")?.token : null;
       const response = await fetch("/api/profile/update", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          ...(authToken ? { "x-servos-auth": authToken } : {}),
         },
         body: JSON.stringify({
           name: name.trim(),
@@ -108,12 +144,14 @@ export default function PerfilPage() {
     }
 
     setSavingPassword(true);
-
     try {
+      const authToken = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("servos_session") || "null")?.token : null;
       const response = await fetch("/api/profile/change-password", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          ...(authToken ? { "x-servos-auth": authToken } : {}),
         },
         body: JSON.stringify({
           currentPassword: curPw,
@@ -150,13 +188,100 @@ export default function PerfilPage() {
 
       {user.must_change_password && (
         <div className="bg-amber-light text-amber text-sm px-4 py-3 rounded-[14px] border border-amber/10 mb-5 flex items-center gap-2">
-          &#9888; Voce esta usando uma senha temporaria.
+          &#9888; Você está usando uma senha temporária.
           <button onClick={() => setTab("senha")} className="font-bold underline">
             Altere agora
           </button>
           .
         </div>
       )}
+
+      {summaryLoading ? (
+        <div className="grid gap-3 mb-5 md:grid-cols-3">
+          <Skeleton className="h-[140px] rounded-[18px]" />
+          <Skeleton className="h-[140px] rounded-[18px] md:col-span-2" />
+        </div>
+      ) : summaryError ? (
+        <div className="rounded-[14px] border border-amber/20 bg-amber-light px-4 py-3 mb-5 text-sm text-amber flex items-center justify-between gap-3">
+          <span>{summaryError}</span>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => window.location.reload()}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      ) : profileSummary && (
+        <div className="grid gap-3 mb-5 md:grid-cols-3">
+          <div className="rounded-[18px] border border-border-soft bg-white p-5 shadow-sm">
+            <div className="text-[11px] uppercase tracking-[0.24em] text-ink-faint mb-2">Pontos este mês</div>
+            <div className="text-3xl font-display text-brand">{profileSummary.monthPoints}</div>
+            <div className="text-xs text-ink-muted mt-2">Ganhos por confirmação, presença e apoio ao time.</div>
+          </div>
+          <div className="rounded-[18px] border border-border-soft bg-white p-5 shadow-sm md:col-span-2">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="text-[11px] uppercase tracking-[0.24em] text-ink-faint">Conquistas</div>
+              <div className="text-[11px] text-ink-muted">{profileSummary.badges.length} desbloqueada(s)</div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {profileSummary.badges.length > 0 ? (
+                profileSummary.badges.map((badge) => (
+                  <div key={badge.id} className="rounded-[14px] border border-border-soft bg-surface-alt p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl bg-brand-light text-brand text-sm">{badge.icon}</span>
+                      <div>
+                        <div className="text-sm font-semibold">{badge.name}</div>
+                        <div className="text-[11px] text-ink-faint">{new Date(badge.unlockedAt).toLocaleDateString("pt-BR")}</div>
+                      </div>
+                    </div>
+                    <p className="text-[12px] text-ink-muted">{badge.description}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-ink-faint">Nenhuma conquista desbloqueada ainda. Confirme sua presença e ajude o time!</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-[14px] border border-border-soft bg-white px-4 py-3 mb-5">
+        <div className="text-[11px] uppercase tracking-[0.2em] text-ink-faint mb-2">Notificações push</div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-ink-muted">
+            {pushPermission === "granted"
+              ? pushEnabled
+                ? "Ativas neste dispositivo."
+                : "Permissão concedida, finalize o registro do dispositivo."
+              : pushPermission === "denied"
+              ? "Bloqueadas no navegador. Reative nas configurações do site."
+              : pushPermission === "default"
+              ? "Desativadas. Ative para receber lembretes e avisos importantes."
+              : "Este navegador não suporta notificações push."}
+          </div>
+          {pushPermission === "default" && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => void enablePushNotifications()}
+              disabled={registeringPush}
+            >
+              {registeringPush ? "Ativando..." : "Ativar notificações"}
+            </button>
+          )}
+          {pushPermission === "granted" && !pushEnabled && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => void retryPushNotifications()}
+              disabled={registeringPush}
+            >
+              {registeringPush ? "Registrando..." : "Tentar novamente"}
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="flex gap-1 mb-5 bg-surface-alt rounded-[10px] p-0.5 w-fit">
         <button

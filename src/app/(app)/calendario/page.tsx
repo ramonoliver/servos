@@ -142,15 +142,27 @@ export default function CalendarioPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
         <div className="card p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-2 sm:gap-3 mb-4">
-          <button onClick={() => setMonthOffset((m) => m - 1)} className="btn btn-ghost btn-sm">
-            &larr;
-          </button>
-          <span className="font-display text-base sm:text-lg capitalize text-center break-words">{monthName}</span>
-          <button onClick={() => setMonthOffset((m) => m + 1)} className="btn btn-ghost btn-sm">
-            &rarr;
-          </button>
-        </div>
+          <div className="flex items-center justify-between gap-2 sm:gap-3 mb-4">
+            <button onClick={() => setMonthOffset((m) => m - 1)} className="btn btn-ghost btn-sm" aria-label="Mês anterior">
+              &larr;
+            </button>
+            <span className="font-display text-base sm:text-lg capitalize text-center break-words">{monthName}</span>
+            <button onClick={() => setMonthOffset((m) => m + 1)} className="btn btn-ghost btn-sm" aria-label="Próximo mês">
+              &rarr;
+            </button>
+          </div>
+          <div className="mb-4 flex justify-end">
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                setMonthOffset(0);
+                setSelectedDay(now.getDate());
+              }}
+            >
+              Ir para hoje
+            </button>
+          </div>
 
         <div className="grid grid-cols-7 gap-1 mb-2">
           {["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"].map((d) => (

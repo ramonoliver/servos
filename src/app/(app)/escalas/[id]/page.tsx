@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase/client";
 import { suggestSubstitute } from "@/lib/ai/engine";
 import { formatDate, getDayOfWeek, getInitials, getIconEmoji } from "@/lib/utils/helpers";
 import { Modal } from "@/components/ui";
+import { MentionInput } from "@/components/ui/mention-input";
 import Link from "next/link";
 import type {
   Schedule,
@@ -1510,19 +1511,14 @@ export default function EscalaDetailPage({ params }: { params: { id: string } })
           </div>
 
           <div className="px-4 py-3 border-t border-border-soft flex gap-2">
-            <input
+            <MentionInput
               value={chatMsg}
-              onChange={(e) => setChatMsg(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendChat();
-                }
-              }}
-              placeholder="Mensagem para a equipe..."
-              className="input-field flex-1 py-2"
-              maxLength={500}
+              onChange={setChatMsg}
+              onSend={sendChat}
+              placeholder="Digite @ para mencionar alguém..."
               disabled={!chatAvailable || sendingChat || !canAccessScheduleChat}
+              scheduleId={schedule.id}
+              churchId={user.church_id}
             />
 
             <button

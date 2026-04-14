@@ -4,6 +4,12 @@ import {
   sendSmsScheduleReminder,
 } from "@/lib/email/send";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { sendUserNotification } from "@/lib/server/notification-service";
+import {
+  getUserReminderProfile,
+  buildScheduleReminderText,
+  type ReminderStage,
+} from "@/lib/server/behavior-analysis-service";
 import type { Department, Event, Schedule, User } from "@/types";
 
 type ScheduleContext = {
@@ -12,10 +18,13 @@ type ScheduleContext = {
   department: Department | null;
 };
 
+type ChannelSummary = { sent: number; failed: number; skipped: number };
+
 type DeliveryResult = {
-  email: { sent: number; failed: number; skipped: number };
-  sms: { sent: number; failed: number; skipped: number };
-  failed: Array<{ userId: string; channel: "email" | "sms"; error: string }>;
+  email: ChannelSummary;
+  sms: ChannelSummary;
+  push: ChannelSummary;
+  failed: Array<{ userId: string; channel: "email" | "sms" | "push"; error: string }>;
 };
 
 async function getScheduleContext(scheduleId: string, churchId: string): Promise<ScheduleContext | null> {
@@ -50,13 +59,14 @@ function emptyDeliveryResult(): DeliveryResult {
   return {
     email: { sent: 0, failed: 0, skipped: 0 },
     sms: { sent: 0, failed: 0, skipped: 0 },
+    push: { sent: 0, failed: 0, skipped: 0 },
     failed: [],
   };
 }
 
 function trackChannelResult(
   summary: DeliveryResult,
-  channel: "email" | "sms",
+  channel: "email" | "sms" | "push",
   status: "sent" | "failed" | "skipped",
   userId: string,
   error?: string | null
@@ -110,9 +120,10 @@ export async function sendScheduleAssignmentAlerts(params: {
 export async function sendScheduleReminderAlerts(params: {
   churchId: string;
   scheduleId: string;
+  stage: ReminderStage;
   onlyPending?: boolean;
 }) {
-  const { churchId, scheduleId, onlyPending = false } = params;
+  const { churchId, scheduleId, stage, onlyPending = false } = params;
   const supabase = getSupabaseServerClient();
   const context = await getScheduleContext(scheduleId, churchId);
 
@@ -143,6 +154,18 @@ export async function sendScheduleReminderAlerts(params: {
   const summary = emptyDeliveryResult();
 
   for (const user of (users || []) as User[]) {
+    const member = (scheduleMembers || []).find((item) => item.user_id === user.id);
+    if (!member) continue;
+
+    const profile = await getUserReminderProfile(user.id, churchId);
+    const reminder = buildScheduleReminderText({
+      profile,
+      stage,
+      status: member.status,
+      departmentName: context.department?.name || "Ministério",
+      time: context.schedule.time,
+    });
+
     if (user.email) {
       try {
         await sendScheduleReminderEmail({
@@ -177,6 +200,33 @@ export async function sendScheduleReminderAlerts(params: {
     });
 
     trackChannelResult(summary, "sms", smsResult.status, user.id, smsResult.error);
+
+    try {
+      const pushResult = await sendUserNotification({
+        userId: user.id,
+        churchId,
+        title: reminder.title,
+        body: reminder.body,
+        actionUrl: `/escalas/${encodeURIComponent(scheduleId)}`,
+        type: reminder.type,
+      });
+      if (pushResult.pushSent > 0) {
+        trackChannelResult(summary, "push", "sent", user.id);
+      } else {
+        trackChannelResult(summary, "push", "skipped", user.id);
+      }
+      if (pushResult.pushFailed > 0) {
+        trackChannelResult(summary, "push", "failed", user.id, "Falha ao enviar push.");
+      }
+    } catch (error) {
+      trackChannelResult(
+        summary,
+        "push",
+        "failed",
+        user.id,
+        error instanceof Error ? error.message : "Falha ao enviar push."
+      );
+    }
   }
 
   return summary;

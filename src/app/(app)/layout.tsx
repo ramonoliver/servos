@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { AppProvider, useApp } from "@/hooks/use-app";
 import { Avatar } from "@/components/ui";
-import { supabase } from "@/lib/supabase/client";
 import { getIconEmoji } from "@/lib/utils/helpers";
 import { SupportButton } from "@/components/shared/support-button";
 import type { User } from "@/types";
@@ -128,46 +127,11 @@ function UserAvatar({ user, size = 32 }: { user: User; size?: number }) {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  const { user, church, departments, canDo, logout } = useApp();
+  const { user, church, departments, canDo, logout, unreadNotifications } = useApp();
   const pathname = usePathname();
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [unreadNotifs, setUnreadNotifs] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    let interval: ReturnType<typeof setInterval> | null = null;
-
-    async function loadUnreadNotifications() {
-      const { count, error } = await supabase
-        .from("notifications")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("read", false);
-
-      if (error) {
-        console.error("Erro ao carregar notificações não lidas:", error);
-        return;
-      }
-
-      if (!cancelled) {
-        setUnreadNotifs(count || 0);
-      }
-    }
-
-    loadUnreadNotifications();
-
-    interval = setInterval(() => {
-      void loadUnreadNotifications();
-    }, 12000);
-
-    return () => {
-      cancelled = true;
-      if (interval) clearInterval(interval);
-    };
-  }, [user.id, pathname]);
-
   useEffect(() => {
     function syncViewport() {
       setIsMobile(window.innerWidth < 1024);
@@ -196,7 +160,8 @@ function Shell({ children }: { children: React.ReactNode }) {
     { href: "/membros", label: "Membros", icon: "user", show: canDo("member.view") },
     { href: "/eventos", label: "Eventos", icon: "star", show: canDo("event.view") && !isMember },
     { href: "/calendario", label: "Calendário", icon: "calendar-days", show: true },
-    { href: "/notificacoes", label: "Notificações", icon: "bell", show: true, badge: unreadNotifs || undefined },
+    { href: "/notificacoes", label: "Notificações", icon: "bell", show: true, badge: unreadNotifications || undefined },
+    { href: "/rankings", label: "Ranking", icon: "bar-chart", show: true },
     { href: "/mensagens", label: "Mensagens", icon: "message-circle", show: canDo("message.send") },
     { href: "/relatorios", label: "Relatórios", icon: "bar-chart", show: canDo("report.view") },
     { href: "/configuracoes", label: "Configurações", icon: "settings", show: isAdmin },

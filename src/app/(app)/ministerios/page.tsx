@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { getIconEmoji, getInitials } from "@/lib/utils/helpers";
-import { Modal } from "@/components/ui";
+import { ConfirmDialog, Modal } from "@/components/ui";
 import Link from "next/link";
 import type { Department, User, DepartmentMember } from "@/types";
 
@@ -123,6 +123,7 @@ export default function MinisteriosPage() {
                         }}
                         className="w-8 h-8 rounded-full bg-white/90 shadow-sm flex items-center justify-center text-xs text-ink opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                         title="Editar ministério"
+                        aria-label="Editar ministério"
                       >
                         &#9998;
                       </button>
@@ -137,6 +138,7 @@ export default function MinisteriosPage() {
                         }}
                         className="w-8 h-8 rounded-full bg-white/90 shadow-sm flex items-center justify-center text-xs text-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                         title="Excluir ministério"
+                        aria-label="Excluir ministério"
                       >
                         &#10005;
                       </button>
@@ -189,25 +191,13 @@ export default function MinisteriosPage() {
       )}
 
       {modal?.type === "delete" && (
-        <Modal
-          title="Excluir Ministério"
-          close={() => setModal(null)}
-          width={420}
-          footer={
-            <>
-              <button onClick={() => setModal(null)} className="btn btn-secondary">
-                Cancelar
-              </button>
-              <button onClick={() => deleteDept(modal.dept)} className="btn btn-danger">
-                Excluir
-              </button>
-            </>
-          }
-        >
-          <div className="bg-danger-light text-danger text-sm px-4 py-3 rounded-[10px] border border-danger/10">
-            Excluir <strong>{modal.dept.name}</strong>?
-          </div>
-        </Modal>
+        <ConfirmDialog
+          title="Excluir ministério"
+          message={`Você está prestes a excluir <strong>${modal.dept.name}</strong>.`}
+          confirmLabel="Excluir"
+          onCancel={() => setModal(null)}
+          onConfirm={() => void deleteDept(modal.dept)}
+        />
       )}
     </div>
   );

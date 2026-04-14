@@ -7,7 +7,67 @@ export type UserStatus = "active" | "inactive" | "paused" | "vacation";
 export type ScheduleStatus = "draft" | "active" | "cancelled" | "completed";
 export type ConfirmStatus = "pending" | "confirmed" | "declined";
 export type EventType = "recurring" | "special";
-export type NotificationType = "info" | "reminder" | "confirmation" | "alert" | "welcome" | "substitution";
+export type NotificationType =
+  | "info"
+  | "reminder"
+  | "confirmation"
+  | "alert"
+  | "welcome"
+  | "substitution"
+  | "points"
+  | "badge";
+
+export interface PushToken {
+  id: string;
+  user_id: string;
+  church_id: string;
+  token: string;
+  platform: string;
+  device_name: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PointsHistory {
+  id: string;
+  user_id: string;
+  church_id: string;
+  schedule_id: string | null;
+  reason: string;
+  points: number;
+  created_at: string;
+}
+
+export interface Badge {
+  id: string;
+  church_id: string;
+  key: string;
+  name: string;
+  description: string;
+  icon: string;
+  created_at: string;
+}
+
+export interface UserBadge {
+  id: string;
+  badge_id: string;
+  church_id: string;
+  user_id: string;
+  unlocked_at: string;
+}
+
+export interface MonthlyRanking {
+  id: string;
+  church_id: string;
+  month: string;
+  user_id: string;
+  points: number;
+  services: number;
+  absences: number;
+  rank: number;
+  created_at: string;
+}
 
 export interface Church {
   id: string;

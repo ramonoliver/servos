@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { getSession } from "@/lib/auth/session";
 import { formatInviteOpenedAt } from "@/lib/invitations";
 import { getInitials } from "@/lib/utils/helpers";
+import { ConfirmDialog } from "@/components/ui";
 import Link from "next/link";
 import type { User, DepartmentMember, MemberInvitation } from "@/types";
 
@@ -64,6 +65,7 @@ export default function MembrosPage() {
   const [loading, setLoading] = useState(true);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [openActionsFor, setOpenActionsFor] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ member: User; action: "deactivate" | "reactivate" | "hard_delete" } | null>(null);
   const actionsMenuRef = useRef<HTMLDivElement | null>(null);
 
   async function loadData() {
@@ -176,15 +178,6 @@ export default function MembrosPage() {
     m: User,
     action: "deactivate" | "reactivate" | "hard_delete"
   ) {
-    const confirmationMessage =
-      action === "reactivate"
-        ? `Reativar ${m.name}?`
-        : action === "hard_delete"
-        ? `Excluir ${m.name} permanentemente e apagar os dados relacionados?`
-        : `Desativar ${m.name}?`;
-
-    if (!confirm(confirmationMessage)) return;
-
     try {
       const response = await fetch("/api/members/deactivate", {
         method: "POST",
@@ -247,6 +240,8 @@ export default function MembrosPage() {
           ? "Erro ao excluir membro."
           : "Erro ao desativar membro."
       );
+    } finally {
+      setPendingAction(null);
     }
   }
 
@@ -493,7 +488,7 @@ export default function MembrosPage() {
 
                       {canDo("member.remove") && m.id !== user.id && m.active && (
                         <button
-                          onClick={() => changeMemberState(m, "deactivate")}
+                          onClick={() => setPendingAction({ member: m, action: "deactivate" })}
                           className="w-full text-left rounded-xl px-3 py-2 text-sm text-amber-700 hover:bg-amber-light"
                         >
                           Desativar membro
@@ -502,7 +497,7 @@ export default function MembrosPage() {
 
                       {canDo("member.remove") && m.id !== user.id && !m.active && (
                         <button
-                          onClick={() => changeMemberState(m, "reactivate")}
+                          onClick={() => setPendingAction({ member: m, action: "reactivate" })}
                           className="w-full text-left rounded-xl px-3 py-2 text-sm text-success hover:bg-success-light"
                         >
                           Reativar membro
@@ -511,7 +506,7 @@ export default function MembrosPage() {
 
                       {user.role === "admin" && canDo("member.remove") && m.id !== user.id && (
                         <button
-                          onClick={() => changeMemberState(m, "hard_delete")}
+                          onClick={() => setPendingAction({ member: m, action: "hard_delete" })}
                           className="w-full text-left rounded-xl px-3 py-2 text-sm text-danger hover:bg-danger-light"
                         >
                           Excluir permanentemente
@@ -526,6 +521,34 @@ export default function MembrosPage() {
           })
         )}
       </div>
+      {pendingAction && (
+        <ConfirmDialog
+          title={
+            pendingAction.action === "reactivate"
+              ? "Reativar membro"
+              : pendingAction.action === "hard_delete"
+              ? "Excluir membro permanentemente"
+              : "Desativar membro"
+          }
+          message={
+            pendingAction.action === "reactivate"
+              ? `Você está prestes a reativar <strong>${pendingAction.member.name}</strong>.`
+              : pendingAction.action === "hard_delete"
+              ? `Esta ação excluirá <strong>${pendingAction.member.name}</strong> e dados relacionados de forma permanente.`
+              : `Você está prestes a desativar <strong>${pendingAction.member.name}</strong>.`
+          }
+          confirmLabel={
+            pendingAction.action === "reactivate"
+              ? "Reativar"
+              : pendingAction.action === "hard_delete"
+              ? "Excluir permanentemente"
+              : "Desativar"
+          }
+          variant={pendingAction.action === "reactivate" ? "success" : "danger"}
+          onCancel={() => setPendingAction(null)}
+          onConfirm={() => void changeMemberState(pendingAction.member, pendingAction.action)}
+        />
+      )}
     </div>
   );
 }
