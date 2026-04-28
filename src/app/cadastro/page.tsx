@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createSession } from "@/lib/auth/session";
 import Link from "next/link";
 
 const WEEKDAY_OPTIONS = [
@@ -88,7 +87,6 @@ export default function CadastroPage() {
         return;
       }
 
-      createSession(data.user, data.token);
       router.push("/onboarding");
     } catch (err: any) {
       setError(err?.message || "Erro ao criar conta.");

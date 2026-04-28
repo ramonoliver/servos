@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/hooks/use-app";
-import { updateSession } from "@/lib/auth/session";
 import { getInitials } from "@/lib/utils/helpers";
 import { AvailabilityEditor, Skeleton } from "@/components/ui";
 
@@ -62,10 +61,8 @@ export default function PerfilPage() {
       setSummaryLoading(true);
       setSummaryError("");
       try {
-        const authToken = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("servos_session") || "null")?.token : null;
         const response = await fetch("/api/profile/summary", {
           credentials: "include",
-          headers: authToken ? { "x-servos-auth": authToken } : undefined,
         });
         const data = await response.json().catch(() => null);
         if (response.ok && data?.success) {
@@ -92,13 +89,11 @@ export default function PerfilPage() {
 
     setSavingProfile(true);
     try {
-      const authToken = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("servos_session") || "null")?.token : null;
       const response = await fetch("/api/profile/update", {
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...(authToken ? { "x-servos-auth": authToken } : {}),
         },
         body: JSON.stringify({
           name: name.trim(),
@@ -116,7 +111,6 @@ export default function PerfilPage() {
         return;
       }
 
-      updateSession({ name: name.trim() });
       await refresh();
       toast("Perfil atualizado!");
     } catch (error) {
@@ -145,13 +139,11 @@ export default function PerfilPage() {
 
     setSavingPassword(true);
     try {
-      const authToken = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("servos_session") || "null")?.token : null;
       const response = await fetch("/api/profile/change-password", {
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...(authToken ? { "x-servos-auth": authToken } : {}),
         },
         body: JSON.stringify({
           currentPassword: curPw,

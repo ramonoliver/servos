@@ -290,7 +290,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           <button
             onClick={() => (isMobile ? setMobileNavOpen(true) : setDesktopCollapsed(!desktopCollapsed))}
             className="text-ink-muted hover:text-ink p-1 -ml-1"
-            aria-label="Abrir menu"
+            aria-label={isMobile ? "Abrir menu" : desktopCollapsed ? "Expandir menu" : "Recolher menu"}
+            aria-expanded={isMobile ? mobileNavOpen : !desktopCollapsed}
           >
             <SvgIcon name="menu" size={20} />
           </button>

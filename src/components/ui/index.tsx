@@ -11,17 +11,44 @@ export function Modal({
   title: string; children: React.ReactNode; footer?: React.ReactNode; close: () => void; width?: number;
 }) {
   const closeButtonRef = React.useRef<HTMLButtonElement | null>(null);
+  const dialogRef = React.useRef<HTMLDivElement | null>(null);
   const previousFocusRef = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
     previousFocusRef.current = document.activeElement as HTMLElement | null;
     closeButtonRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+      if (event.key === "Escape") {
+        close();
+        return;
+      }
+
+      if (event.key !== "Tab" || !dialogRef.current) return;
+
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((element) => !element.hasAttribute("disabled") && element.offsetParent !== null);
+
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
       previousFocusRef.current?.focus();
     };
   }, [close]);
@@ -32,7 +59,7 @@ export function Modal({
       onClick={e => e.target === e.currentTarget && close()}
       role="presentation"
     >
-      <div className="bg-white rounded-xl w-full shadow-xl max-h-[90vh] overflow-y-auto animate-in" style={{ maxWidth: width }} role="dialog" aria-modal="true" aria-label={title}>
+      <div ref={dialogRef} className="bg-white rounded-xl w-full shadow-xl max-h-[90vh] overflow-y-auto animate-in" style={{ maxWidth: width }} role="dialog" aria-modal="true" aria-label={title}>
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border-soft sticky top-0 bg-white z-[1] rounded-t-xl">
           <span className="font-display text-xl">{title}</span>
           <button ref={closeButtonRef} onClick={close} className="w-8 h-8 rounded-full bg-surface-alt flex items-center justify-center hover:bg-border text-ink-muted transition-colors" aria-label="Fechar modal">&times;</button>
@@ -67,7 +94,9 @@ export function ConfirmDialog({
   return (
     <Modal title={title} close={onCancel} width={420}
       footer={<><button onClick={onCancel} className="btn btn-secondary">{cancelLabel}</button><button onClick={onConfirm} className={colors.btn}>{confirmLabel}</button></>}>
-      <div className={`${colors.bg} ${colors.text} text-sm px-4 py-3 rounded-[10px] border ${colors.border}`} dangerouslySetInnerHTML={{ __html: message }} />
+      <div className={`${colors.bg} ${colors.text} text-sm px-4 py-3 rounded-[10px] border ${colors.border}`}>
+        {message}
+      </div>
     </Modal>
   );
 }

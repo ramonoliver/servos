@@ -78,13 +78,11 @@ export function usePushNotifications(userId: string | null, toast: (message: str
         return false;
       }
 
-      const authToken = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("servos_session") || "null")?.token : null;
       const response = await fetch("/api/notifications/register-push", {
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...(authToken ? { "x-servos-auth": authToken } : {}),
         },
         body: JSON.stringify({ token, platform: "web", deviceName: window.navigator.userAgent }),
       });

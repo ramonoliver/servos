@@ -5,11 +5,14 @@ export const AUTH_COOKIE_NAME = "servos_auth";
 const SEVEN_DAYS = 7 * 24 * 60 * 60;
 
 function getSessionSecret() {
-  return (
-    process.env.AUTH_SESSION_SECRET ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    "servos-dev-session-secret"
-  );
+  const secret = process.env.AUTH_SESSION_SECRET;
+  if (secret) return secret;
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("AUTH_SESSION_SECRET is required in production.");
+  }
+
+  return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "servos-dev-session-secret";
 }
 
 function toBase64Url(value: string) {
@@ -75,7 +78,8 @@ export function decodeSessionToken(token?: string | null): Session | null {
 }
 
 export function buildSessionCookie(token: string) {
-  return `${AUTH_COOKIE_NAME}=${token}; Path=/; Max-Age=${SEVEN_DAYS}; HttpOnly; SameSite=Lax`;
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${AUTH_COOKIE_NAME}=${token}; Path=/; Max-Age=${SEVEN_DAYS}; HttpOnly; SameSite=Lax${secure}`;
 }
 
 export function buildClearSessionCookie() {

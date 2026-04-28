@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import { getSession } from "@/lib/auth/session";
 import { getIconEmoji, genId } from "@/lib/utils/helpers";
+import type { Session } from "@/types";
 import type { Church, User, Department, Event } from "@/types";
 
 type OnboardingProgress = {
@@ -62,9 +62,11 @@ export default function OnboardingPage() {
   const [eventTime, setEventTime] = useState("18:00");
 
   async function loadData() {
-    const session = getSession();
+    const sessionResponse = await fetch("/api/auth/session", { credentials: "include" });
+    const sessionPayload = await sessionResponse.json().catch(() => null);
+    const session = sessionPayload?.session as Session | undefined;
 
-    if (!session) {
+    if (!sessionResponse.ok || !session) {
       router.replace("/login");
       return;
     }

@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import { getSession, clearSession, updateSession } from "@/lib/auth/session";
+import { clearSession } from "@/lib/auth/session";
 import { can, type Action } from "@/lib/auth/permissions";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import type { User, Church, Department, Session } from "@/types";
@@ -53,119 +53,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refresh = useCallback(async () => {
-    const localSession = getSession();
-
-    if (!localSession) {
-      router.replace("/login");
-      return;
-    }
-
-    const sessionResponse = await fetch("/api/auth/session", {
+    const bootstrapResponse = await fetch("/api/app/bootstrap", {
       method: "GET",
       credentials: "include",
-      headers: {
-        ...(localSession.token ? { "x-servos-auth": localSession.token } : {}),
-      },
     });
 
-    const sessionPayload = await sessionResponse.json().catch(() => null);
+    const bootstrapPayload = await bootstrapResponse.json().catch(() => null);
 
-    if (!sessionResponse.ok || !sessionPayload?.authenticated || !sessionPayload?.session) {
+    if (!bootstrapResponse.ok || !bootstrapPayload?.success) {
       clearSession();
       router.replace("/login");
       return;
     }
 
-    const s = {
-      ...localSession,
-      ...sessionPayload.session,
-      token: sessionPayload.token || localSession.token,
-    } as Session;
-
-    updateSession({
-      ...sessionPayload.session,
-      token: sessionPayload.token || localSession.token,
-    });
-
-    // ===== USER =====
-    const { data: u, error: userError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", s.user_id)
-      .single();
-
-    if (userError || !u) {
-      clearSession();
-      router.replace("/login");
-      return;
-    }
-
-    // ===== CHURCH =====
-    const { data: c, error: churchError } = await supabase
-      .from("churches")
-      .select("*")
-      .eq("id", u.church_id)
-      .single();
-
-    if (churchError || !c) {
-      clearSession();
-      router.replace("/login");
-      return;
-    }
-
-    // ===== DEPARTMENTS =====
-    const { data: depts, error: deptError } = await supabase
-      .from("departments")
-      .select("*")
-      .eq("church_id", u.church_id);
-
-    if (deptError) {
-      console.error("Erro ao buscar departamentos:", deptError);
-      setLoading(false);
-      return;
-    }
-
-    const { data: departmentLinks, error: departmentLinksError } = await supabase
-      .from("department_members")
-      .select("department_id")
-      .eq("user_id", u.id);
-
-    if (departmentLinksError) {
-      console.error("Erro ao buscar vínculos do usuário:", departmentLinksError);
-      setLoading(false);
-      return;
-    }
-
-    const leadDeptIds = (depts || [])
-      .filter((d: any) =>
-        (d.leader_ids || []).includes(u.id) ||
-        (d.co_leader_ids || []).includes(u.id)
-      )
-      .map((d: any) => d.id);
-
-    const memberDeptIds = ((departmentLinks || []) as Array<{ department_id: string }>).map(
-      (link) => link.department_id
-    );
-
-    const visibleDepartments =
-      u.role === "admin"
-        ? ((depts || []) as Department[])
-        : u.role === "leader"
-        ? ((depts || []) as Department[]).filter((dept) => leadDeptIds.includes(dept.id))
-        : ((depts || []) as Department[]).filter((dept) => memberDeptIds.includes(dept.id));
-
-    const permissionDeptIds =
-      u.role === "admin"
-        ? ((depts || []) as Department[]).map((dept) => dept.id)
-        : u.role === "leader"
-        ? leadDeptIds
-        : memberDeptIds;
-
-    setUser(u as User);
-    setSessionState(s);
-    setChurch(c as Church);
-    setDepartments(visibleDepartments);
-    setUserDeptIds(permissionDeptIds);
+    setUser(bootstrapPayload.user as User);
+    setSessionState(bootstrapPayload.session as Session);
+    setChurch(bootstrapPayload.church as Church);
+    setDepartments((bootstrapPayload.departments || []) as Department[]);
+    setUserDeptIds(bootstrapPayload.userDeptIds || []);
     setLoading(false);
   }, [router]);
 

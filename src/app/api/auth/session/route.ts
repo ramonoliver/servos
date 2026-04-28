@@ -8,7 +8,8 @@ import {
 
 export async function GET(req: Request) {
   const cookieSession = getSessionFromCookieHeader(req.headers.get("cookie"));
-  const headerSession = decodeSessionToken(req.headers.get("x-servos-auth"));
+  const headerSession =
+    process.env.NODE_ENV === "production" ? null : decodeSessionToken(req.headers.get("x-servos-auth"));
   const session = cookieSession || headerSession;
 
   if (!session) {
@@ -16,12 +17,13 @@ export async function GET(req: Request) {
   }
 
   const token = encodeSessionToken(session);
-  const response = NextResponse.json({ authenticated: true, session, token });
+  const response = NextResponse.json({ authenticated: true, session });
 
   if (!cookieSession) {
     response.cookies.set(AUTH_COOKIE_NAME, token, {
       httpOnly: true,
       sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: 7 * 24 * 60 * 60,
     });

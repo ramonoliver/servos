@@ -241,11 +241,11 @@ export function MemberEditModal({
                       : "border-border-soft bg-white hover:border-ink-ghost"
                   }`}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => toggleDepartment(dept.id)}
-                      className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center text-[11px] font-bold transition-all ${
+                      className={`w-5 h-5 rounded-md border-2 flex shrink-0 items-center justify-center text-[11px] font-bold transition-all ${
                         selected
                           ? "bg-brand border-brand text-white"
                           : "border-border bg-white text-transparent"

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createSession } from "@/lib/auth/session";
 import Link from "next/link";
 
 export default function LoginPage() {
@@ -35,7 +34,6 @@ export default function LoginPage() {
         return;
       }
 
-      createSession(data.user, data.token);
       router.push("/dashboard");
     } catch (err: any) {
       setError(err?.message || "Erro ao entrar.");

@@ -448,11 +448,11 @@ function AddMemberModal({
                       : "border-border-soft bg-white"
                   }`}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => toggleUser(member.id)}
-                      className={`mt-1 w-5 h-5 rounded-md border-2 flex items-center justify-center text-[11px] font-bold transition-all ${
+                      className={`w-5 h-5 rounded-md border-2 flex shrink-0 items-center justify-center text-[11px] font-bold transition-all ${
                         selected
                           ? "bg-brand border-brand text-white"
                           : "border-border bg-white text-transparent"
