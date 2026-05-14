@@ -45,6 +45,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Sem permissao para convidar membros." }, { status: 403 });
     }
 
+    const allowedRoles: Record<string, string[]> = {
+      admin: ["admin", "leader", "member"],
+      leader: ["member"],
+    };
+    if (!allowedRoles[actor.role]?.includes(role)) {
+      return NextResponse.json({ error: "Sem permissao para atribuir este perfil." }, { status: 403 });
+    }
+
     const churchId = session!.church_id;
     const invitedByUserId = session!.user_id;
     const supabase = getSupabaseServerClient();
