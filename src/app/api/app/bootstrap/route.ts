@@ -16,21 +16,32 @@ export async function GET(req: Request) {
     }
 
     const supabase = getSupabaseServerClient();
-    const [{ data: user, error: userError }, { data: church, error: churchError }, { data: depts, error: deptError }, { data: departmentLinks, error: linksError }] =
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const restHeaders = {
+      "apikey": supabaseKey,
+      "Authorization": `Bearer ${supabaseKey}`,
+      "Content-Type": "application/json",
+    };
+
+    const [{ data: user, error: userError }, { data: church, error: churchError }, deptsRes, { data: departmentLinks, error: linksError }] =
       await Promise.all([
         supabase.from("users").select("*").eq("id", session.user_id).eq("church_id", session.church_id).single(),
         supabase.from("churches").select("*").eq("id", session.church_id).single(),
-        supabase.from("departments").select("*").eq("church_id", session.church_id),
+        fetch(`${supabaseUrl}/rest/v1/departments?select=*&church_id=eq.${session.church_id}`, { headers: restHeaders, cache: "no-store" }),
         supabase.from("department_members").select("department_id").eq("user_id", session.user_id),
       ]);
 
     if (userError) throw userError;
     if (churchError) throw churchError;
-    if (deptError) throw deptError;
+    if (!deptsRes.ok) throw new Error(`departments fetch failed: ${deptsRes.status}`);
     if (linksError) throw linksError;
+
+    const depts = await deptsRes.json();
 
     const allDepartments = (depts || []) as Department[];
     const currentUser = user as User;
+    console.log("[bootstrap] user_id:", session.user_id, "church_id:", session.church_id, "role:", currentUser.role, "depts:", allDepartments.length, "names:", allDepartments.map(d => d.name));
     const leadDeptIds = allDepartments
       .filter(
         (department) =>

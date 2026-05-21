@@ -19,5 +19,10 @@ export function getSupabaseServerClient() {
       autoRefreshToken: false,
       persistSession: false,
     },
+    global: {
+      headers: {
+        Authorization: `Bearer ${supabaseKey}`,
+      },
+    },
   });
 }

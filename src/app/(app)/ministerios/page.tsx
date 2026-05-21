@@ -21,25 +21,29 @@ export default function MinisteriosPage() {
   const [allDM, setAllDM] = useState<DepartmentMember[]>([]);
   const [loading, setLoading] = useState(true);
 
-  async function loadData() {
-    setLoading(true);
+  async function loadData(silent = false) {
+    if (!silent) setLoading(true);
+
+    const deptIds = departments.map((d) => d.id);
 
     const [{ data: usersData, error: usersError }, { data: dmData, error: dmError }] =
       await Promise.all([
         supabase.from("users").select("*").eq("church_id", user.church_id).eq("active", true),
-        supabase.from("department_members").select("*"),
+        deptIds.length > 0
+          ? supabase.from("department_members").select("*").in("department_id", deptIds)
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
     if (usersError || dmError) {
       console.error({ usersError, dmError });
-      toast("Erro ao carregar ministérios.");
-      setLoading(false);
+      if (!silent) toast("Erro ao carregar ministérios.");
+      if (!silent) setLoading(false);
       return;
     }
 
     setMembers((usersData || []) as User[]);
     setAllDM((dmData || []) as DepartmentMember[]);
-    setLoading(false);
+    if (!silent) setLoading(false);
   }
 
   useEffect(() => {
@@ -69,7 +73,7 @@ export default function MinisteriosPage() {
       await refresh();
       await loadData();
     } catch (error) {
-      console.error("Erro ao excluir ministério:", error);
+      console.error("Erro ao excluir ministériodois:", error);
       toast("Erro ao excluir ministério.");
     }
   }
@@ -185,7 +189,7 @@ export default function MinisteriosPage() {
           onSaved={async () => {
             setModal(null);
             await refresh();
-            await loadData();
+            await loadData(true);
           }}
         />
       )}
@@ -213,6 +217,7 @@ function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
   const [newFunctionName, setNewFunctionName] = useState("");
   const [leaderIds, setLeaderIds] = useState<string[]>(dept?.leader_ids || [user.id]);
   const [coLeaderIds, setCoLeaderIds] = useState<string[]>(dept?.co_leader_ids || []);
+  const [isSaving, setIsSaving] = useState(false);
 
   function toggleList(list: string[], setList: (v: string[]) => void, id: string) {
     setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
@@ -238,6 +243,8 @@ function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
       toast("Informe o nome.");
       return;
     }
+    if (isSaving) return;
+    setIsSaving(true);
 
     const data = {
       name,
@@ -262,16 +269,17 @@ function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
 
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        console.error("Erro ao salvar ministério:", payload);
         toast(payload?.error || "Erro ao salvar ministério.");
         return;
       }
 
       toast(isEdit ? "Atualizado!" : "Criado!");
-      onSaved();
+      await onSaved();
     } catch (error) {
       console.error("Erro ao salvar ministério:", error);
       toast("Erro ao salvar ministério.");
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -284,11 +292,11 @@ function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
       width={520}
       footer={
         <>
-          <button onClick={close} className="btn btn-secondary">
+          <button type="button" onClick={close} className="btn btn-secondary" disabled={isSaving}>
             Cancelar
           </button>
-          <button onClick={save} className="btn btn-primary">
-            {isEdit ? "Salvar" : "Criar"}
+          <button type="button" onClick={save} className="btn btn-primary" disabled={isSaving}>
+            {isSaving ? "Salvando..." : isEdit ? "Salvar" : "Criar"}
           </button>
         </>
       }

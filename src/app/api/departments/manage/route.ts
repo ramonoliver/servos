@@ -2,8 +2,47 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiActor } from "@/lib/auth/api-session";
 import { can } from "@/lib/auth/permissions";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { genId } from "@/lib/utils/helpers";
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const REST = `${SUPABASE_URL}/rest/v1`;
+const headers = {
+  "apikey": SUPABASE_KEY,
+  "Authorization": `Bearer ${SUPABASE_KEY}`,
+  "Content-Type": "application/json",
+  "Prefer": "return=minimal",
+};
+
+async function dbGet(table: string, filter: string) {
+  const res = await fetch(`${REST}/${table}?${filter}`, { headers, cache: "no-store" });
+  if (!res.ok) throw new Error(`${table} GET failed: ${res.status}`);
+  return res.json();
+}
+
+async function dbPost(table: string, body: object) {
+  const res = await fetch(`${REST}/${table}`, { method: "POST", headers, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const msg = await res.text().catch(() => String(res.status));
+    throw new Error(`${table} INSERT failed: ${msg}`);
+  }
+}
+
+async function dbPatch(table: string, filter: string, body: object) {
+  const res = await fetch(`${REST}/${table}?${filter}`, { method: "PATCH", headers, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const msg = await res.text().catch(() => String(res.status));
+    throw new Error(`${table} UPDATE failed: ${msg}`);
+  }
+}
+
+async function dbDelete(table: string, filter: string) {
+  const res = await fetch(`${REST}/${table}?${filter}`, { method: "DELETE", headers });
+  if (!res.ok) {
+    const msg = await res.text().catch(() => String(res.status));
+    throw new Error(`${table} DELETE failed: ${msg}`);
+  }
+}
 
 const departmentDataSchema = z.object({
   name: z.string().trim().min(1),
@@ -33,7 +72,7 @@ export async function POST(req: Request) {
 
     const churchId = session!.church_id;
     const { mode, departmentId, data } = parsed.data;
-    const supabase = getSupabaseServerClient();
+
     if (!actor?.active) {
       return NextResponse.json({ error: "Usuario nao encontrado." }, { status: 404 });
     }
@@ -50,15 +89,30 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Dados do ministerio sao obrigatorios." }, { status: 400 });
       }
 
-      const { error } = await supabase.from("departments").insert({
-        id: genId(),
+      const newDeptId = genId();
+      const now = new Date().toISOString();
+
+      await dbPost("departments", {
+        id: newDeptId,
         church_id: churchId,
         ...data,
         active: true,
-        created_at: new Date().toISOString(),
+        created_at: now,
       });
 
-      if (error) throw error;
+      const leaderIds: string[] = data.leader_ids ?? [];
+      if (leaderIds.length > 0) {
+        const memberRows = leaderIds.map((userId) => ({
+          id: genId(),
+          department_id: newDeptId,
+          user_id: userId,
+          function_name: "Líder",
+          function_names: ["Líder"],
+          joined_at: now,
+        }));
+        await dbPost("department_members", memberRows);
+      }
+
       return NextResponse.json({ success: true });
     }
 
@@ -66,15 +120,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Ministerio nao informado." }, { status: 400 });
     }
 
-    const { data: department, error: departmentError } = await supabase
-      .from("departments")
-      .select("id, church_id")
-      .eq("id", departmentId)
-      .eq("church_id", churchId)
-      .maybeSingle();
-
-    if (departmentError) throw departmentError;
-    if (!department) {
+    const rows = await dbGet("departments", `select=id,church_id&id=eq.${departmentId}&church_id=eq.${churchId}`);
+    if (!rows.length) {
       return NextResponse.json({ error: "Ministerio nao encontrado." }, { status: 404 });
     }
 
@@ -82,31 +129,12 @@ export async function POST(req: Request) {
       if (!data) {
         return NextResponse.json({ error: "Dados do ministerio sao obrigatorios." }, { status: 400 });
       }
-
-      const { error } = await supabase
-        .from("departments")
-        .update(data)
-        .eq("id", departmentId)
-        .eq("church_id", churchId);
-
-      if (error) throw error;
+      await dbPatch("departments", `id=eq.${departmentId}&church_id=eq.${churchId}`, data);
       return NextResponse.json({ success: true });
     }
 
-    const { error: deleteDMError } = await supabase
-      .from("department_members")
-      .delete()
-      .eq("department_id", departmentId);
-
-    if (deleteDMError) throw deleteDMError;
-
-    const { error: deleteDepartmentError } = await supabase
-      .from("departments")
-      .delete()
-      .eq("id", departmentId)
-      .eq("church_id", churchId);
-
-    if (deleteDepartmentError) throw deleteDepartmentError;
+    await dbDelete("department_members", `department_id=eq.${departmentId}`);
+    await dbDelete("departments", `id=eq.${departmentId}&church_id=eq.${churchId}`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

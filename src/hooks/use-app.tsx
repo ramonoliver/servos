@@ -56,6 +56,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const bootstrapResponse = await fetch("/api/app/bootstrap", {
       method: "GET",
       credentials: "include",
+      cache: "no-store",
     });
 
     const bootstrapPayload = await bootstrapResponse.json().catch(() => null);
