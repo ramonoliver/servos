@@ -19,6 +19,7 @@ const bodySchema = z.object({
   mode: z.enum(["create", "update", "delete"]),
   departmentId: z.string().optional(),
   data: departmentDataSchema.optional(),
+  memberIds: z.array(z.string()).default([]),
 });
 
 export async function POST(req: Request) {
@@ -50,15 +51,39 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Dados do ministerio sao obrigatorios." }, { status: 400 });
       }
 
+      const deptId = genId();
       const { error } = await supabase.from("departments").insert({
-        id: genId(),
+        id: deptId,
         church_id: churchId,
         ...data,
         active: true,
         created_at: new Date().toISOString(),
       });
-
       if (error) throw error;
+
+      const now = new Date().toISOString();
+      const dmRows = [
+        ...data.leader_ids.map((uid) => ({
+          id: genId(), department_id: deptId, user_id: uid,
+          function_name: "Líder", function_names: ["Líder"], joined_at: now,
+        })),
+        ...data.co_leader_ids.map((uid) => ({
+          id: genId(), department_id: deptId, user_id: uid,
+          function_name: "Co-líder", function_names: ["Co-líder"], joined_at: now,
+        })),
+        ...parsed.data.memberIds
+          .filter((uid) => !data.leader_ids.includes(uid) && !data.co_leader_ids.includes(uid))
+          .map((uid) => ({
+            id: genId(), department_id: deptId, user_id: uid,
+            function_name: "Membro", function_names: ["Membro"], joined_at: now,
+          })),
+      ];
+
+      if (dmRows.length > 0) {
+        const { error: dmError } = await supabase.from("department_members").insert(dmRows);
+        if (dmError) throw dmError;
+      }
+
       return NextResponse.json({ success: true });
     }
 
@@ -88,8 +113,49 @@ export async function POST(req: Request) {
         .update(data)
         .eq("id", departmentId)
         .eq("church_id", churchId);
-
       if (error) throw error;
+
+      const { data: existingDM } = await supabase
+        .from("department_members")
+        .select("id, user_id")
+        .eq("department_id", departmentId);
+
+      const existingIds = new Set((existingDM || []).map((dm: any) => dm.user_id));
+      const now = new Date().toISOString();
+
+      const allDesiredIds = [
+        ...data.leader_ids,
+        ...data.co_leader_ids,
+        ...parsed.data.memberIds.filter(
+          (uid) => !data.leader_ids.includes(uid) && !data.co_leader_ids.includes(uid)
+        ),
+      ];
+      const desiredSet = new Set(allDesiredIds);
+
+      const toRemove = (existingDM || [])
+        .filter((dm: any) => !desiredSet.has(dm.user_id))
+        .map((dm: any) => dm.id);
+      if (toRemove.length > 0) {
+        await supabase.from("department_members").delete().in("id", toRemove);
+      }
+
+      const toAdd = allDesiredIds.filter((uid) => !existingIds.has(uid));
+      const newRows = toAdd.map((uid) => {
+        const fn = data.leader_ids.includes(uid)
+          ? "Líder"
+          : data.co_leader_ids.includes(uid)
+          ? "Co-líder"
+          : "Membro";
+        return {
+          id: genId(), department_id: departmentId, user_id: uid,
+          function_name: fn, function_names: [fn], joined_at: now,
+        };
+      });
+      if (newRows.length > 0) {
+        const { error: dmError } = await supabase.from("department_members").insert(newRows);
+        if (dmError) throw dmError;
+      }
+
       return NextResponse.json({ success: true });
     }
 
@@ -111,9 +177,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("API departments/manage error:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Falha ao gerenciar ministerio." },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === "object" && error !== null && "message" in error
+        ? String((error as any).message)
+        : "Falha ao gerenciar ministerio.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
