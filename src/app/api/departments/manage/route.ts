@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     if (errorResponse) return errorResponse;
 
     const churchId = session!.church_id;
-    const { mode, departmentId, data } = parsed.data;
+    const { mode, departmentId, data, memberIds } = parsed.data;
     const supabase = getSupabaseServerClient();
     if (!actor?.active) {
       return NextResponse.json({ error: "Usuario nao encontrado." }, { status: 404 });
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
           id: genId(), department_id: deptId, user_id: uid,
           function_name: "Co-líder", function_names: ["Co-líder"], joined_at: now,
         })),
-        ...parsed.data.memberIds
+        ...memberIds
           .filter((uid) => !data.leader_ids.includes(uid) && !data.co_leader_ids.includes(uid))
           .map((uid) => ({
             id: genId(), department_id: deptId, user_id: uid,
@@ -120,23 +120,25 @@ export async function POST(req: Request) {
         .select("id, user_id")
         .eq("department_id", departmentId);
 
-      const existingIds = new Set((existingDM || []).map((dm: any) => dm.user_id));
+      const typedDM = (existingDM || []) as { id: string; user_id: string }[];
+      const existingIds = new Set(typedDM.map((dm) => dm.user_id));
       const now = new Date().toISOString();
 
       const allDesiredIds = [
         ...data.leader_ids,
         ...data.co_leader_ids,
-        ...parsed.data.memberIds.filter(
+        ...memberIds.filter(
           (uid) => !data.leader_ids.includes(uid) && !data.co_leader_ids.includes(uid)
         ),
       ];
       const desiredSet = new Set(allDesiredIds);
 
-      const toRemove = (existingDM || [])
-        .filter((dm: any) => !desiredSet.has(dm.user_id))
-        .map((dm: any) => dm.id);
+      const toRemove = typedDM
+        .filter((dm) => !desiredSet.has(dm.user_id))
+        .map((dm) => dm.id);
       if (toRemove.length > 0) {
-        await supabase.from("department_members").delete().in("id", toRemove);
+        const { error: removeError } = await supabase.from("department_members").delete().in("id", toRemove);
+        if (removeError) throw removeError;
       }
 
       const toAdd = allDesiredIds.filter((uid) => !existingIds.has(uid));
