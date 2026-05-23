@@ -243,3 +243,6 @@ export function RoleBadge({ role }: { role: string }) {
 export function CoupleBadge({ spouseName }: { spouseName: string }) {
   return <span className="text-[9px] font-semibold text-brand bg-brand-light px-1.5 py-0.5 rounded-full">&#128145; {spouseName.split(" ")[0]}</span>;
 }
+
+export { MultiSelect } from "./multi-select";
+export type { MultiSelectOption } from "./multi-select";
