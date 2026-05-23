@@ -15,6 +15,7 @@ interface AppContextType {
   departments: Department[];
   userDeptIds: string[];
   unreadNotifications: number;
+  setUnreadNotifications: (n: number) => void;
   pushPermission: NotificationPermission | "unsupported";
   pushEnabled: boolean;
   registeringPush: boolean;
@@ -277,6 +278,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         departments,
         userDeptIds,
         unreadNotifications,
+        setUnreadNotifications,
         pushPermission,
         pushEnabled,
         registeringPush,
