@@ -6,6 +6,7 @@ module.exports = {
       colors: {
         bg: "#FAFAF8",
         surface: { DEFAULT: "#FFFFFF", alt: "#F5F4F0", hover: "#EDECE8" },
+        sidebar: { bg: "#F7F7F5", border: "#E9E9E6" },
         ink: { DEFAULT: "#171717", soft: "#333333", muted: "#666666", faint: "#999999", ghost: "#CCCCCC" },
         brand: { DEFAULT: "#F4532A", deep: "#D94420", light: "#FFF0EC", glow: "#FDF5F2" },
         success: { DEFAULT: "#5A8F6E", light: "#EAF3ED", deep: "#3D6B4E" },
