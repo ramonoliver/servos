@@ -73,14 +73,14 @@ export function NotificationPanel({ open, onClose, userId, onMarkAllRead }: Noti
             notifications.map((n) => (
               <Link
                 key={n.id}
-                href={(n as any).action_url ?? "/notificacoes"}
+                href={n.action_url ?? "/notificacoes"}
                 onClick={onClose}
                 className={`flex gap-3 px-5 py-3.5 border-b border-border-soft hover:bg-surface-alt transition-colors ${!n.read ? "bg-brand-light/40" : ""}`}
               >
                 {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-brand mt-1.5 flex-shrink-0" />}
                 <div className={!n.read ? "" : "pl-[18px]"}>
                   <div className="text-[13px] font-semibold text-ink">{n.title}</div>
-                  <div className="text-[12px] text-ink-muted mt-0.5">{n.message}</div>
+                  <div className="text-[12px] text-ink-muted mt-0.5">{n.body}</div>
                 </div>
               </Link>
             ))
