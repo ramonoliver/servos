@@ -26,8 +26,15 @@ export function MultiSelect({ options, selected, onChange, placeholder = "Seleci
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   const selectedOptions = options.filter((o) => selected.includes(o.id));
@@ -49,6 +56,10 @@ export function MultiSelect({ options, selected, onChange, placeholder = "Seleci
       {/* Trigger */}
       <div
         onClick={() => setOpen((v) => !v)}
+        tabIndex={0}
+        role="combobox"
+        aria-expanded={open}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((v) => !v); } }}
         className={`min-h-[44px] w-full px-3 py-2 border-[1.5px] rounded-[12px] bg-white cursor-pointer transition-all flex flex-wrap gap-1.5 items-center ${
           open ? "border-brand ring-[3px] ring-brand/10" : "border-border hover:border-ink-ghost"
         }`}
@@ -59,6 +70,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = "Seleci
         {selectedOptions.map((o) => (
           <span
             key={o.id}
+            title={o.label}
             className="inline-flex items-center gap-1 bg-surface-alt border border-border-soft rounded-full px-2 py-0.5 text-[11px] font-medium text-ink"
           >
             {o.avatarColor && (
@@ -66,20 +78,21 @@ export function MultiSelect({ options, selected, onChange, placeholder = "Seleci
                 className="w-3.5 h-3.5 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[7px] font-bold"
                 style={{ background: o.avatarColor }}
               >
-                {getInitials(o.label)[0]}
+                {getInitials(o.label).charAt(0) || "?"}
               </span>
             )}
             {o.label.split(" ")[0]}
             <button
               type="button"
               onClick={(e) => remove(o.id, e)}
+              aria-label={`Remover ${o.label}`}
               className="text-ink-faint hover:text-danger ml-0.5"
             >
               ×
             </button>
           </span>
         ))}
-        <span className="ml-auto text-ink-ghost text-xs select-none">▾</span>
+        <span className={`ml-auto text-ink-ghost text-xs select-none transition-transform duration-200 ${open ? "rotate-180" : ""}`}>▾</span>
       </div>
 
       {/* Dropdown */}
@@ -110,7 +123,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = "Seleci
                     className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[8px] font-bold"
                     style={{ background: o.avatarColor }}
                   >
-                    {getInitials(o.label)}
+                    {getInitials(o.label).charAt(0) || "?"}
                   </span>
                 )}
                 <div className="min-w-0">
