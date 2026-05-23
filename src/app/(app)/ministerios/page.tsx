@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { getIconEmoji, getInitials } from "@/lib/utils/helpers";
-import { ConfirmDialog, Modal } from "@/components/ui";
+import { ConfirmDialog, Modal, MultiSelect } from "@/components/ui";
+import type { MultiSelectOption } from "@/components/ui";
 import Link from "next/link";
 import type { Department, User, DepartmentMember } from "@/types";
 
@@ -76,23 +77,22 @@ export default function MinisteriosPage() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div className="flex items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="page-title">Ministérios</h1>
-          <p className="page-subtitle">
-            {departments.length} departamentos · edite cada ministério para ajustar líderes e funções
-          </p>
+          <h1 className="font-display text-xl font-bold text-ink">Ministérios</h1>
+          <p className="text-[12px] text-ink-faint mt-0.5">{departments.length} ministérios cadastrados</p>
         </div>
-
         {canDo("department.create") && (
-          <button onClick={() => setModal({ type: "form" })} className="btn btn-primary self-start sm:self-auto">
+          <button onClick={() => setModal({ type: "form" })} className="btn btn-primary btn-sm">
             + Novo
           </button>
         )}
       </div>
 
       {loading ? (
-        <div className="card p-8 text-center text-sm text-ink-faint">Carregando ministérios...</div>
+        <div className="py-12 text-center text-sm text-ink-faint">Carregando ministérios...</div>
+      ) : departments.length === 0 ? (
+        <div className="py-12 text-center text-sm text-ink-faint">Nenhum ministério cadastrado.</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {departments.map((d) => {
@@ -105,38 +105,29 @@ export default function MinisteriosPage() {
               <Link
                 key={d.id}
                 href={`/ministerios/${d.id}`}
-                className="card group cursor-pointer hover:shadow-md transition-shadow"
+                className="group bg-white border border-border-soft rounded-xl overflow-hidden hover:border-black/[.12] hover:shadow-sm transition-all cursor-pointer"
               >
                 <div
-                  className="h-20 flex items-center justify-center text-3xl relative"
-                  style={{ background: d.color + "18" }}
+                  className="h-16 flex items-center justify-center text-3xl relative"
+                  style={{ background: d.color + "22" }}
                 >
                   {getIconEmoji(d.icon)}
 
                   <div className="absolute top-2 right-2 flex items-center gap-1">
                     {canDo("department.edit", d.id) && (
                       <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setModal({ type: "form", dept: d });
-                        }}
-                        className="w-8 h-8 rounded-full bg-white/90 shadow-sm flex items-center justify-center text-xs text-ink opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setModal({ type: "form", dept: d }); }}
+                        className="w-7 h-7 rounded-full bg-white/90 shadow-sm flex items-center justify-center text-xs text-ink opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                         title="Editar ministério"
                         aria-label="Editar ministério"
                       >
                         &#9998;
                       </button>
                     )}
-
                     {canDo("department.delete") && (
                       <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setModal({ type: "delete", dept: d });
-                        }}
-                        className="w-8 h-8 rounded-full bg-white/90 shadow-sm flex items-center justify-center text-xs text-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setModal({ type: "delete", dept: d }); }}
+                        className="w-7 h-7 rounded-full bg-white/90 shadow-sm flex items-center justify-center text-xs text-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                         title="Excluir ministério"
                         aria-label="Excluir ministério"
                       >
@@ -146,27 +137,23 @@ export default function MinisteriosPage() {
                   </div>
                 </div>
 
-                <div className="p-4 space-y-1">
-                  <div className="font-display text-[17px] leading-snug break-words">{d.name}</div>
-                  <div className="text-xs text-ink-muted break-words leading-relaxed">
-                    {count} membros{leaderNames.length ? " · " + leaderNames.join(", ") : ""}
+                <div className="p-4">
+                  <div className="font-display text-[16px] font-semibold text-ink leading-snug">{d.name}</div>
+                  <div className="text-[11px] text-ink-faint mt-0.5">
+                    {count} {count === 1 ? "membro" : "membros"}{leaderNames.length ? " · " + leaderNames.join(", ") : ""}
                   </div>
+                  {d.description && (
+                    <div className="text-xs text-ink-faint leading-relaxed line-clamp-2 mt-1">{d.description}</div>
+                  )}
                   {d.function_names?.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {d.function_names.slice(0, 3).map((functionName) => (
-                        <span key={functionName} className="badge badge-secondary">
-                          {functionName}
-                        </span>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {d.function_names.slice(0, 3).map((fn) => (
+                        <span key={fn} className="badge badge-secondary">{fn}</span>
                       ))}
                       {d.function_names.length > 3 && (
-                        <span className="text-[10px] text-ink-faint self-center">
-                          +{d.function_names.length - 3}
-                        </span>
+                        <span className="text-[10px] text-ink-faint self-center">+{d.function_names.length - 3}</span>
                       )}
                     </div>
-                  )}
-                  {d.description && (
-                    <div className="text-xs text-ink-faint leading-relaxed line-clamp-2 break-words">{d.description}</div>
                   )}
                 </div>
               </Link>
@@ -182,6 +169,7 @@ export default function MinisteriosPage() {
           user={user}
           toast={toast}
           close={() => setModal(null)}
+          allDM={allDM}
           onSaved={async () => {
             setModal(null);
             await refresh();
@@ -203,79 +191,89 @@ export default function MinisteriosPage() {
   );
 }
 
-function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
+function DeptForm({ dept, members, user, toast, close, onSaved, allDM }: {
+  dept?: Department;
+  members: User[];
+  user: User;
+  toast: (msg: string) => void;
+  close: () => void;
+  onSaved: () => void;
+  allDM: DepartmentMember[];
+}) {
   const isEdit = !!dept;
+  const [tab, setTab] = useState<"geral" | "pessoas">("geral");
+
   const [name, setName] = useState(dept?.name || "");
   const [desc, setDesc] = useState(dept?.description || "");
   const [icon, setIcon] = useState(dept?.icon || "church");
   const [color, setColor] = useState(dept?.color || "#7B9E87");
   const [functionNames, setFunctionNames] = useState<string[]>(dept?.function_names || []);
   const [newFunctionName, setNewFunctionName] = useState("");
+
+  const existingMemberIds = isEdit
+    ? allDM.filter((dm) => dm.department_id === dept!.id).map((dm) => dm.user_id)
+    : [];
   const [leaderIds, setLeaderIds] = useState<string[]>(dept?.leader_ids || [user.id]);
   const [coLeaderIds, setCoLeaderIds] = useState<string[]>(dept?.co_leader_ids || []);
-
-  function toggleList(list: string[], setList: (v: string[]) => void, id: string) {
-    setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
-  }
+  const [memberIds, setMemberIds] = useState<string[]>(
+    existingMemberIds.filter(
+      (id) => !(dept?.leader_ids || []).includes(id) && !(dept?.co_leader_ids || []).includes(id)
+    )
+  );
+  const [memberSearch, setMemberSearch] = useState("");
 
   function addFunctionName() {
     const normalized = newFunctionName.trim();
     if (!normalized) return;
-    if (functionNames.some((item) => item.toLowerCase() === normalized.toLowerCase())) {
+    if (functionNames.some((f) => f.toLowerCase() === normalized.toLowerCase())) {
       setNewFunctionName("");
       return;
     }
-    setFunctionNames((current) => [...current, normalized]);
+    setFunctionNames((c) => [...c, normalized]);
     setNewFunctionName("");
   }
 
-  function removeFunctionName(functionName: string) {
-    setFunctionNames((current) => current.filter((item) => item !== functionName));
+  function removeFunctionName(fn: string) {
+    setFunctionNames((c) => c.filter((f) => f !== fn));
   }
 
+  const eligibleLeaders = members.filter((m) => m.role === "admin" || m.role === "leader");
+  const eligibleCoLeaders = members.filter((m) => !leaderIds.includes(m.id));
+  const allActiveMembers = members.filter(
+    (m) => m.name.toLowerCase().includes(memberSearch.toLowerCase())
+  );
+
+  const leaderOptions: MultiSelectOption[] = eligibleLeaders.map((m) => ({
+    id: m.id,
+    label: m.name,
+    sublabel: m.role === "admin" ? "Admin" : "Líder",
+    avatarColor: m.avatar_color,
+  }));
+
+  const coLeaderOptions: MultiSelectOption[] = eligibleCoLeaders.map((m) => ({
+    id: m.id,
+    label: m.name,
+    sublabel: m.role === "admin" ? "Admin" : m.role === "leader" ? "Líder" : "Membro",
+    avatarColor: m.avatar_color,
+  }));
+
   async function save() {
-    if (!name.trim()) {
-      toast("Informe o nome.");
-      return;
-    }
-
-    const data = {
-      name,
-      description: desc,
-      icon,
-      color,
-      function_names: functionNames,
-      leader_ids: leaderIds,
-      co_leader_ids: coLeaderIds,
-    };
-
+    if (!name.trim()) { toast("Informe o nome."); return; }
+    const data = { name, description: desc, icon, color, function_names: functionNames, leader_ids: leaderIds, co_leader_ids: coLeaderIds };
     try {
       const response = await fetch("/api/departments/manage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: isEdit ? "update" : "create",
-          departmentId: dept?.id,
-          data,
-        }),
+        body: JSON.stringify({ mode: isEdit ? "update" : "create", departmentId: dept?.id, data, memberIds }),
       });
-
       const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        console.error("Erro ao salvar ministério:", payload);
-        toast(payload?.error || "Erro ao salvar ministério.");
-        return;
-      }
-
+      if (!response.ok) { toast(payload?.error || "Erro ao salvar ministério."); return; }
       toast(isEdit ? "Atualizado!" : "Criado!");
       onSaved();
-    } catch (error) {
-      console.error("Erro ao salvar ministério:", error);
+    } catch {
       toast("Erro ao salvar ministério.");
     }
   }
-
-  const eligibleLeaders = members.filter((m: User) => m.role === "admin" || m.role === "leader");
 
   return (
     <Modal
@@ -284,171 +282,194 @@ function DeptForm({ dept, members, user, toast, close, onSaved }: any) {
       width={520}
       footer={
         <>
-          <button onClick={close} className="btn btn-secondary">
-            Cancelar
-          </button>
-          <button onClick={save} className="btn btn-primary">
-            {isEdit ? "Salvar" : "Criar"}
-          </button>
+          <button onClick={close} className="btn btn-secondary">Cancelar</button>
+          <button onClick={save} className="btn btn-primary">{isEdit ? "Salvar" : "Criar"}</button>
         </>
       }
     >
-      <div className="space-y-4">
-        <div>
-          <label className="input-label">Nome</label>
-          <input className="input-field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Louvor" />
-        </div>
+      <div className="flex gap-0.5 mb-5 border-b border-border-soft -mx-1 px-1">
+        {(["geral", "pessoas"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`px-3 py-2 text-[13px] font-medium transition-colors ${
+              tab === t ? "text-ink border-b-2 border-brand" : "text-ink-muted hover:text-ink"
+            }`}
+          >
+            {t === "geral" ? "Geral" : "Pessoas"}
+          </button>
+        ))}
+      </div>
 
-        <div>
-          <label className="input-label">Descrição</label>
-          <textarea className="input-field min-h-[60px]" value={desc} onChange={(e) => setDesc(e.target.value)} />
-        </div>
-
-        <div>
-          <label className="input-label">Icone</label>
-          <div className="flex flex-wrap gap-2">
-            {ICONS.map((i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setIcon(i)}
-                className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg border-2 transition-all ${
-                  icon === i ? "border-brand bg-brand-light" : "border-border-soft"
-                }`}
-              >
-                {getIconEmoji(i)}
-              </button>
-            ))}
+      {tab === "geral" && (
+        <div className="space-y-4">
+          <div>
+            <label className="input-label">Nome</label>
+            <input className="input-field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Louvor" autoFocus />
           </div>
-        </div>
-
-        <div>
-          <label className="input-label">Cor</label>
-          <input type="color" className="input-field h-10 p-1 cursor-pointer" value={color} onChange={(e) => setColor(e.target.value)} />
-        </div>
-
-        <div>
-          <label className="input-label">Funções do ministério</label>
-          <div className="rounded-[14px] border border-border-soft bg-surface-alt/50 p-3">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                className="input-field flex-1"
-                value={newFunctionName}
-                onChange={(e) => setNewFunctionName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addFunctionName();
-                  }
-                }}
-                placeholder="Ex: Câmera, Fotografia, Projeção..."
-              />
-              <button type="button" onClick={addFunctionName} className="btn btn-secondary sm:self-start">
-                Adicionar função
-              </button>
-            </div>
-
-            {functionNames.length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {functionNames.map((functionName) => (
+          <div>
+            <label className="input-label">Descrição</label>
+            <textarea className="input-field min-h-[56px]" value={desc} onChange={(e) => setDesc(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-[1fr_100px] gap-4">
+            <div>
+              <label className="input-label">Ícone</label>
+              <div className="flex flex-wrap gap-1.5">
+                {ICONS.map((i) => (
                   <button
-                    key={functionName}
+                    key={i}
                     type="button"
-                    onClick={() => removeFunctionName(functionName)}
-                    className="badge badge-secondary"
-                    title="Remover função"
-                  >
-                    {functionName} ×
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-3 text-xs text-ink-faint">
-                Cadastre as funções principais deste ministério para reaproveitar depois nos membros e nas escalas.
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <label className="input-label">Lideres</label>
-          <div className="space-y-1.5">
-            {eligibleLeaders.map((m: User) => (
-              <label
-                key={m.id}
-                className={`flex items-center gap-3 px-3 py-2 rounded-[10px] cursor-pointer transition-all border-[1.5px] ${
-                  leaderIds.includes(m.id)
-                    ? "border-brand bg-brand-light"
-                    : "border-border-soft hover:border-ink-ghost"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={leaderIds.includes(m.id)}
-                  onChange={() => toggleList(leaderIds, setLeaderIds, m.id)}
-                  className="sr-only"
-                />
-                <div
-                  className={`w-4 h-4 rounded border-2 flex items-center justify-center text-[10px] font-bold ${
-                    leaderIds.includes(m.id) ? "bg-brand border-brand text-white" : "border-border"
-                  }`}
-                >
-                  {leaderIds.includes(m.id) ? "\u2713" : ""}
-                </div>
-                <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0"
-                  style={{ background: m.avatar_color }}
-                >
-                  {getInitials(m.name)}
-                </div>
-                <span className="text-sm font-medium">{m.name}</span>
-                <span className="text-[10px] text-ink-faint ml-auto">
-                  {m.role === "admin" ? "Admin" : "Líder"}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="input-label">Co-lideres (opcional)</label>
-          <div className="space-y-1.5">
-            {members
-              .filter((m: User) => !leaderIds.includes(m.id))
-              .map((m: User) => (
-                <label
-                  key={m.id}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-[10px] cursor-pointer transition-all border-[1.5px] ${
-                    coLeaderIds.includes(m.id)
-                      ? "border-info bg-info-light"
-                      : "border-border-soft hover:border-ink-ghost"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={coLeaderIds.includes(m.id)}
-                    onChange={() => toggleList(coLeaderIds, setCoLeaderIds, m.id)}
-                    className="sr-only"
-                  />
-                  <div
-                    className={`w-4 h-4 rounded border-2 flex items-center justify-center text-[10px] font-bold ${
-                      coLeaderIds.includes(m.id) ? "bg-info border-info text-white" : "border-border"
+                    onClick={() => setIcon(i)}
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center text-base border-2 transition-all ${
+                      icon === i ? "border-brand bg-brand-light" : "border-border-soft hover:border-ink-ghost"
                     }`}
                   >
-                    {coLeaderIds.includes(m.id) ? "\u2713" : ""}
+                    {getIconEmoji(i)}
+                  </button>
+                ))}
+                {!ICONS.includes(icon as any) && icon && (
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center text-base border-2 border-brand bg-brand-light">
+                    {icon}
                   </div>
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0"
-                    style={{ background: m.avatar_color }}
-                  >
-                    {getInitials(m.name)}
-                  </div>
-                  <span className="text-sm font-medium">{m.name}</span>
-                </label>
-              ))}
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-1.5">
+                <input
+                  type="text"
+                  className="w-12 h-8 text-center text-lg border-[1.5px] border-border rounded-[10px] outline-none focus:border-brand focus:ring-[3px] focus:ring-brand/10 transition-all bg-white"
+                  placeholder="✏️"
+                  value={!ICONS.includes(icon as any) ? icon : ""}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (!raw) return;
+                    const graphemes = [...new Intl.Segmenter().segment(raw)];
+                    const last = graphemes[graphemes.length - 1]?.segment;
+                    if (last) setIcon(last);
+                  }}
+                />
+                <span className="text-[10px] text-ink-faint">Emoji personalizado</span>
+              </div>
+            </div>
+            <div>
+              <label className="input-label">Cor</label>
+              <input type="color" className="input-field h-10 p-1 cursor-pointer" value={color} onChange={(e) => setColor(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className="input-label">Funções do ministério</label>
+            <div className="rounded-[14px] border border-border-soft bg-surface-alt/50 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  className="input-field flex-1"
+                  value={newFunctionName}
+                  onChange={(e) => setNewFunctionName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addFunctionName(); } }}
+                  placeholder="Ex: Câmera, Fotografia, Projeção..."
+                />
+                <button type="button" onClick={addFunctionName} className="btn btn-secondary sm:self-start">
+                  Adicionar
+                </button>
+              </div>
+              {functionNames.length > 0 ? (
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {functionNames.map((fn) => (
+                    <button key={fn} type="button" onClick={() => removeFunctionName(fn)} className="badge badge-secondary">
+                      {fn} ×
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-ink-faint">Funções deste ministério para uso nas escalas.</p>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {tab === "pessoas" && (
+        <div className="space-y-4">
+          <div>
+            <label className="input-label">Líderes</label>
+            <MultiSelect
+              options={leaderOptions}
+              selected={leaderIds}
+              onChange={setLeaderIds}
+              placeholder="Selecionar líderes..."
+            />
+          </div>
+          <div>
+            <label className="input-label">Co-líderes (opcional)</label>
+            <MultiSelect
+              options={coLeaderOptions}
+              selected={coLeaderIds}
+              onChange={(ids) => setCoLeaderIds(ids.filter((id) => !leaderIds.includes(id)))}
+              placeholder="Selecionar co-líderes..."
+            />
+          </div>
+          <div>
+            <label className="input-label">Membros</label>
+            <div className="rounded-[14px] border border-border-soft overflow-hidden">
+              <div className="p-2 border-b border-border-soft bg-surface-alt/40">
+                <input
+                  className="w-full text-sm px-2 py-1.5 rounded-lg border-[1.5px] border-border outline-none focus:border-brand transition-all bg-white placeholder:text-ink-ghost"
+                  placeholder="Buscar membro..."
+                  value={memberSearch}
+                  onChange={(e) => setMemberSearch(e.target.value)}
+                />
+              </div>
+              <div className="max-h-52 overflow-y-auto">
+                {allActiveMembers.length === 0 && (
+                  <div className="px-3 py-4 text-xs text-ink-faint text-center">Nenhum membro encontrado</div>
+                )}
+                {allActiveMembers.map((m) => {
+                  const isLeader = leaderIds.includes(m.id);
+                  const isCoLeader = coLeaderIds.includes(m.id);
+                  const isImplicit = isLeader || isCoLeader;
+                  const checked = isImplicit || memberIds.includes(m.id);
+                  return (
+                    <label
+                      key={m.id}
+                      className={`flex items-center gap-3 px-3 py-2.5 border-b border-border-soft last:border-b-0 transition-colors ${
+                        isImplicit ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-surface-alt/60"
+                      } ${checked && !isImplicit ? "bg-brand-light/30" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={checked}
+                        disabled={isImplicit}
+                        onChange={() => {
+                          if (isImplicit) return;
+                          setMemberIds((ids) =>
+                            ids.includes(m.id) ? ids.filter((x) => x !== m.id) : [...ids, m.id]
+                          );
+                        }}
+                      />
+                      <div
+                        className={`w-4 h-4 rounded border-2 flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                          checked ? "bg-brand border-brand text-white" : "border-border"
+                        }`}
+                      >
+                        {checked ? "✓" : ""}
+                      </div>
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"
+                        style={{ background: m.avatar_color }}
+                      >
+                        {getInitials(m.name)}
+                      </div>
+                      <span className="text-[13px] font-medium text-ink flex-1 truncate">{m.name}</span>
+                      {isLeader && <span className="text-[10px] text-brand font-semibold">Líder</span>}
+                      {isCoLeader && !isLeader && <span className="text-[10px] text-info font-semibold">Co-líder</span>}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }
