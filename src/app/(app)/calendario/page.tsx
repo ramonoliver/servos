@@ -5,8 +5,12 @@ import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { getIconEmoji } from "@/lib/utils/helpers";
 import { PageShell, PageHeader } from "@/components/ui";
+import { fetchCells } from "@/lib/cells/client";
+import type { Cell, CellMemberRow } from "@/lib/cells/types";
 import Link from "next/link";
 import type { Schedule, Event, ScheduleMember } from "@/types";
+
+const WEEKDAY_PT = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
 export default function CalendarioPage() {
   const { user, departments } = useApp();
@@ -17,6 +21,8 @@ export default function CalendarioPage() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [allSM, setAllSM] = useState<ScheduleMember[]>([]);
+  const [cellList, setCellList] = useState<Cell[]>([]);
+  const [cellMembers, setCellMembers] = useState<CellMemberRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const now = new Date();
@@ -29,6 +35,23 @@ export default function CalendarioPage() {
 
   async function loadData() {
     setLoading(true);
+
+    // Cells (independent of schedules). Admin sees all; others see the cells
+    // they lead/co-lead or are members of.
+    try {
+      const { cells: allCells, cellMembers: cm } = await fetchCells();
+      const myCellIds = new Set(cm.filter((x) => x.user_id === user.id).map((x) => x.cell_id));
+      const visibleCells =
+        user.role === "admin"
+          ? allCells
+          : allCells.filter(
+              (c) => c.leader_id === user.id || c.co_leader_id === user.id || myCellIds.has(c.id)
+            );
+      setCellList(visibleCells);
+      setCellMembers(cm);
+    } catch (cellsError) {
+      console.warn("Falha ao carregar células na agenda:", cellsError);
+    }
 
     const visibleDepartmentIds = departments.map((department) => department.id);
 
@@ -100,6 +123,23 @@ export default function CalendarioPage() {
     [allSM, user.id]
   );
 
+  const myCellIds = useMemo(() => {
+    const set = new Set<string>();
+    cellList.forEach((c) => {
+      if (c.leader_id === user.id || c.co_leader_id === user.id) set.add(c.id);
+    });
+    cellMembers.forEach((cm) => {
+      if (cm.user_id === user.id) set.add(cm.cell_id);
+    });
+    return set;
+  }, [cellList, cellMembers, user.id]);
+
+  const dayCells = useMemo(
+    () => (selectedDay ? getCellsForDay(selectedDay) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedDay, cellList, year, month]
+  );
+
   const monthStats = useMemo(() => {
     let recurringDays = 0;
     let specialDays = 0;
@@ -132,6 +172,11 @@ export default function CalendarioPage() {
   function getSchedulesForDay(day: number) {
     const ds = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     return schedules.filter((s) => s.date === ds);
+  }
+
+  function getCellsForDay(day: number) {
+    const wd = WEEKDAY_PT[new Date(year, month, day).getDay()];
+    return cellList.filter((c) => c.week_day === wd);
   }
 
   return (
@@ -185,6 +230,8 @@ export default function CalendarioPage() {
             const hasRecurring = eventTypes.includes("recurring");
             const hasSpecial = eventTypes.includes("special");
             const hasMine = dayScheds.some((schedule) => myScheduleIds.has(schedule.id));
+            const dayCellList = getCellsForDay(day);
+            const hasCell = dayCellList.length > 0;
             const isToday =
               day === now.getDate() &&
               month === now.getMonth() &&
@@ -206,6 +253,8 @@ export default function CalendarioPage() {
                     ? "bg-[#ffe8e3] border-[#f2b6a6] text-[#8f3b22] hover:bg-[#ffdcd2]"
                     : hasRecurring
                     ? "bg-[#edf6ef] border-[#b8d8bf] text-[#285e34] hover:bg-[#e4f1e7]"
+                    : hasCell
+                    ? "bg-[#f0ecff] border-[#cfc2f6] text-[#5b4aa8] hover:bg-[#e9e2ff]"
                     : "bg-white border-border-soft hover:bg-surface-alt"
                 }`}
               >
@@ -220,6 +269,8 @@ export default function CalendarioPage() {
                         ? "bg-[#e46b42]"
                         : hasRecurring
                         ? "bg-[#4d9c62]"
+                        : hasCell
+                        ? "bg-[#9b8cfb]"
                         : "bg-transparent"
                     }`}
                   />
@@ -244,13 +295,18 @@ export default function CalendarioPage() {
                         Recorrente
                       </span>
                     )}
+                    {hasCell && (
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-white/80 text-[#5b4aa8]"}`}>
+                        Célula
+                      </span>
+                    )}
                   </div>
 
-                  {dayScheds.length > 0 ? (
+                  {dayScheds.length + dayCellList.length > 0 ? (
                     <div className="flex items-center gap-1">
-                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white" : hasMine ? "bg-[#f0aa00]" : hasSpecial ? "bg-[#e46b42]" : "bg-brand"}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white" : hasMine ? "bg-[#f0aa00]" : hasSpecial ? "bg-[#e46b42]" : hasCell ? "bg-[#9b8cfb]" : "bg-brand"}`} />
                       <span className={`text-[10px] ${isSelected ? "text-white/90" : "text-ink-faint"}`}>
-                        {dayScheds.length}
+                        {dayScheds.length + dayCellList.length}
                       </span>
                     </div>
                   ) : (
@@ -304,6 +360,10 @@ export default function CalendarioPage() {
               <span className="w-3 h-3 rounded-full bg-[#e46b42]" />
               <span>Evento especial</span>
             </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-[#9b8cfb]" />
+              <span>Encontro de célula</span>
+            </div>
           </div>
         </div>
       </div>
@@ -314,13 +374,19 @@ export default function CalendarioPage() {
             <div>
               <h3 className="font-display text-lg break-words">Agenda de {selectedDay}/{month + 1}</h3>
               <p className="text-sm text-ink-muted">
-                {daySchedules.length} {daySchedules.length === 1 ? "escala encontrada" : "escalas encontradas"} neste dia.
+                {daySchedules.length} {daySchedules.length === 1 ? "escala" : "escalas"}
+                {dayCells.length > 0 && ` · ${dayCells.length} ${dayCells.length === 1 ? "célula" : "células"}`} neste dia.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
               {daySchedules.some((schedule) => myScheduleIds.has(schedule.id)) && (
                 <span className="badge" style={{ background: "#fff4dc", color: "#7b4c00" }}>
                   Você está escalado
+                </span>
+              )}
+              {dayCells.some((c) => myCellIds.has(c.id)) && (
+                <span className="badge" style={{ background: "#f0ecff", color: "#5b4aa8" }}>
+                  Sua célula
                 </span>
               )}
               {daySchedules.some((schedule) => events.find((event) => event.id === schedule.event_id)?.type === "special") && (
@@ -333,12 +399,14 @@ export default function CalendarioPage() {
 
           {loading ? (
             <div className="card px-5 py-8 text-center text-sm text-ink-faint">Carregando...</div>
-          ) : daySchedules.length === 0 ? (
+          ) : daySchedules.length === 0 && dayCells.length === 0 ? (
             <div className="card px-5 py-8 text-center text-sm text-ink-faint">
-              Nenhuma escala neste dia.
+              Nada agendado neste dia.
             </div>
           ) : (
-            <div className="card">
+            <div className="space-y-4">
+              {daySchedules.length > 0 && (
+              <div className="card">
               {daySchedules.map((s) => {
                 const ev = events.find((e) => e.id === s.event_id);
                 const dept = departments.find((d) => d.id === s.department_id);
@@ -385,6 +453,40 @@ export default function CalendarioPage() {
                   </Link>
                 );
               })}
+              </div>
+              )}
+
+              {dayCells.length > 0 && (
+                <div className="card">
+                  {dayCells.map((c) => {
+                    const isMine = myCellIds.has(c.id);
+                    return (
+                      <Link
+                        key={c.id}
+                        href={`/celulas/${c.id}`}
+                        className="flex items-start sm:items-center gap-3 px-5 py-4 border-t border-border-soft first:border-t-0 transition-colors hover:bg-[#f6f2ff]"
+                      >
+                        <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-[#f0ecff] text-[#5b4aa8]">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M3 10.5L12 3l9 7.5" /><path d="M5 9.5V20a1 1 0 001 1h12a1 1 0 001-1V9.5" /><path d="M9.5 21v-5a2.5 2.5 0 015 0v5" /></svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <div className="text-sm font-medium break-words">{c.name}</div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f0ecff] text-[#5b4aa8]">Célula</span>
+                            {isMine && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#fff4dc] text-[#7b4c00]">Minha célula</span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-ink-faint break-words leading-relaxed">
+                            {[c.time, c.audience, c.address].filter(Boolean).join(" · ") || "Sem horário definido"}
+                          </div>
+                        </div>
+                        <div className="text-brand text-sm font-semibold shrink-0">&rarr;</div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
