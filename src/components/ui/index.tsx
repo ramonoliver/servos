@@ -216,7 +216,7 @@ export function AvailabilityEditor({ availability, onChange }: { availability: b
 // ============================================
 // VERSE CARD
 // ============================================
-export function VerseCard({ text, ref: reference }: { text: string; ref: string }) {
+export function VerseCard({ text, reference }: { text: string; reference: string }) {
   return (
     <div className="bg-brand-glow border border-brand/10 rounded-[14px] p-5">
       <p className="font-display italic text-sm text-ink-soft leading-relaxed mb-1.5">&ldquo;{text}&rdquo;</p>
@@ -246,3 +246,15 @@ export function CoupleBadge({ spouseName }: { spouseName: string }) {
 
 export { MultiSelect } from "./multi-select";
 export type { MultiSelectOption } from "./multi-select";
+
+export {
+  PageShell,
+  PageHeader,
+  SectionCard,
+  StatTile,
+  SegmentedControl,
+  PageLoading,
+} from "./page-header";
+export type { Tone } from "./page-header";
+
+export { DateField } from "./date-field";

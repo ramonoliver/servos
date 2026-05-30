@@ -47,7 +47,7 @@ export function getIconEmoji(icon: string): string {
     flame: "\uD83D\uDD25", star: "\u2B50", book: "\uD83D\uDCD6",
     baby: "\uD83D\uDC76", pray: "\uD83D\uDE4F",
   };
-  return map[icon] || "\u26EA";
+  return map[icon] ?? icon;
 }
 
 export function pluralize(count: number, singular: string, plural?: string): string {

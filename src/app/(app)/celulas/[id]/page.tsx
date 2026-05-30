@@ -1,0 +1,350 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useApp } from "@/hooks/use-app";
+import { supabase } from "@/lib/supabase/client";
+import { Avatar, ConfirmDialog, PageShell } from "@/components/ui";
+import { CellForm } from "@/components/shared/cell-form";
+import { CellMeetingForm } from "@/components/shared/cell-meeting-form";
+import { fetchCells, saveCell, fetchMeetings, saveMeeting } from "@/lib/cells/client";
+import {
+  cellHealthAverage,
+  formatMeetingDate,
+  MEETING_FEELINGS,
+  type Cell,
+  type CellMemberRow,
+  type CellHealth,
+  type CellMeeting,
+  type CellAttendanceRow,
+} from "@/lib/cells/types";
+import type { User } from "@/types";
+
+const HEALTH_LABELS: Record<keyof CellHealth, string> = {
+  frequency: "Frequência",
+  communion: "Comunhão",
+  participation: "Participação",
+  growth: "Crescimento",
+  engagement: "Engajamento",
+  care: "Acompanhamento",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  active: "Ativa",
+  paused: "Pausada",
+  multiplying: "Multiplicando",
+};
+
+export default function CellDetailPage() {
+  const params = useParams<{ id: string }>();
+  const cellId = params?.id;
+  const router = useRouter();
+  const { user, toast } = useApp();
+  const canManage = user.role !== "member";
+
+  const [cell, setCell] = useState<Cell | null>(null);
+  const [cellMembers, setCellMembers] = useState<CellMemberRow[]>([]);
+  const [members, setMembers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showEdit, setShowEdit] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [meetings, setMeetings] = useState<CellMeeting[]>([]);
+  const [meetingAttendance, setMeetingAttendance] = useState<CellAttendanceRow[]>([]);
+  const [meetingModal, setMeetingModal] = useState<null | { meeting?: CellMeeting }>(null);
+  const [deleteMeeting, setDeleteMeeting] = useState<CellMeeting | null>(null);
+
+  async function loadMeetings() {
+    if (!cellId) return;
+    try {
+      const { meetings: ms, attendance } = await fetchMeetings(cellId);
+      setMeetings(ms);
+      setMeetingAttendance(attendance);
+    } catch (error) {
+      console.warn("Falha ao carregar reuniões:", error);
+    }
+  }
+
+  async function handleDeleteMeeting(meeting: CellMeeting) {
+    try {
+      await saveMeeting({ mode: "delete", cellId: cellId!, meetingId: meeting.id });
+      toast("Reunião removida.");
+      setDeleteMeeting(null);
+      await Promise.all([loadMeetings(), loadData()]);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Erro ao remover reunião.");
+    }
+  }
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const [{ data: usersData }, cellsData] = await Promise.all([
+        supabase.from("users").select("*").eq("church_id", user.church_id).eq("active", true),
+        fetchCells(),
+      ]);
+      setMembers((usersData || []) as User[]);
+      setCellMembers(cellsData.cellMembers.filter((cm) => cm.cell_id === cellId));
+      setCell(cellsData.cells.find((c) => c.id === cellId) ?? null);
+    } catch (error) {
+      console.warn("Falha ao carregar célula:", error);
+      setCell(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadData();
+    loadMeetings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cellId, user.church_id]);
+
+  const memberById = useMemo(() => {
+    const map = new Map<string, User>();
+    members.forEach((m) => map.set(m.id, m));
+    return map;
+  }, [members]);
+
+  const memberUsers = useMemo(
+    () => cellMembers.map((cm) => memberById.get(cm.user_id)).filter(Boolean) as User[],
+    [cellMembers, memberById]
+  );
+
+  async function handleDelete() {
+    if (!cell) return;
+    try {
+      await saveCell({ mode: "delete", cellId: cell.id });
+      toast(`${cell.name} excluída.`);
+      router.push("/celulas");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Erro ao excluir célula.");
+    }
+  }
+
+  if (loading) {
+    return (
+      <PageShell>
+        <div className="py-16 text-center text-sm text-ink-faint">Carregando célula...</div>
+      </PageShell>
+    );
+  }
+
+  if (!cell) {
+    return (
+      <PageShell>
+        <Link href="/celulas" className="mb-5 inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand-deep hover:underline">
+          &larr; Células
+        </Link>
+        <div className="rounded-[18px] border border-border-soft bg-white/70 px-6 py-12 text-center backdrop-blur">
+          <p className="text-sm font-semibold text-ink">Célula não encontrada</p>
+          <p className="mt-1 text-sm text-ink-muted">Ela pode ter sido removida.</p>
+        </div>
+      </PageShell>
+    );
+  }
+
+  const leader = cell.leader_id ? memberById.get(cell.leader_id) : null;
+  const coLeader = cell.co_leader_id ? memberById.get(cell.co_leader_id) : null;
+  const average = cellHealthAverage(cell.health);
+  const healthChip = average >= 75 ? "text-success bg-success-light" : average >= 50 ? "text-amber bg-amber-light" : "text-danger bg-danger-light";
+
+  return (
+    <PageShell>
+      <Link href="/celulas" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand-deep hover:underline">
+        &larr; Células
+      </Link>
+
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-[24px] border border-border-soft bg-white/70 p-6 shadow-lift backdrop-blur-xl">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(255,107,87,0.10),transparent_45%),radial-gradient(70%_120%_at_92%_8%,rgba(155,140,251,0.14),transparent_55%)]" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-1.5 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.1em] text-brand-deep">
+              Célula · {STATUS_LABEL[cell.status] || cell.status}
+            </div>
+            <h1 className="font-display text-[28px] font-extrabold leading-tight tracking-tight text-ink">{cell.name}</h1>
+            <p className="mt-1 text-[14px] text-ink-muted">
+              {[cell.week_day, cell.time, cell.audience].filter(Boolean).join(" · ") || "Sem horário definido"}
+            </p>
+            {cell.address && <p className="mt-1 text-[13px] text-ink-faint">📍 {cell.address}</p>}
+          </div>
+          <div className="flex items-center gap-2 self-start">
+            <span className={`rounded-full px-3 py-1.5 text-[12px] font-bold ${healthChip}`}>{average}% saúde</span>
+            {canManage && (
+              <>
+                <button onClick={() => setShowEdit(true)} className="btn btn-secondary btn-sm">Editar</button>
+                <button onClick={() => setShowDelete(true)} className="btn btn-danger btn-sm">Excluir</button>
+              </>
+            )}
+          </div>
+        </div>
+        {cell.description && <p className="relative mt-4 max-w-[680px] text-[14px] leading-relaxed text-ink-soft">{cell.description}</p>}
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[1fr_320px] lg:items-start">
+        <div className="space-y-5">
+        {/* Members */}
+        <div className="rounded-[20px] border border-border-soft bg-white/70 p-5 shadow-soft backdrop-blur">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-[17px] font-bold text-ink">Membros</h2>
+            <span className="text-[12px] font-semibold text-ink-faint">{memberUsers.length}/{cell.max_members}</span>
+          </div>
+          {memberUsers.length === 0 ? (
+            <p className="py-6 text-center text-sm text-ink-faint">Nenhum membro ainda. Use “Editar” para adicionar.</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {memberUsers.map((m) => {
+                const roleTag = m.id === cell.leader_id ? "Líder" : m.id === cell.co_leader_id ? "Co-líder" : null;
+                return (
+                  <Link key={m.id} href={`/membros/${m.id}`} className="flex items-center gap-3 rounded-[14px] border border-border-soft bg-white/60 p-2.5 transition hover:-translate-y-0.5 hover:shadow-soft">
+                    <Avatar name={m.name} color={m.avatar_color} photoUrl={m.photo_url} size={36} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-semibold text-ink">{m.name}</div>
+                      {roleTag && <div className="text-[11px] font-semibold text-brand-deep">{roleTag}</div>}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Reuniões */}
+        <div className="rounded-[20px] border border-border-soft bg-white/70 p-5 shadow-soft backdrop-blur">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-[17px] font-bold text-ink">Reuniões</h2>
+            {canManage && (
+              <button onClick={() => setMeetingModal({})} className="btn btn-primary btn-sm">+ Registrar</button>
+            )}
+          </div>
+          {meetings.length === 0 ? (
+            <p className="py-6 text-center text-sm text-ink-faint">Nenhuma reunião registrada ainda.</p>
+          ) : (
+            <div className="space-y-2">
+              {meetings.map((mt) => {
+                const rows = meetingAttendance.filter((a) => a.meeting_id === mt.id);
+                const present = rows.filter((a) => a.status === "present" || a.status === "visitor" || a.status === "first_visit").length;
+                const feel = MEETING_FEELINGS.find((f) => f.value === mt.feeling);
+                const [dd, mm] = formatMeetingDate(mt.date).split(" ");
+                return (
+                  <div key={mt.id} className="flex items-center gap-3 rounded-[14px] border border-border-soft bg-white/60 p-3">
+                    <div className="flex h-11 w-11 flex-shrink-0 flex-col items-center justify-center rounded-[12px] bg-brand-light text-brand-deep">
+                      <span className="text-[15px] font-extrabold leading-none">{dd}</span>
+                      <span className="text-[9px] font-bold uppercase">{mm}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-bold text-ink">{mt.theme || "Encontro"}</div>
+                      <div className="text-[11px] text-ink-muted">{present} presentes{feel ? ` · ${feel.emoji} ${feel.label}` : ""}</div>
+                    </div>
+                    {canManage && (
+                      <div className="flex gap-1">
+                        <button onClick={() => setMeetingModal({ meeting: mt })} className="rounded-full px-2 py-1 text-[11px] font-semibold text-ink-muted transition hover:bg-surface-alt hover:text-ink">Editar</button>
+                        <button onClick={() => setDeleteMeeting(mt)} className="rounded-full px-2 py-1 text-[11px] font-semibold text-danger transition hover:bg-danger-light">Excluir</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        </div>
+
+        {/* Side: leadership + health */}
+        <div className="space-y-5">
+          <div className="rounded-[20px] border border-border-soft bg-white/70 p-5 shadow-soft backdrop-blur">
+            <h2 className="mb-3 font-display text-[15px] font-bold text-ink">Liderança</h2>
+            {leader ? (
+              <div className="flex items-center gap-3">
+                <Avatar name={leader.name} color={leader.avatar_color} photoUrl={leader.photo_url} size={40} />
+                <div className="min-w-0">
+                  <div className="truncate text-[13px] font-bold text-ink">{leader.name}</div>
+                  <div className="text-[11px] text-ink-faint">Líder</div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-ink-faint">Sem líder definido.</p>
+            )}
+            {coLeader && (
+              <div className="mt-3 flex items-center gap-3 border-t border-border-soft pt-3">
+                <Avatar name={coLeader.name} color={coLeader.avatar_color} photoUrl={coLeader.photo_url} size={40} />
+                <div className="min-w-0">
+                  <div className="truncate text-[13px] font-bold text-ink">{coLeader.name}</div>
+                  <div className="text-[11px] text-ink-faint">Co-líder</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-[20px] border border-border-soft bg-white/70 p-5 shadow-soft backdrop-blur">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-display text-[15px] font-bold text-ink">Saúde da célula</h2>
+              <span className="rounded-full bg-brand-light px-2.5 py-1 text-[12px] font-bold text-brand-deep">{average}%</span>
+            </div>
+            <div className="space-y-3">
+              {(Object.keys(HEALTH_LABELS) as (keyof CellHealth)[]).map((key) => {
+                const value = cell.health?.[key] ?? 0;
+                return (
+                  <div key={key}>
+                    <div className="mb-1 flex items-center justify-between text-[11px] font-semibold">
+                      <span className="text-ink-muted">{HEALTH_LABELS[key]}</span>
+                      <span className="text-ink-faint">{value}%</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-surface-alt">
+                      <div className="h-1.5 rounded-full bg-gradient-to-r from-brand to-rose" style={{ width: `${value}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-[11px] text-ink-faint">A <strong className="font-semibold text-ink-muted">frequência</strong> é calculada automaticamente pela presença nas reuniões.</p>
+          </div>
+        </div>
+      </div>
+
+      {showEdit && (
+        <CellForm
+          cell={cell}
+          members={members}
+          cellMembers={cellMembers}
+          toast={toast}
+          close={() => setShowEdit(false)}
+          onSaved={async () => { setShowEdit(false); await loadData(); }}
+        />
+      )}
+
+      {showDelete && (
+        <ConfirmDialog
+          title="Excluir célula"
+          message={`Você está prestes a excluir <strong>${cell.name}</strong>.`}
+          confirmLabel="Excluir"
+          onCancel={() => setShowDelete(false)}
+          onConfirm={() => void handleDelete()}
+        />
+      )}
+
+      {meetingModal && (
+        <CellMeetingForm
+          cellId={cell.id}
+          members={memberUsers}
+          meeting={meetingModal.meeting}
+          existingAttendance={meetingModal.meeting ? meetingAttendance.filter((a) => a.meeting_id === meetingModal.meeting!.id) : []}
+          toast={toast}
+          close={() => setMeetingModal(null)}
+          onSaved={async () => { setMeetingModal(null); await Promise.all([loadMeetings(), loadData()]); }}
+        />
+      )}
+
+      {deleteMeeting && (
+        <ConfirmDialog
+          title="Remover reunião"
+          message={`Remover a reunião de <strong>${formatMeetingDate(deleteMeeting.date)}</strong>?`}
+          confirmLabel="Remover"
+          onCancel={() => setDeleteMeeting(null)}
+          onConfirm={() => void handleDeleteMeeting(deleteMeeting)}
+        />
+      )}
+    </PageShell>
+  );
+}

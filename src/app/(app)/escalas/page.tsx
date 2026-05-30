@@ -1,15 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
-import { getDayName, formatShortDate } from "@/lib/utils/helpers";
-import { ConfirmDialog } from "@/components/ui";
-import Link from "next/link";
+import { getDayName } from "@/lib/utils/helpers";
+import { ConfirmDialog, DateField } from "@/components/ui";
+import { ActionDrawer } from "@/components/ui/action-drawer";
+import { SplitView } from "@/components/ui/split-view";
+import { EscalaDetailPanel } from "@/components/escalas/escala-detail-panel";
 import type { Schedule, ScheduleMember, Event } from "@/types";
 
-export default function EscalasPage() {
+function EscalasPageInner() {
   const { user, canDo, toast, departments } = useApp();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const selectedId = searchParams.get("id");
+
   const [filter, setFilter] = useState<"all" | "active" | "draft">("all");
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -17,10 +24,17 @@ export default function EscalasPage() {
   const [loading, setLoading] = useState(true);
   const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
 
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerEvents, setDrawerEvents] = useState<Event[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [newEventId, setNewEventId] = useState("");
+  const [newDeptId, setNewDeptId] = useState("");
+  const [newDate, setNewDate] = useState("");
+  const [newTime, setNewTime] = useState("18:00");
+
   async function loadData() {
     setLoading(true);
-
-    const visibleDepartmentIds = departments.map((department) => department.id);
+    const visibleDepartmentIds = departments.map((d) => d.id);
 
     const [
       { data: schedulesData, error: schedulesError },
@@ -42,14 +56,16 @@ export default function EscalasPage() {
     const scopedSchedules =
       user.role === "admin"
         ? ((schedulesData || []) as Schedule[])
-        : ((schedulesData || []) as Schedule[]).filter((schedule) =>
-            visibleDepartmentIds.includes(schedule.department_id)
+        : ((schedulesData || []) as Schedule[]).filter((s) =>
+            visibleDepartmentIds.includes(s.department_id)
           );
-    const scopedScheduleIds = new Set(scopedSchedules.map((schedule) => schedule.id));
+    const scopedScheduleIds = new Set(scopedSchedules.map((s) => s.id));
 
     setSchedules(scopedSchedules);
     setEvents((eventsData || []) as Event[]);
-    setAllSM(((smData || []) as ScheduleMember[]).filter((scheduleMember) => scopedScheduleIds.has(scheduleMember.schedule_id)));
+    setAllSM(
+      ((smData || []) as ScheduleMember[]).filter((sm) => scopedScheduleIds.has(sm.schedule_id))
+    );
     setLoading(false);
   }
 
@@ -57,66 +73,116 @@ export default function EscalasPage() {
     loadData();
   }, [user.church_id, departments.length]);
 
-  const filtered = useMemo(() => {
-    return schedules
-      .filter((s) => filter === "all" || s.status === filter)
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [schedules, filter]);
+  async function openCreationDrawer() {
+    if (drawerEvents.length === 0) {
+      const { data } = await supabase
+        .from("events")
+        .select("*")
+        .eq("church_id", user.church_id)
+        .eq("active", true);
+      const evts = (data || []) as Event[];
+      setDrawerEvents(evts);
+      if (evts.length > 0 && !newEventId) setNewEventId(evts[0].id);
+    }
+    if (!newDeptId && departments.length > 0) setNewDeptId(departments[0].id);
+    setDrawerOpen(true);
+  }
+
+  async function createSchedule() {
+    if (!newEventId || !newDeptId || !newDate) {
+      toast("Preencha todos os campos.");
+      return;
+    }
+    setCreating(true);
+    try {
+      const response = await fetch("/api/schedules/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId: newEventId,
+          departmentId: newDeptId,
+          date: newDate,
+          time: newTime,
+          arrivalTime: "",
+          instructions: "",
+          publish: false,
+          selectedIds: [],
+          functionTargets: {},
+        }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        toast(data?.error || "Erro ao criar escala.");
+        return;
+      }
+      toast("Rascunho criado!");
+      setDrawerOpen(false);
+      setNewDate("");
+      await loadData();
+      router.push(`/escalas?id=${data.scheduleId}`);
+    } catch {
+      toast("Erro ao criar escala.");
+    } finally {
+      setCreating(false);
+    }
+  }
 
   async function deleteSchedule(id: string) {
     try {
       const response = await fetch("/api/schedules/delete", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          scheduleId: id,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduleId: id }),
       });
-
       const data = await response.json().catch(() => null);
-
       if (!response.ok) {
-        console.error("Erro ao excluir escala:", data);
         toast(data?.error || "Erro ao excluir escala.");
         return;
       }
-
       toast("Escala excluída.");
+      if (selectedId === id) router.push("/escalas");
       await loadData();
-    } catch (error) {
-      console.error("Erro ao excluir escala:", error);
+    } catch {
       toast("Erro ao excluir escala.");
     } finally {
       setScheduleToDelete(null);
     }
   }
 
-  return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="page-title">Escalas</h1>
-          <p className="page-subtitle">{schedules.length} escalas</p>
-        </div>
+  const filtered = useMemo(() => {
+    return schedules
+      .filter((s) => filter === "all" || s.status === filter)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [schedules, filter]);
 
+  const listPanel = (
+    <div className="flex flex-col h-full">
+      {/* List header */}
+      <div className="px-4 py-3 border-b border-border-soft flex items-center justify-between flex-shrink-0">
+        <div>
+          <h1 className="font-display text-[15px] font-bold text-ink">Escalas</h1>
+          <p className="text-[11px] text-ink-faint">{schedules.length} no total</p>
+        </div>
         {canDo("schedule.create") && (
-          <Link href="/escalas/nova" className="btn btn-primary self-start sm:self-auto">
-            + Nova Escala
-          </Link>
+          <button
+            onClick={openCreationDrawer}
+            className="w-7 h-7 rounded-lg bg-brand text-white flex items-center justify-center hover:opacity-90 transition-opacity text-lg leading-none"
+            title="Nova Escala"
+            aria-label="Nova Escala"
+          >
+            +
+          </button>
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1 mb-5 bg-surface-alt rounded-[10px] p-0.5 w-fit max-w-full">
+      {/* Filter tabs */}
+      <div className="px-3 py-2 border-b border-border-soft flex gap-0.5 flex-shrink-0">
         {(["all", "active", "draft"] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-4 py-1.5 rounded-lg text-[13px] font-medium transition-all ${
-              filter === f
-                ? "bg-surface text-ink font-semibold shadow-sm"
-                : "text-ink-muted"
+            className={`px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors ${
+              filter === f ? "bg-black/[.06] text-ink" : "text-ink-muted hover:text-ink"
             }`}
           >
             {f === "all" ? "Todas" : f === "active" ? "Ativas" : "Rascunhos"}
@@ -124,21 +190,17 @@ export default function EscalasPage() {
         ))}
       </div>
 
-      <div className="card">
+      {/* Schedule list */}
+      <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="px-5 py-16 text-center">
-            <div className="text-4xl mb-3 opacity-40">&#128197;</div>
-            <p className="font-display text-lg mb-1">Carregando escalas...</p>
-          </div>
+          <div className="px-4 py-8 text-center text-sm text-ink-faint">Carregando...</div>
         ) : filtered.length === 0 ? (
-          <div className="px-5 py-16 text-center">
-            <div className="text-4xl mb-3 opacity-40">&#128197;</div>
-            <p className="font-display text-lg mb-1">Nenhuma escala</p>
-            <p className="text-sm text-ink-muted mb-4">Crie a primeira escala.</p>
+          <div className="px-4 py-8 text-center">
+            <p className="text-sm text-ink-faint mb-2">Nenhuma escala</p>
             {canDo("schedule.create") && (
-              <Link href="/escalas/nova" className="btn btn-primary">
+              <button onClick={openCreationDrawer} className="text-sm font-semibold text-brand hover:underline">
                 + Criar
-              </Link>
+              </button>
             )}
           </div>
         ) : (
@@ -147,65 +209,144 @@ export default function EscalasPage() {
             const dept = departments.find((d) => d.id === s.department_id);
             const sm = allSM.filter((m) => m.schedule_id === s.id);
             const confirmed = sm.filter((m) => m.status === "confirmed").length;
-            const allOk = confirmed === sm.length && sm.length > 0;
+            const isSelected = selectedId === s.id;
 
             return (
-              <div
+              <button
                 key={s.id}
-                className="flex flex-col sm:flex-row sm:items-center gap-3.5 px-5 py-3.5 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors group"
+                onClick={() => router.push(`/escalas?id=${s.id}`)}
+                className={`w-full text-left flex items-start gap-3 px-4 py-3 border-b border-border-soft transition-colors group ${
+                  isSelected ? "bg-black/[.06]" : "hover:bg-black/[.03]"
+                }`}
               >
-                <Link href={`/escalas/${s.id}`} className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
-                  <div
-                    className={`w-12 h-[50px] rounded-[10px] flex flex-col items-center justify-center flex-shrink-0 ${
-                      ev?.type === "special" ? "bg-brand-light" : "bg-surface-alt"
-                    }`}
-                  >
-                    <span className="text-[9px] font-bold uppercase text-brand tracking-wide">
-                      {getDayName(s.date)}
+                <div className="w-9 h-[38px] rounded-lg bg-surface-alt border border-border-soft flex flex-col items-center justify-center flex-shrink-0">
+                  <span className="text-[7px] font-bold uppercase text-ink-faint">{getDayName(s.date)}</span>
+                  <span className="font-display text-[14px] text-ink leading-none">{s.date.split("-")[2]}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-medium text-ink truncate">{ev?.name || "Escala"}</div>
+                  <div className="text-[11px] text-ink-faint truncate">{dept?.name} · {s.time}</div>
+                  {s.status === "draft" && (
+                    <span className="inline-block mt-0.5 text-[9px] font-semibold text-info bg-info/10 px-1.5 py-0.5 rounded-full">
+                      Rascunho
                     </span>
-                    <span className="font-display text-[20px] leading-none">
-                      {s.date.split("-")[2]}
-                    </span>
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium flex flex-wrap items-center gap-2 leading-snug">
-                      <span className="break-words">{ev?.name || "Escala"}</span>
-                      {ev?.type === "special" && <span className="badge badge-brand">Especial</span>}
-                      {s.status === "draft" && <span className="badge badge-info">Rascunho</span>}
-                      {s.status === "cancelled" && <span className="badge badge-red">Cancelada</span>}
-                    </div>
-
-                    <div className="text-[11px] text-ink-faint break-words leading-relaxed">
-                      {formatShortDate(s.date)} &middot; {s.time} &middot; {dept?.name} &middot; {sm.length} escalados
-                    </div>
-                  </div>
-
-                  {sm.length > 0 ? (
-                    <span className={`badge shrink-0 ${allOk ? "badge-green" : "badge-amber"}`}>
-                      {confirmed}/{sm.length}
-                      {allOk ? " \u2713" : ""}
-                    </span>
-                  ) : (
-                    <span className="badge shrink-0 badge-info">Vazia</span>
                   )}
-                </Link>
-
-                {canDo("schedule.delete") && (
-                  <button
-                    onClick={() => setScheduleToDelete(s.id)}
-                    className="btn btn-ghost btn-sm text-danger self-start sm:self-auto opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                    title="Excluir"
-                    aria-label="Excluir escala"
-                  >
-                    &#10005;
-                  </button>
-                )}
-              </div>
+                </div>
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  {sm.length > 0 && (
+                    <span className={`text-[10px] font-semibold ${confirmed === sm.length ? "text-success" : "text-amber"}`}>
+                      {confirmed}/{sm.length}
+                    </span>
+                  )}
+                  {canDo("schedule.delete") && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setScheduleToDelete(s.id); }}
+                      className="text-[10px] text-danger opacity-0 group-hover:opacity-100 transition-opacity hover:underline"
+                      title="Excluir"
+                    >
+                      excluir
+                    </button>
+                  )}
+                </div>
+              </button>
             );
           })
         )}
       </div>
+    </div>
+  );
+
+  const detailPanel = selectedId ? (
+    <EscalaDetailPanel
+      key={selectedId}
+      scheduleId={selectedId}
+      onRefreshList={loadData}
+    />
+  ) : null;
+
+  const placeholder = (
+    <div className="flex-1 flex items-center justify-center text-center p-8">
+      <div>
+        <p className="text-4xl mb-3 opacity-20">📅</p>
+        <p className="text-sm text-ink-faint">Selecione uma escala para ver os detalhes</p>
+        {canDo("schedule.create") && (
+          <button onClick={openCreationDrawer} className="mt-3 text-sm font-semibold text-brand hover:underline">
+            + Nova Escala
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <SplitView list={listPanel} detail={detailPanel} listWidth={280} placeholder={placeholder} />
+
+      {/* Creation drawer */}
+      <ActionDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title="Nova Escala"
+        width={360}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="input-label">Evento</label>
+            <select
+              className="input-field"
+              value={newEventId}
+              onChange={(e) => setNewEventId(e.target.value)}
+            >
+              {drawerEvents.length === 0 && <option value="">Nenhum evento ativo</option>}
+              {drawerEvents.map((ev) => (
+                <option key={ev.id} value={ev.id}>{ev.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="input-label">Ministério</label>
+            <select
+              className="input-field"
+              value={newDeptId}
+              onChange={(e) => setNewDeptId(e.target.value)}
+            >
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="input-label">Data</label>
+              <DateField value={newDate} onChange={setNewDate} />
+            </div>
+            <div>
+              <label className="input-label">Horário</label>
+              <input
+                type="time"
+                className="input-field"
+                value={newTime}
+                onChange={(e) => setNewTime(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <p className="text-[12px] text-ink-faint">
+            A escala será criada como rascunho. Adicione membros e publique no painel de detalhes.
+          </p>
+
+          <button
+            onClick={createSchedule}
+            disabled={creating || !newEventId || !newDeptId || !newDate}
+            className="btn btn-primary w-full"
+          >
+            {creating ? "Criando..." : "Criar rascunho"}
+          </button>
+        </div>
+      </ActionDrawer>
+
       {scheduleToDelete && (
         <ConfirmDialog
           title="Excluir escala"
@@ -215,6 +356,14 @@ export default function EscalasPage() {
           onConfirm={() => void deleteSchedule(scheduleToDelete)}
         />
       )}
-    </div>
+    </>
+  );
+}
+
+export default function EscalasPage() {
+  return (
+    <Suspense>
+      <EscalasPageInner />
+    </Suspense>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
-import { Avatar } from "@/components/ui";
+import { Avatar, PageShell, PageHeader, DateField } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/utils/helpers";
 import type { UnavailableDate, User, Event, Schedule } from "@/types";
@@ -261,24 +261,21 @@ export default function IndisponibilidadePage() {
   const myUnavailableDates = new Set(allUD.filter((item) => item.user_id === user.id).map((item) => item.date));
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="page-title">Indisponibilidade</h1>
-          <p className="page-subtitle">
-            {isMember
-              ? "Informe quando não poderá ser escalado"
-              : "Veja quando os membros estão indisponíveis"}
-          </p>
-        </div>
-
-        <button
-          onClick={() => setShowForm(true)}
-          className="btn btn-primary btn-sm self-start sm:self-auto"
-        >
-          + Registrar
-        </button>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Disponibilidade"
+        title="Indisponibilidade"
+        subtitle={
+          isMember
+            ? "Informe quando não poderá ser escalado"
+            : "Veja quando os membros estão indisponíveis"
+        }
+        actions={
+          <button onClick={() => setShowForm(true)} className="btn btn-primary btn-sm">
+            + Registrar
+          </button>
+        }
+      />
 
       {!isMember && (
         <div className="mb-5">
@@ -419,25 +416,13 @@ export default function IndisponibilidadePage() {
                 <label className="input-label">
                   {type === "single" ? "Data" : "Data inicial"}
                 </label>
-                <input
-                  type="date"
-                  value={date}
-                  min={today}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="input-field"
-                />
+                <DateField value={date} onChange={setDate} min={today} />
               </div>
 
               {type !== "single" && (
                 <div>
                   <label className="input-label">Data final</label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    min={date || today}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="input-field"
-                  />
+                  <DateField value={endDate} onChange={setEndDate} min={date || today} />
                 </div>
               )}
             </div>
@@ -569,6 +554,6 @@ export default function IndisponibilidadePage() {
           })}
         </details>
       )}
-    </div>
+    </PageShell>
   );
 }

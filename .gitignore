@@ -32,3 +32,8 @@ next-env.d.ts
 
 # misc
 *.log
+
+# tooling / local agent
+.claude/
+.superpowers/
+.conductor/

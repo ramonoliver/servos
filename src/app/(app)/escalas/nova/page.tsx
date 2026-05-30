@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useApp } from "@/hooks/use-app";
-import { Avatar } from "@/components/ui";
+import { Avatar, PageHeader, DateField } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
 import { suggestMembers, autoSelectWithCouples } from "@/lib/ai/engine";
 import { getDayOfWeek, getIconEmoji } from "@/lib/utils/helpers";
@@ -386,18 +386,22 @@ export default function NovaEscalaPage() {
 
   if (loading) {
     return (
-      <div className="max-w-[720px] mx-auto">
+      <div className="w-full">
         <div className="card p-10 text-center text-ink-faint">Carregando...</div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-[720px] mx-auto">
-      <div className="mb-6">
-        <h1 className="page-title">Nova Escala</h1>
-        <p className="page-subtitle">Configure o evento, equipe e publique.</p>
-      </div>
+    <div className="w-full">
+      <PageHeader
+        className="mb-6"
+        backHref="/escalas"
+        backLabel="Escalas"
+        eyebrow="Serviço"
+        title="Nova Escala"
+        subtitle="Configure o evento, equipe e publique."
+      />
 
       <div className="card p-6 mb-5">
         <h3 className="font-display text-lg mb-4">Evento e Data</h3>
@@ -435,12 +439,10 @@ export default function NovaEscalaPage() {
 
           <div>
             <label className="input-label">Data</label>
-            <input
-              type="date"
-              className="input-field"
+            <DateField
               value={date}
-              onChange={(e) => {
-                setDate(e.target.value);
+              onChange={(v) => {
+                setDate(v);
                 setAiRan(false);
               }}
             />

@@ -20,6 +20,7 @@ const bodySchema = z.object({
     role: z.enum(["admin", "leader", "member"]),
     status: z.enum(["active", "inactive", "paused", "vacation"]),
     spouse_id: z.string().nullable(),
+    photo_url: z.string().nullable().optional(),
   }),
   selectedDepartments: z.array(selectedDepartmentSchema).default([]),
   spouseId: z.string().default(""),

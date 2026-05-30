@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useApp } from "@/hooks/use-app";
-import { Avatar } from "@/components/ui";
+import { Avatar, PageHeader } from "@/components/ui";
 import { MentionInput } from "@/components/ui/mention-input";
 import { supabase } from "@/lib/supabase/client";
 import { useSearchParams } from "next/navigation";
@@ -252,10 +252,7 @@ export default function MensagensPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="page-title">Mensagens</h1>
-        <p className="page-subtitle">Chat por ministério</p>
-      </div>
+      <PageHeader className="mb-6" eyebrow="Comunicação" title="Mensagens" subtitle="Chat por ministério" />
 
       <div className="flex gap-1 mb-5 bg-surface-alt rounded-[10px] p-0.5 w-fit max-w-full flex-wrap">
         {visibleDepartments.map((d) => (

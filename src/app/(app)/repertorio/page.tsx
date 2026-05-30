@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
+import { PageShell, PageHeader } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
 
 export type Song = {
@@ -190,21 +191,19 @@ export default function RepertorioPage() {
   const themes = ["all", ...THEMES];
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="page-title">Repertório</h1>
-          <p className="page-subtitle">{songs.length} músicas cadastradas</p>
-        </div>
-        {canDo("schedule.create") && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="btn btn-primary btn-sm self-start sm:self-auto"
-          >
-            + Adicionar música
-          </button>
-        )}
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Louvor"
+        title="Repertório"
+        subtitle={`${songs.length} música${songs.length === 1 ? "" : "s"} cadastrada${songs.length === 1 ? "" : "s"}`}
+        actions={
+          canDo("schedule.create") && (
+            <button onClick={() => setShowForm(true)} className="btn btn-primary btn-sm">
+              + Adicionar música
+            </button>
+          )
+        }
+      />
 
       {showForm && (
         <div className="card mb-6">
@@ -472,6 +471,6 @@ export default function RepertorioPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

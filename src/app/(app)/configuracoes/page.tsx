@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useApp } from "@/hooks/use-app";
+import { PageHeader } from "@/components/ui";
 
 export default function ConfiguraçõesPage() {
   const { toast, church, refresh, user } = useApp();
@@ -46,11 +47,13 @@ export default function ConfiguraçõesPage() {
   }
 
   return (
-    <div className="max-w-[720px]">
-      <div className="mb-6">
-        <h1 className="page-title">Configurações</h1>
-        <p className="page-subtitle">Ajustes gerais da igreja e orientações de uso</p>
-      </div>
+    <div className="w-full">
+      <PageHeader
+        className="mb-6"
+        eyebrow="Sistema"
+        title="Configurações"
+        subtitle="Ajustes gerais da igreja e orientações de uso"
+      />
 
       <div className="card p-6 mb-5">
         <h3 className="font-display text-lg mb-4">Igreja</h3>

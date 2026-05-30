@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
+import { PageShell, PageHeader } from "@/components/ui";
 import Link from "next/link";
 import type { Notification } from "@/types";
 
@@ -111,23 +112,19 @@ export default function NotificaçõesPage() {
   }
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div className="flex items-center gap-2">
-          <h1 className="page-title">Notificações</h1>
-          {unreadCount > 0 && <span className="badge badge-red">{unreadCount}</span>}
-        </div>
-
-        {hasUnread && (
-          <button
-            onClick={markAllRead}
-            disabled={markingAll}
-            className="btn btn-secondary btn-sm self-start sm:self-auto"
-          >
-            {markingAll ? "Marcando..." : "Marcar todas como lidas"}
-          </button>
-        )}
-      </div>
+    <PageShell width="narrow">
+      <PageHeader
+        eyebrow="Atualizações"
+        title="Notificações"
+        subtitle={unreadCount > 0 ? `${unreadCount} não lida${unreadCount === 1 ? "" : "s"}` : "Tudo em dia"}
+        actions={
+          hasUnread && (
+            <button onClick={markAllRead} disabled={markingAll} className="btn btn-secondary btn-sm">
+              {markingAll ? "Marcando..." : "Marcar todas como lidas"}
+            </button>
+          )
+        }
+      />
 
       {loading ? (
         <div className="card px-5 py-16 text-center">
@@ -208,6 +205,6 @@ export default function NotificaçõesPage() {
           )}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

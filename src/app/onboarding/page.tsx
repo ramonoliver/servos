@@ -16,12 +16,9 @@ type OnboardingProgress = {
 };
 
 const STEPS = [
-  { id: "welcome", title: "Bem-vindo ao Servos!", subtitle: "Vamos configurar sua igreja em poucos passos." },
-  { id: "church", title: "Sua Igreja", subtitle: "Complete as informações da sua igreja." },
+  { id: "church", title: "Sua Igreja", subtitle: "Bem-vindo ao Servos! Confirme os dados da sua igreja." },
   { id: "department", title: "Primeiro Ministério", subtitle: "Crie o primeiro ministério da sua igreja." },
-  { id: "invite", title: "Convide Alguem", subtitle: "Traga um lider ou membro para servir com voce." },
-  { id: "event", title: "Primeiro Evento", subtitle: "Configure o culto principal da sua igreja." },
-  { id: "done", title: "Tudo pronto!", subtitle: "Seu ministério está organizado. Vamos servir." },
+  { id: "invite", title: "Convide Alguém", subtitle: "Traga um líder ou membro para servir com você (opcional)." },
 ] as const;
 
 const DEPT_ICONS = [
@@ -58,9 +55,6 @@ export default function OnboardingPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [tempPw, setTempPw] = useState<string | null>(null);
 
-  const [eventName, setEventName] = useState("Culto de Domingo");
-  const [eventTime, setEventTime] = useState("18:00");
-
   async function loadData() {
     const session = getSession();
 
@@ -87,13 +81,7 @@ export default function OnboardingPage() {
     ]);
 
     if (userError || churchError || onboardingError || departmentsError || eventsError) {
-      console.error({
-        userError,
-        churchError,
-        onboardingError,
-        departmentsError,
-        eventsError,
-      });
+      console.error({ userError, churchError, onboardingError, departmentsError, eventsError });
       router.replace("/login");
       return;
     }
@@ -126,78 +114,47 @@ export default function OnboardingPage() {
         .from("churches")
         .update({ city: churchCity })
         .eq("id", church.id);
-
-      if (error) {
-        console.error("Erro ao atualizar igreja:", error);
-        return;
-      }
+      if (error) { console.error("Erro ao atualizar igreja:", error); return; }
     }
 
     if (current === "department" && deptName.trim()) {
       const alreadyExists = existingDepartments.some((d) => d.name === deptName);
-
       if (!alreadyExists) {
         const deptId = genId();
-
-        const { error: deptError } = await supabase
-          .from("departments")
-          .insert({
-            id: deptId,
-            church_id: church.id,
-            name: deptName.trim(),
-            description: "",
-            icon: deptIcon,
-            color: "#D4A574",
-            leader_ids: [user.id],
-            co_leader_ids: [],
-            active: true,
-            created_at: new Date().toISOString(),
-          });
-
-        if (deptError) {
-          console.error("Erro ao criar ministério:", deptError);
-          return;
-        }
-
-        const { error: dmError } = await supabase
-          .from("department_members")
-          .insert({
-            id: genId(),
-            department_id: deptId,
-            user_id: user.id,
-            function_name: "Líder",
-            function_names: ["Líder"],
-            joined_at: new Date().toISOString(),
-          });
-
-        if (dmError) {
-          console.error("Erro ao vincular líder ao ministério:", dmError);
-          return;
-        }
+        const { error: deptError } = await supabase.from("departments").insert({
+          id: deptId,
+          church_id: church.id,
+          name: deptName.trim(),
+          description: "",
+          icon: deptIcon,
+          color: "#D4A574",
+          leader_ids: [user.id],
+          co_leader_ids: [],
+          active: true,
+          created_at: new Date().toISOString(),
+        });
+        if (deptError) { console.error("Erro ao criar ministério:", deptError); return; }
+        const { error: dmError } = await supabase.from("department_members").insert({
+          id: genId(),
+          department_id: deptId,
+          user_id: user.id,
+          function_name: "Líder",
+          function_names: ["Líder"],
+          joined_at: new Date().toISOString(),
+        });
+        if (dmError) { console.error("Erro ao vincular líder ao ministério:", dmError); return; }
       }
     }
 
     if (current === "invite" && inviteName.trim() && inviteEmail.trim()) {
       const normalizedEmail = inviteEmail.trim().toLowerCase();
-
-      const { data: existingUser, error: existingUserError } = await supabase
-        .from("users")
-        .select("id")
-        .eq("email", normalizedEmail)
-        .maybeSingle();
-
-      if (existingUserError) {
-        console.error("Erro ao verificar usuário convidado:", existingUserError);
-        return;
-      }
-
+      const { data: existingUser } = await supabase
+        .from("users").select("id").eq("email", normalizedEmail).maybeSingle();
       if (!existingUser) {
         try {
           const response = await fetch("/api/member-invitations/create", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               name: inviteName.trim(),
               email: normalizedEmail,
@@ -207,16 +164,12 @@ export default function OnboardingPage() {
               selectedDepartments: [],
             }),
           });
-
           if (!response.ok) {
             const errorData = await response.json().catch(() => null);
             console.error("Erro ao convidar usuario:", errorData || response.statusText);
             return;
           }
-
-          const payload = (await response.json().catch(() => null)) as
-            | { tempPassword?: string }
-            | null;
+          const payload = (await response.json().catch(() => null)) as { tempPassword?: string } | null;
           setTempPw(payload?.tempPassword || null);
         } catch (error) {
           console.error("Erro ao convidar usuario:", error);
@@ -225,65 +178,20 @@ export default function OnboardingPage() {
       }
     }
 
-    if (current === "event" && eventName.trim()) {
-      const alreadyExists = existingEvents.some((e) => e.name === eventName);
-
-      if (!alreadyExists) {
-        const { error } = await supabase
-          .from("events")
-          .insert({
-            id: genId(),
-            church_id: church.id,
-            name: eventName.trim(),
-            description: "",
-            type: "recurring",
-            icon: "church",
-            location: "",
-            base_time: eventTime,
-            instructions: "",
-            recurrence: "weekly",
-            active: true,
-            created_at: new Date().toISOString(),
-          });
-
-        if (error) {
-          console.error("Erro ao criar evento:", error);
-          return;
-        }
-      }
-    }
-
-    if (current === "done") {
+    // Last step: mark complete and redirect
+    if (step === STEPS.length - 1) {
+      const completedSteps = STEPS.map((s) => s.id);
       if (onboarding) {
-        const { error } = await supabase
-          .from("onboarding_progress")
-          .update({
-            completed: true,
-            completed_steps: STEPS.map((s) => s.id),
-          })
-          .eq("id", onboarding.id);
-
-        if (error) {
-          console.error("Erro ao concluir onboarding:", error);
-          return;
-        }
+        await supabase.from("onboarding_progress").update({ completed: true, completed_steps: completedSteps }).eq("id", onboarding.id);
       } else if (sessionChurchId) {
-        const { error } = await supabase
-          .from("onboarding_progress")
-          .insert({
-            id: genId(),
-            church_id: sessionChurchId,
-            completed: true,
-            completed_steps: STEPS.map((s) => s.id),
-            created_at: new Date().toISOString(),
-          });
-
-        if (error) {
-          console.error("Erro ao criar progresso do onboarding:", error);
-          return;
-        }
+        await supabase.from("onboarding_progress").insert({
+          id: genId(),
+          church_id: sessionChurchId,
+          completed: true,
+          completed_steps: completedSteps,
+          created_at: new Date().toISOString(),
+        });
       }
-
       router.push("/dashboard");
       return;
     }
@@ -293,6 +201,10 @@ export default function OnboardingPage() {
   }
 
   function skip() {
+    if (step === STEPS.length - 1) {
+      router.push("/dashboard");
+      return;
+    }
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   }
 
@@ -301,70 +213,46 @@ export default function OnboardingPage() {
   }
 
   const current = STEPS[step];
-  const progress = (step / (STEPS.length - 1)) * 100;
+  const isLast = step === STEPS.length - 1;
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-4">
-      <div className="w-full max-w-[480px]">
-        <div className="mb-8">
-          <div className="h-1 bg-border-soft rounded-full overflow-hidden">
+    <div className="min-h-screen bg-[#F7F7F5] flex flex-col items-center justify-center p-4">
+      {/* Logo */}
+      <div className="flex items-center gap-2 mb-8">
+        <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center">
+          <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+            <path d="M12 3C8 3 5 7.5 5 12C5 16.5 8 21 12 24C16 21 19 16.5 19 12C19 7.5 16 3 12 3Z" fill="rgba(255,255,255,.35)" />
+            <circle cx="12" cy="12.5" r="2.5" fill="white" />
+          </svg>
+        </div>
+        <span className="font-display text-[17px] font-semibold text-ink">Servos</span>
+      </div>
+
+      <div className="w-full max-w-[440px]">
+        {/* Step dots */}
+        <div className="flex items-center justify-center gap-2 mb-6">
+          {STEPS.map((s, i) => (
             <div
-              className="h-full bg-brand rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
+              key={s.id}
+              className={`rounded-full transition-all duration-300 ${
+                i === step
+                  ? "w-5 h-2 bg-brand"
+                  : i < step
+                  ? "w-2 h-2 bg-brand/40"
+                  : "w-2 h-2 bg-border"
+              }`}
             />
-          </div>
-          <div className="flex justify-between mt-2">
-            <span className="text-[10px] text-ink-faint">
-              Passo {step + 1} de {STEPS.length}
-            </span>
-            {step > 0 && step < STEPS.length - 1 && (
-              <button
-                onClick={skip}
-                className="text-[10px] text-ink-faint hover:text-brand transition-colors"
-              >
-                Pular
-              </button>
-            )}
-          </div>
+          ))}
         </div>
 
-        <div className="bg-white rounded-2xl border border-border-soft shadow-lg p-8">
-          <div className="text-center mb-8">
-            {step === 0 && (
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand to-brand-deep flex items-center justify-center shadow-lg shadow-brand/30 mx-auto mb-5">
-                <svg viewBox="0 0 24 24" fill="none" width="32" height="32">
-                  <path
-                    d="M12 3C8 3 5 7.5 5 12C5 16.5 8 21 12 24C16 21 19 16.5 19 12C19 7.5 16 3 12 3Z"
-                    fill="rgba(255,255,255,.3)"
-                  />
-                  <circle cx="12" cy="12.5" r="2.5" fill="white" />
-                </svg>
-              </div>
-            )}
-
-            {step === STEPS.length - 1 && <div className="text-5xl mb-4">&#127881;</div>}
-
-            <h2 className="font-display text-2xl mb-1">{current.title}</h2>
-            <p className="text-sm text-ink-muted">{current.subtitle}</p>
+        <div className="bg-white rounded-2xl border border-border-soft shadow-sm p-7">
+          <div className="mb-6">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint mb-1">
+              Passo {step + 1} de {STEPS.length}
+            </p>
+            <h2 className="font-display text-xl font-bold text-ink">{current.title}</h2>
+            <p className="text-sm text-ink-muted mt-1">{current.subtitle}</p>
           </div>
-
-          {current.id === "welcome" && (
-            <div className="space-y-3 mb-6">
-              {[
-                "Criar ministérios",
-                "Montar escalas inteligentes",
-                "Confirmar presença com 1 toque",
-                "Manter tudo organizado",
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-3 py-2">
-                  <div className="w-6 h-6 rounded-full bg-success-light flex items-center justify-center text-success text-xs font-bold">
-                    {"\u2713"}
-                  </div>
-                  <span className="text-sm text-ink-soft">{item}</span>
-                </div>
-              ))}
-            </div>
-          )}
 
           {current.id === "church" && (
             <div className="space-y-4 mb-6">
@@ -398,7 +286,7 @@ export default function OnboardingPage() {
                 />
               </div>
               <div>
-                <label className="input-label">Icone</label>
+                <label className="input-label">Ícone</label>
                 <div className="flex flex-wrap gap-2">
                   {DEPT_ICONS.map((ic) => (
                     <button
@@ -413,7 +301,7 @@ export default function OnboardingPage() {
                       className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 border-2 transition-all ${
                         deptIcon === ic.value
                           ? "border-brand bg-brand-light font-semibold"
-                          : "border-border-soft"
+                          : "border-border-soft hover:border-ink-ghost"
                       }`}
                     >
                       {getIconEmoji(ic.value)} {ic.label}
@@ -427,10 +315,10 @@ export default function OnboardingPage() {
           {current.id === "invite" && (
             <div className="space-y-4 mb-6">
               {tempPw ? (
-                <div className="text-center">
+                <div className="text-center py-2">
                   <div className="text-3xl mb-3">&#9989;</div>
-                  <p className="text-sm font-semibold mb-2">{inviteName} convidado!</p>
-                  <div className="bg-surface-alt rounded-[14px] p-4 text-left text-sm mb-3">
+                  <p className="text-sm font-semibold mb-3">{inviteName} convidado!</p>
+                  <div className="bg-[#F7F7F5] rounded-xl p-4 text-left text-sm">
                     <div className="text-ink-muted mb-1">
                       Email: <strong className="text-ink">{inviteEmail}</strong>
                     </div>
@@ -438,7 +326,7 @@ export default function OnboardingPage() {
                       Senha: <strong className="text-brand font-mono">{tempPw}</strong>
                     </div>
                   </div>
-                  <p className="text-xs text-ink-faint">Envie essas credenciais para o membro.</p>
+                  <p className="text-xs text-ink-faint mt-3">Envie essas credenciais para o membro.</p>
                 </div>
               ) : (
                 <>
@@ -467,54 +355,16 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {current.id === "event" && (
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="input-label">Nome do evento</label>
-                <input
-                  className="input-field"
-                  value={eventName}
-                  onChange={(e) => setEventName(e.target.value)}
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="input-label">Horario</label>
-                <input
-                  type="time"
-                  className="input-field"
-                  value={eventTime}
-                  onChange={(e) => setEventTime(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
-          {current.id === "done" && (
-            <div className="space-y-3 mb-6">
-              {[
-                "Igreja configurada",
-                "Ministério criado",
-                inviteName ? `${inviteName} convidado` : "Membro pode ser convidado depois",
-                `${eventName} criado`,
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-3 py-1.5">
-                  <div className="w-5 h-5 rounded-full bg-success-light flex items-center justify-center text-success text-[10px] font-bold">
-                    {"\u2713"}
-                  </div>
-                  <span className="text-sm text-ink-soft">{item}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <button onClick={next} className="btn btn-primary w-full py-3 text-base">
-            {current.id === "done"
-              ? "Ir para o Dashboard"
-              : current.id === "welcome"
-              ? "Comecar"
-              : "Continuar"}
-          </button>
+          <div className="flex gap-2">
+            {isLast && !tempPw && (
+              <button onClick={skip} className="btn btn-secondary flex-1">
+                Pular
+              </button>
+            )}
+            <button onClick={next} className="btn btn-primary flex-1 py-2.5">
+              {isLast ? (tempPw ? "Ir para o Dashboard" : "Finalizar") : "Continuar"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

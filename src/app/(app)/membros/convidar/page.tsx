@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/hooks/use-app";
 import { formatPhoneInput } from "@/lib/invitations";
+import { fileToAvatarDataUrl } from "@/lib/utils/image";
+import { getInitials } from "@/lib/utils/helpers";
 import { supabase } from "@/lib/supabase/client";
 import { getIconEmoji } from "@/lib/utils/helpers";
+import { PageHeader } from "@/components/ui";
 import type { User } from "@/types";
 
 type MemberRole = "member" | "leader" | "admin";
@@ -45,6 +48,21 @@ export default function ConvidarMembroPage() {
   });
 
   const [selectedDepartments, setSelectedDepartments] = useState<SelectedDepartment[]>([]);
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  async function handlePhoto(file: File | undefined) {
+    if (!file) return;
+    setPhotoBusy(true);
+    try {
+      setPhoto(await fileToAvatarDataUrl(file));
+    } catch (err) {
+      console.error("Erro ao processar a foto:", err);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
   const [tempPw, setTempPw] = useState<string | null>(null);
   const [createdName, setCreatedName] = useState("");
   const [createdEmail, setCreatedEmail] = useState("");
@@ -158,6 +176,7 @@ export default function ConvidarMembroPage() {
           phone: f.phone.trim(),
           role: f.role,
           spouseId: f.spouseId,
+          photoUrl: photo,
           selectedDepartments,
         }),
       });
@@ -311,13 +330,55 @@ export default function ConvidarMembroPage() {
   }
 
   return (
-    <div className="max-w-[760px] mx-auto">
-      <div className="mb-6">
-        <h1 className="page-title">Convidar Membro</h1>
-        <p className="page-subtitle">Adicione um novo voluntario com acesso ao app.</p>
-      </div>
+    <div className="w-full">
+      <PageHeader
+        className="mb-6"
+        backHref="/membros"
+        backLabel="Membros"
+        eyebrow="Comunidade"
+        title="Convidar Membro"
+        subtitle="Adicione um novo voluntário com acesso ao app."
+      />
 
       <div className="card p-6 space-y-6">
+        <div className="flex items-center gap-4">
+          <div className="relative shrink-0">
+            {photo ? (
+              <img src={photo} alt="Foto do membro" className="h-16 w-16 rounded-full object-cover ring-2 ring-white" />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-alt text-base font-bold text-ink-faint">
+                {f.name.trim() ? getInitials(f.name) : "?"}
+              </div>
+            )}
+            {photoBusy && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-white/60 text-[10px] font-semibold text-ink-muted">…</div>
+            )}
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-ink">Foto (opcional)</div>
+            <div className="mt-1.5 flex items-center gap-2">
+              <button type="button" onClick={() => fileRef.current?.click()} className="btn btn-secondary btn-sm">
+                {photo ? "Trocar foto" : "Adicionar foto"}
+              </button>
+              {photo && (
+                <button type="button" onClick={() => setPhoto(null)} className="text-xs font-semibold text-ink-faint transition hover:text-danger">
+                  Remover
+                </button>
+              )}
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                void handlePhoto(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="input-label">Nome completo</label>

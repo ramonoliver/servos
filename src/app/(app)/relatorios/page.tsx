@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
-import { Avatar } from "@/components/ui";
+import { Avatar, PageShell, PageHeader, SectionCard, StatTile } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
 import type { User, Schedule, ScheduleMember, ScheduleSlot } from "@/types";
 
@@ -113,118 +113,80 @@ export default function RelatóriosPage() {
   }, [allSlots, schedules, departments]);
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="page-title">Relatórios</h1>
-        <p className="page-subtitle">Insights do seu ministério</p>
+    <PageShell>
+      <PageHeader
+        eyebrow="Análise"
+        title="Relatórios"
+        subtitle="Insights do seu ministério — quem mais serve, confirmações e lacunas de cobertura."
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatTile tone="brand" loading={loading} value={schedules.length} label="Total de escalas" icon="🗓️" />
+        <StatTile tone="success" loading={loading} value={`${confirmRate}%`} label="Taxa de confirmação" icon="✅" />
+        <StatTile tone="info" loading={loading} value={members.length} label="Membros ativos" icon="👥" />
+        <StatTile tone="amber" loading={loading} value={`${totalCoverageRate}%`} label="Cobertura das funções" icon="🎯" />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <div className="bg-surface border border-border-soft rounded-[14px] px-5 py-4">
-          <div className="font-display text-[28px] text-brand">
-            {loading ? "..." : schedules.length}
-          </div>
-          <div className="text-xs text-ink-muted">Total de escalas</div>
-        </div>
-
-        <div className="bg-surface border border-border-soft rounded-[14px] px-5 py-4">
-          <div className="font-display text-[28px] text-success">
-            {loading ? "..." : `${confirmRate}%`}
-          </div>
-          <div className="text-xs text-ink-muted">Taxa de confirmação</div>
-        </div>
-
-        <div className="bg-surface border border-border-soft rounded-[14px] px-5 py-4">
-          <div className="font-display text-[28px] text-info">
-            {loading ? "..." : members.length}
-          </div>
-          <div className="text-xs text-ink-muted">Membros ativos</div>
-        </div>
-
-        <div className="bg-surface border border-border-soft rounded-[14px] px-5 py-4">
-          <div className="font-display text-[28px] text-amber">
-            {loading ? "..." : `${totalCoverageRate}%`}
-          </div>
-          <div className="text-xs text-ink-muted">Cobertura das funções</div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <div className="card">
-          <div className="px-5 pt-4 pb-3">
-            <span className="font-display text-[17px]">Mais servem</span>
-          </div>
-
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <SectionCard title="Mais servem" padding="none">
           {loading ? (
-            <div className="px-5 py-6 text-sm text-ink-faint text-center">Carregando...</div>
+            <div className="px-5 py-6 text-center text-sm text-ink-faint">Carregando...</div>
           ) : topServing.length === 0 ? (
-            <div className="px-5 py-6 text-sm text-ink-faint text-center">Nenhum dado.</div>
+            <div className="px-5 py-6 text-center text-sm text-ink-faint">Nenhum dado.</div>
           ) : (
             topServing.map((m, i) => (
-              <div key={m.id} className="flex items-center gap-3 px-5 py-2.5 border-t border-border-soft">
-                <span className="text-xs text-ink-faint w-4">{i + 1}.</span>
+              <div key={m.id} className="flex items-center gap-3 border-t border-border-soft px-5 py-2.5 first:border-t-0">
+                <span className="w-4 text-xs text-ink-faint">{i + 1}.</span>
                 <Avatar name={m.name} color={m.avatar_color} photoUrl={m.photo_url} size={28} />
                 <div className="flex-1 text-sm font-medium">{m.name}</div>
                 <span className="text-sm font-semibold text-brand">{m.total_schedules}</span>
               </div>
             ))
           )}
-        </div>
+        </SectionCard>
 
-        <div className="card">
-          <div className="px-5 pt-4 pb-3">
-            <span className="font-display text-[17px]">Menor confirmação</span>
-          </div>
-
+        <SectionCard title="Menor confirmação" padding="none">
           {loading ? (
-            <div className="px-5 py-6 text-sm text-ink-faint text-center">Carregando...</div>
+            <div className="px-5 py-6 text-center text-sm text-ink-faint">Carregando...</div>
           ) : lowConfirm.length === 0 ? (
-            <div className="px-5 py-6 text-sm text-ink-faint text-center">Dados insuficientes.</div>
+            <div className="px-5 py-6 text-center text-sm text-ink-faint">Dados insuficientes.</div>
           ) : (
             lowConfirm.map((m, i) => (
-              <div key={m.id} className="flex items-center gap-3 px-5 py-2.5 border-t border-border-soft">
-                <span className="text-xs text-ink-faint w-4">{i + 1}.</span>
+              <div key={m.id} className="flex items-center gap-3 border-t border-border-soft px-5 py-2.5 first:border-t-0">
+                <span className="w-4 text-xs text-ink-faint">{i + 1}.</span>
                 <Avatar name={m.name} color={m.avatar_color} photoUrl={m.photo_url} size={28} />
                 <div className="flex-1 text-sm font-medium">{m.name}</div>
-                <span
-                  className={`text-sm font-semibold ${
-                    m.confirm_rate < 80 ? "text-danger" : "text-amber"
-                  }`}
-                >
+                <span className={`text-sm font-semibold ${m.confirm_rate < 80 ? "text-danger" : "text-amber"}`}>
                   {m.confirm_rate}%
                 </span>
               </div>
             ))
           )}
-        </div>
+        </SectionCard>
 
-        <div className="card">
-          <div className="px-5 pt-4 pb-3">
-            <span className="font-display text-[17px]">Funções mais descobertas</span>
-          </div>
-
+        <SectionCard title="Funções mais descobertas" padding="none">
           {loading ? (
-            <div className="px-5 py-6 text-sm text-ink-faint text-center">Carregando...</div>
+            <div className="px-5 py-6 text-center text-sm text-ink-faint">Carregando...</div>
           ) : uncoveredFunctions.length === 0 ? (
-            <div className="px-5 py-6 text-sm text-ink-faint text-center">
+            <div className="px-5 py-6 text-center text-sm text-ink-faint">
               Nenhuma lacuna de cobertura nas funções planejadas.
             </div>
           ) : (
             uncoveredFunctions.map((item) => (
               <div
                 key={item.key}
-                className="flex items-start justify-between gap-3 px-5 py-3 border-t border-border-soft"
+                className="flex items-start justify-between gap-3 border-t border-border-soft px-5 py-3 first:border-t-0"
               >
                 <div className="min-w-0">
-                  <div className="text-sm font-medium break-words">{item.functionName}</div>
-                  <div className="text-[11px] text-ink-faint break-words">{item.departmentName}</div>
+                  <div className="break-words text-sm font-medium">{item.functionName}</div>
+                  <div className="break-words text-[11px] text-ink-faint">{item.departmentName}</div>
                 </div>
-                <span className="text-sm font-semibold text-amber shrink-0">-{item.missing}</span>
+                <span className="shrink-0 text-sm font-semibold text-amber">-{item.missing}</span>
               </div>
             ))
           )}
-        </div>
+        </SectionCard>
       </div>
-    </div>
+    </PageShell>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { getIconEmoji } from "@/lib/utils/helpers";
+import { PageShell, PageHeader, StatTile } from "@/components/ui";
 import type { Event } from "@/types";
 
 const ICONS = ["church", "cross", "flower", "flame", "star", "music", "heart", "book"] as const;
@@ -78,52 +79,24 @@ export default function EventosPage() {
   }
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div className="max-w-2xl">
-          <h1 className="page-title">Eventos</h1>
-          <p className="page-subtitle">
-            Organize a agenda da igreja com uma leitura mais clara entre bases recorrentes e
-            programações especiais.
-          </p>
-        </div>
-        {canDo("event.create") && (
-          <button onClick={() => setModal({ type: "form" })} className="btn btn-primary self-start sm:self-auto">
-            + Novo
-          </button>
-        )}
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Agenda"
+        title="Eventos"
+        subtitle="Organize a agenda da igreja com uma leitura mais clara entre bases recorrentes e programações especiais."
+        actions={
+          canDo("event.create") && (
+            <button onClick={() => setModal({ type: "form" })} className="btn btn-primary btn-sm">
+              + Novo
+            </button>
+          )
+        }
+      />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-6">
-        <div className="rounded-[18px] border border-border-soft bg-[linear-gradient(180deg,rgba(236,245,238,0.9),rgba(255,255,255,0.96))] px-4 py-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
-            Recorrentes
-          </div>
-          <div className="mt-2 font-display text-[28px] leading-none text-success">{recurring.length}</div>
-          <div className="mt-1 text-xs text-ink-muted leading-relaxed">
-            Bases semanais que sustentam as escalas.
-          </div>
-        </div>
-
-        <div className="rounded-[18px] border border-border-soft bg-[linear-gradient(180deg,rgba(255,241,230,0.9),rgba(255,255,255,0.96))] px-4 py-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
-            Especiais
-          </div>
-          <div className="mt-2 font-display text-[28px] leading-none text-brand">{special.length}</div>
-          <div className="mt-1 text-xs text-ink-muted leading-relaxed">
-            Eventos únicos ou fora do ritmo semanal.
-          </div>
-        </div>
-
-        <div className="rounded-[18px] border border-border-soft bg-[linear-gradient(180deg,rgba(240,246,255,0.9),rgba(255,255,255,0.96))] px-4 py-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
-            Com horário base
-          </div>
-          <div className="mt-2 font-display text-[28px] leading-none text-info">{withTime}</div>
-          <div className="mt-1 text-xs text-ink-muted leading-relaxed">
-            Prontos para agilizar a criação de escala.
-          </div>
-        </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatTile tone="success" value={recurring.length} label="Recorrentes" hint="Bases semanais que sustentam as escalas." icon="🔁" />
+        <StatTile tone="brand" value={special.length} label="Especiais" hint="Eventos únicos ou fora do ritmo semanal." icon="✨" />
+        <StatTile tone="info" value={withTime} label="Com horário base" hint="Prontos para agilizar a criação de escala." icon="⏰" />
       </div>
 
       {[{ title: "Cultos Recorrentes", list: recurring }, { title: "Eventos Especiais", list: special }].map(
@@ -241,7 +214,7 @@ export default function EventosPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }
 

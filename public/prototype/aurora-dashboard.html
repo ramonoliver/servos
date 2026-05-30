@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Servos · Aurora — protótipo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,500&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     AURORA SUAVE — design tokens
+     fresh · luminous · light · warm · playful-but-refined
+     ============================================================ */
+  :root {
+    /* brand — fresh warm coral (refreshed from terracotta) */
+    --coral-50:  #FFF1EE;
+    --coral-100: #FFE2DC;
+    --coral-400: #FF8A78;
+    --coral:     #FF6B57;
+    --coral-600: #F0492F;
+
+    /* luminous accents */
+    --sky:    #38BDF0;
+    --sky-50: #E8F8FE;
+    --lav:    #9B8CFB;
+    --lav-50: #F0ECFF;
+    --mint:   #2DD4A7;
+    --mint-50:#E2FBF3;
+    --sun:    #FFC24B;
+    --sun-50: #FFF6E2;
+    --rose:   #FB7199;
+    --rose-50:#FFEDF2;
+
+    /* ink — warm near-black with a plum undertone */
+    --ink:       #1B1726;
+    --ink-soft:  #423C52;
+    --ink-muted: #736D82;
+    --ink-faint: #A39DAE;
+    --ink-ghost: #CDC9D4;
+
+    /* surfaces */
+    --paper:    #FBFAFF;
+    --white:    #FFFFFF;
+    --glass:    rgba(255,255,255,0.72);
+    --glass-2:  rgba(255,255,255,0.55);
+    --line:     rgba(27,23,38,0.07);
+    --line-2:   rgba(27,23,38,0.045);
+
+    /* shadows — soft, layered, luminous */
+    --sh-sm: 0 2px 6px rgba(27,23,38,0.04), 0 1px 2px rgba(27,23,38,0.04);
+    --sh:    0 8px 24px -10px rgba(60,40,90,0.18), 0 2px 8px rgba(27,23,38,0.04);
+    --sh-lg: 0 28px 60px -22px rgba(70,45,110,0.28), 0 6px 18px rgba(27,23,38,0.05);
+    --sh-coral: 0 14px 30px -10px rgba(255,107,87,0.45);
+
+    --r-sm: 14px;
+    --r:    20px;
+    --r-lg: 28px;
+    --r-xl: 34px;
+
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--paper);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  ::selection { background: var(--coral-100); color: var(--coral-600); }
+  h1,h2,h3,h4 { font-family: 'Schibsted Grotesk', system-ui, sans-serif; letter-spacing: -0.02em; }
+
+  /* ===== luminous aurora background ===== */
+  .aurora {
+    position: fixed; inset: 0; z-index: -2; overflow: hidden;
+    background:
+      radial-gradient(60% 50% at 12% 8%, rgba(255,107,87,0.16), transparent 60%),
+      radial-gradient(55% 45% at 92% 4%, rgba(56,189,240,0.14), transparent 60%),
+      radial-gradient(50% 50% at 78% 88%, rgba(155,140,251,0.14), transparent 60%),
+      radial-gradient(45% 45% at 8% 92%, rgba(45,212,167,0.12), transparent 60%),
+      var(--paper);
+  }
+  .blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.55; mix-blend-mode: multiply; }
+  .blob.b1 { width: 460px; height: 460px; left: -120px; top: -120px; background: radial-gradient(circle, #ffb3a6, transparent 70%); animation: drift 22s var(--ease) infinite; }
+  .blob.b2 { width: 420px; height: 420px; right: -100px; top: -80px; background: radial-gradient(circle, #a9e4f7, transparent 70%); animation: drift 26s var(--ease) infinite reverse; }
+  .blob.b3 { width: 520px; height: 520px; right: 10%; bottom: -200px; background: radial-gradient(circle, #d7ccff, transparent 70%); animation: drift2 28s var(--ease) infinite; }
+  .grain { position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0.5;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E"); }
+
+  @keyframes drift { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(40px,30px) scale(1.08); } }
+  @keyframes drift2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-50px,-20px) scale(1.1); } }
+
+  /* ============================================================ layout */
+  .app { display: grid; grid-template-columns: 268px 1fr; min-height: 100vh; }
+
+  /* ===== sidebar ===== */
+  .side {
+    position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column;
+    padding: 22px 18px; gap: 6px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.35));
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; padding: 6px 8px 18px; }
+  .brand-mark {
+    width: 44px; height: 44px; border-radius: 14px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--coral), var(--rose));
+    display: grid; place-items: center; color: #fff;
+    box-shadow: var(--sh-coral);
+    animation: pop 0.7s var(--spring) both;
+  }
+  .brand-mark svg { width: 22px; height: 24px; }
+  .brand-name { font-family: 'Schibsted Grotesk'; font-weight: 800; font-size: 20px; line-height: 1; }
+  .brand-sub { font-size: 11px; color: var(--ink-faint); font-weight: 600; margin-top: 3px; }
+
+  .nav { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; position: relative; }
+  .nav-label { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-ghost); padding: 16px 12px 6px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px; padding: 11px 13px; border-radius: 15px;
+    color: var(--ink-muted); font-weight: 600; font-size: 14px; cursor: pointer;
+    position: relative; z-index: 1; transition: color .25s var(--ease), transform .25s var(--spring);
+    user-select: none;
+  }
+  .nav-item svg { width: 19px; height: 19px; opacity: 0.85; transition: transform .3s var(--spring); }
+  .nav-item:hover { color: var(--ink); transform: translateX(2px); }
+  .nav-item:hover svg { transform: scale(1.12) rotate(-4deg); }
+  .nav-item.active { color: #fff; }
+  .nav-item.active svg { opacity: 1; }
+  .nav-pill {
+    position: absolute; left: 0; right: 0; height: 44px; border-radius: 15px; z-index: 0;
+    background: linear-gradient(135deg, var(--coral), var(--coral-600));
+    box-shadow: var(--sh-coral);
+    transition: transform .42s var(--spring); pointer-events: none;
+  }
+  .nav-badge { margin-left: auto; font-size: 11px; font-weight: 700; background: var(--coral-100); color: var(--coral-600); padding: 1px 8px; border-radius: 999px; }
+  .nav-item.active .nav-badge { background: rgba(255,255,255,0.25); color: #fff; }
+
+  .side-foot { margin-top: auto; display: flex; align-items: center; gap: 11px; padding: 10px; border-radius: 16px; background: var(--glass-2); border: 1px solid var(--line); cursor: pointer; transition: transform .25s var(--spring), box-shadow .25s; }
+  .side-foot:hover { transform: translateY(-2px); box-shadow: var(--sh); }
+  .avatar { border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; color: #fff; font-weight: 700; }
+
+  /* ===== main ===== */
+  .main { padding: 30px 38px 60px; max-width: 1240px; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 26px; }
+  .search {
+    display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-radius: 999px;
+    background: var(--glass); border: 1px solid var(--line); width: 320px; max-width: 40vw;
+    color: var(--ink-faint); font-size: 13.5px; box-shadow: var(--sh-sm);
+    transition: box-shadow .3s, border-color .3s, width .35s var(--ease);
+  }
+  .search:focus-within { border-color: var(--coral-400); box-shadow: 0 0 0 4px var(--coral-50); width: 360px; }
+  .search input { border: none; outline: none; background: transparent; font: inherit; color: var(--ink); flex: 1; }
+  .top-actions { display: flex; align-items: center; gap: 10px; }
+  .icon-btn {
+    width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; cursor: pointer;
+    background: var(--glass); border: 1px solid var(--line); color: var(--ink-soft); position: relative;
+    box-shadow: var(--sh-sm); transition: transform .25s var(--spring), box-shadow .25s, color .25s;
+  }
+  .icon-btn:hover { transform: translateY(-3px); box-shadow: var(--sh); color: var(--coral-600); }
+  .dot { position: absolute; top: 9px; right: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--coral); border: 2px solid var(--white); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; font: inherit; font-weight: 700; font-size: 14px;
+    padding: 12px 20px; border-radius: 999px; border: none; cursor: pointer; position: relative; overflow: hidden;
+    transition: transform .2s var(--spring), box-shadow .25s;
+  }
+  .btn-primary { background: linear-gradient(135deg, var(--coral), var(--coral-600)); color: #fff; box-shadow: var(--sh-coral); }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 18px 38px -10px rgba(255,107,87,0.55); }
+  .btn-primary:active { transform: translateY(0) scale(0.97); }
+  .btn-ghost { background: var(--glass); color: var(--ink-soft); border: 1px solid var(--line); box-shadow: var(--sh-sm); }
+  .btn-ghost:hover { transform: translateY(-2px); box-shadow: var(--sh); }
+  .ripple { position: absolute; border-radius: 50%; transform: scale(0); background: rgba(255,255,255,0.5); animation: ripple .6s var(--ease); pointer-events: none; }
+  @keyframes ripple { to { transform: scale(2.6); opacity: 0; } }
+
+  /* ===== greeting ===== */
+  .greet { margin-bottom: 22px; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--coral-600); margin-bottom: 10px; }
+  .eyebrow .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--coral); box-shadow: 0 0 0 0 var(--coral); animation: pulse 2s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,107,87,0.5);} 70%{ box-shadow: 0 0 0 9px rgba(255,107,87,0);} 100%{ box-shadow:0 0 0 0 rgba(255,107,87,0);} }
+  .greet h1 { font-size: 38px; font-weight: 800; line-height: 1.05; }
+  .greet h1 .wave { display: inline-block; transform-origin: 70% 70%; animation: wave 2.4s var(--ease) infinite; }
+  @keyframes wave { 0%,60%,100%{transform: rotate(0);} 10%{transform:rotate(14deg);} 20%{transform:rotate(-8deg);} 30%{transform:rotate(14deg);} 40%{transform:rotate(-4deg);} 50%{transform:rotate(10deg);} }
+  .greet p { color: var(--ink-muted); font-size: 15.5px; margin-top: 10px; max-width: 620px; line-height: 1.55; }
+
+  /* ===== grid ===== */
+  .grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; }
+  .stack { display: flex; flex-direction: column; gap: 18px; }
+
+  .card {
+    background: var(--glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh);
+    transition: transform .35s var(--ease), box-shadow .35s; position: relative; overflow: hidden;
+  }
+  .card.lift:hover { transform: translateY(-4px); box-shadow: var(--sh-lg); }
+  .card-pad { padding: 22px; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .card-head h3 { font-size: 17px; font-weight: 700; }
+  .link { font-size: 12.5px; font-weight: 700; color: var(--coral-600); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: gap .25s var(--ease); }
+  .link:hover { gap: 8px; }
+
+  /* ===== hero next-schedule ===== */
+  .hero { grid-column: 1 / -1; padding: 0; }
+  .hero-inner { display: grid; grid-template-columns: 1fr 260px; gap: 20px; padding: 26px; position: relative; }
+  .hero::before { content:""; position: absolute; inset: 0;
+    background: linear-gradient(120deg, rgba(255,107,87,0.10), transparent 45%), radial-gradient(70% 120% at 90% 10%, rgba(155,140,251,0.14), transparent 55%);
+    pointer-events: none; }
+  .hero-badge { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--coral-600); background: var(--coral-50); padding: 6px 12px; border-radius: 999px; }
+  .hero-badge svg { width: 13px; height: 13px; }
+  .hero h2 { font-size: 27px; font-weight: 800; margin: 14px 0 8px; line-height: 1.1; }
+  .hero .meta { color: var(--ink-muted); font-size: 14.5px; display: flex; flex-wrap: wrap; gap: 16px; }
+  .hero .meta span { display: inline-flex; align-items: center; gap: 6px; }
+  .hero .meta svg { width: 15px; height: 15px; color: var(--ink-faint); }
+  .hero .meta b { color: var(--ink-soft); font-weight: 700; }
+  .stack-av { display: flex; align-items: center; margin-top: 20px; gap: 12px; }
+  .av-row { display: flex; }
+  .av-row .avatar { width: 36px; height: 36px; font-size: 12px; border: 2.5px solid var(--white); margin-left: -10px; box-shadow: var(--sh-sm); transition: transform .3s var(--spring); }
+  .av-row .avatar:first-child { margin-left: 0; }
+  .av-row:hover .avatar { margin-left: 2px; }
+  .av-row .avatar:first-child { margin-left: 0; }
+  .hero-side { background: linear-gradient(165deg, rgba(255,255,255,0.92), rgba(255,255,255,0.55)); border: 1px solid var(--line); border-radius: var(--r); padding: 22px; display: flex; flex-direction: column; gap: 15px; box-shadow: var(--sh-sm); }
+  .hs-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+  .hs-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 4px; }
+  .hs-frac { font-family: 'Schibsted Grotesk'; font-weight: 800; font-size: 36px; line-height: 1; letter-spacing: -0.03em; }
+  .hs-frac small { font-size: 18px; color: var(--ink-faint); font-weight: 700; }
+  .hs-pct { font-size: 12px; font-weight: 800; color: var(--coral-600); background: var(--coral-50); padding: 4px 9px; border-radius: 999px; }
+  .pbar { height: 8px; border-radius: 999px; background: rgba(27,23,38,0.08); overflow: hidden; }
+  .pfill { height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--coral), var(--rose)); transition: width 1.2s cubic-bezier(0.22,1,0.36,1); }
+  .hs-legend { display: flex; gap: 16px; font-size: 12px; font-weight: 600; color: var(--ink-muted); }
+  .hs-legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .hs-cta { font-size: 12.5px; font-weight: 700; color: var(--coral-600); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; transition: gap .25s var(--ease); }
+  .hs-cta:hover { gap: 9px; }
+
+  /* ===== stat tiles ===== */
+  .stats { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .tile { padding: 20px; border-radius: var(--r); background: var(--glass); border: 1px solid var(--line); box-shadow: var(--sh-sm); position: relative; overflow: hidden; transition: transform .3s var(--ease), box-shadow .3s; cursor: default; }
+  .tile:hover { transform: translateY(-4px); box-shadow: var(--sh); }
+  .tile .ic { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; margin-bottom: 14px; }
+  .tile .ic svg { width: 21px; height: 21px; }
+  .tile .num { font-family: 'Schibsted Grotesk'; font-weight: 800; font-size: 32px; line-height: 1; letter-spacing: -0.03em; }
+  .tile .lab { color: var(--ink-muted); font-size: 13px; font-weight: 600; margin-top: 6px; }
+  .tile .spark { position: absolute; right: 14px; bottom: 12px; opacity: 0.5; }
+  .t-coral .ic { background: var(--coral-50); color: var(--coral-600); } .t-coral .num { color: var(--coral-600); }
+  .t-sky .ic { background: var(--sky-50); color: var(--sky); } .t-sky .num { color: var(--sky); }
+  .t-lav .ic { background: var(--lav-50); color: var(--lav); } .t-lav .num { color: var(--lav); }
+  .t-mint .ic { background: var(--mint-50); color: var(--mint); } .t-mint .num { color: var(--mint); }
+  .t-sun .ic { background: var(--sun-50); color: #C2871A; } .t-sun .num { color: #C2871A; }
+  .t-rose .ic { background: var(--rose-50); color: #E14B82; } .t-rose .num { color: #E14B82; }
+
+  /* ===== agenda rows ===== */
+  .row { display: flex; align-items: center; gap: 14px; padding: 12px; border-radius: 16px; transition: background .25s, transform .25s var(--ease); cursor: pointer; }
+  .row:hover { background: rgba(255,255,255,0.6); transform: translateX(3px); }
+  .row + .row { margin-top: 2px; }
+  .time-chip { flex-shrink: 0; width: 54px; text-align: center; }
+  .time-chip .h { font-family: 'Schibsted Grotesk'; font-weight: 700; font-size: 15px; }
+  .time-chip .ap { font-size: 10px; color: var(--ink-faint); font-weight: 700; text-transform: uppercase; }
+  .row .bar { width: 3px; align-self: stretch; border-radius: 3px; background: var(--ink-ghost); }
+  .row.r-coral .bar { background: var(--coral); } .row.r-sky .bar { background: var(--sky); } .row.r-mint .bar { background: var(--mint); } .row.r-lav .bar { background: var(--lav); }
+  .row .t { font-weight: 700; font-size: 14px; }
+  .row .s { color: var(--ink-muted); font-size: 12.5px; margin-top: 2px; }
+  .tag { font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+  .tag-coral { background: var(--coral-50); color: var(--coral-600); }
+  .tag-sky { background: var(--sky-50); color: var(--sky); }
+  .tag-mint { background: var(--mint-50); color: var(--mint); }
+  .tag-sun { background: var(--sun-50); color: #b9860d; }
+
+  /* ===== attention people ===== */
+  .person { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 15px; transition: background .25s, transform .25s var(--ease); cursor: pointer; }
+  .person:hover { background: rgba(255,255,255,0.6); transform: translateX(3px); }
+  .person .nm { font-weight: 700; font-size: 13.5px; }
+  .person .ctx { font-size: 12px; color: var(--ink-muted); margin-top: 1px; }
+  .chip-soft { margin-left: auto; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--lav-50); color: var(--lav); }
+
+  /* ===== verse ===== */
+  .verse { grid-column: 1 / -1; background: transparent; border: none; border-top: 1px solid var(--line); border-radius: 0; padding: 20px 2px 2px; margin-top: 2px; display: flex; align-items: baseline; gap: 14px; }
+  .verse .q { font-style: italic; font-weight: 500; font-size: 14px; line-height: 1.6; color: var(--ink-muted); max-width: 640px; }
+  .verse .ref { white-space: nowrap; font-weight: 700; color: var(--ink-faint); font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .verse .mark { display: none; }
+
+  /* ===== reveal motion ===== */
+  .reveal { opacity: 0; transform: translateY(16px); animation: reveal .7s var(--ease) forwards; }
+  @keyframes reveal { to { opacity: 1; transform: none; } }
+  @keyframes pop { 0% { transform: scale(0.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+  .note { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 50;
+    background: var(--ink); color: #fff; font-size: 12.5px; font-weight: 600; padding: 9px 18px; border-radius: 999px; box-shadow: var(--sh-lg); opacity: 0.92; }
+
+  @media (max-width: 980px) {
+    .app { grid-template-columns: 1fr; }
+    .side { display: none; }
+    .grid { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(2,1fr); }
+    .hero-inner { grid-template-columns: 1fr; }
+    .main { padding: 24px 18px 80px; }
+  }
+</style>
+</head>
+<body>
+  <div class="aurora"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
+  <div class="grain"></div>
+
+  <div class="app">
+    <!-- ===================== SIDEBAR ===================== -->
+    <aside class="side">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 180 201" fill="none"><path d="M74.97 48.53c9.53.03 32.73 17.37 41.45 23.66 26.31 18.98 55.86 31.69 59.08 67.85 1.16 14.63-3.07 27.67-11.64 37.82-13.36 17.09-37.81 24.46-57.27 16.06-18.41-8.6-14.96-12.85-33.77-2.56C57.86 200.4 36.23 197.68 22.15 185.8c-5.7-5.86-9.68-10.73-11.54-19.78a38.26 38.26 0 014.23-30.06c2.34-3.74 6.94-6.88 11.24-7.8 10.76-2.07 20.59 8.98 28.06 14.38 7.74 5.69 15.62 10.67 22.83 15.45 9.06 5.87 20.07 10.68 31.87 8.05 12.34-3.03 23.13-13.74 25.18-27.28 4.01-25.93-21.95-35.26-38.77-47.17-10.62-7.58-39.16-21.78-27.39-37.97 3.2-3.97 5.9-5.24 10.65-6.09z" fill="rgba(255,255,255,.92)"/><path d="M49.85.99c7.01-1.42 16.82.42 23.6 2.83 7.04 2.51 16.36 9.86 23.94 8.67 7.83-1.17 14.56-8.2 22.63-9.87 12.3-3.2 25.7-2.72 36.94 3.52 9.52 5.29 16.59 14.09 19.69 23.53 4.97 17.27-2.97 47.83-27.4 40.58-3.61-1.07-8.72-5.67-12.07-7.84-13.39-8.72-26.22-18.36-39.88-26.65-9.6-5.83-22.83-8.68-33.79-5.86-8.82 2.43-15.46 8.38-19.78 15.64-4.73 8.67-4.78 16.61-2.16 24.83 5.67 15.16 24.97 23.2 37.52 31.06 10.28 7.14 40.88 21.48 28.6 37.38-2.57 3.29-6.34 5.42-10.49 5.94-9.79 1.19-24.89-12.07-32.24-17.01-13.06-8.86-25.9-18.72-38.67-28.05C-17.03 75.29-2.73 7.24 49.85.99z" fill="rgba(255,255,255,.92)"/></svg>
+        </div>
+        <div>
+          <div class="brand-name">Servos</div>
+          <div class="brand-sub">Igreja Vida Nova</div>
+        </div>
+      </div>
+
+      <nav class="nav" id="nav">
+        <div class="nav-pill" id="pill"></div>
+        <div class="nav-item active" data-i="0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 9.5L12 3l9 6.5V20a2 2 0 01-2 2H5a2 2 0 01-2-2V9.5z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          Início
+        </div>
+        <div class="nav-item" data-i="1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Agenda
+        </div>
+        <div class="nav-item" data-i="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/></svg>
+          Pessoas
+        </div>
+        <div class="nav-item" data-i="3">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 001 1h12a1 1 0 001-1V9.5"/><path d="M9.5 21v-5a2.5 2.5 0 015 0v5"/></svg>
+          Células
+        </div>
+        <div class="nav-item" data-i="4">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 10-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 000-7.78z"/></svg>
+          Ministérios
+        </div>
+        <div class="nav-item" data-i="4">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+          Comunicação
+          <span class="nav-badge">3</span>
+        </div>
+        <div class="nav-label">Gestão</div>
+        <div class="nav-item" data-i="5">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Relatórios
+        </div>
+        <div class="nav-item" data-i="6">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          Configurações
+        </div>
+      </nav>
+
+      <div class="side-foot">
+        <div class="avatar" style="width:38px;height:38px;font-size:13px;background:linear-gradient(135deg,#9B8CFB,#FB7199)">RO</div>
+        <div style="line-height:1.25">
+          <div style="font-weight:700;font-size:13.5px">Ramon Oliver</div>
+          <div style="font-size:11.5px;color:var(--ink-faint)">Administrador</div>
+        </div>
+        <svg style="margin-left:auto;width:16px;height:16px;color:var(--ink-faint)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </aside>
+
+    <!-- ===================== MAIN ===================== -->
+    <main class="main">
+      <div class="topbar reveal" style="animation-delay:.05s">
+        <label class="search">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input placeholder="Buscar pessoas, escalas, ministérios…" />
+        </label>
+        <div class="top-actions">
+          <div class="icon-btn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg><span class="dot"></span></div>
+          <button class="btn btn-primary js-ripple"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nova escala</button>
+        </div>
+      </div>
+
+      <div class="greet reveal" style="animation-delay:.12s">
+        <span class="eyebrow"><span class="pulse"></span>Domingo · 1 de junho</span>
+        <h1>Boa noite, Ramon <span class="wave">👋</span></h1>
+        <p>Você tem <b style="color:var(--coral-600)">2 confirmações pendentes</b> e o <b>Louvor</b> precisa de mais 1 pessoa para o culto de amanhã. Tudo o mais está fluindo bem.</p>
+      </div>
+
+      <div class="grid">
+        <!-- HERO -->
+        <div class="card hero reveal" style="animation-delay:.18s">
+          <div class="hero-inner">
+            <div>
+              <span class="hero-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg> Próxima escala</span>
+              <h2>Culto de Domingo · Louvor</h2>
+              <div class="meta">
+                <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Amanhã, <b>1 jun</b></span>
+                <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg><b>18h30</b></span>
+                <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg><b>Templo principal</b></span>
+              </div>
+              <div class="stack-av">
+                <div class="av-row">
+                  <div class="avatar" style="background:linear-gradient(135deg,#FF6B57,#FB7199)">JL</div>
+                  <div class="avatar" style="background:linear-gradient(135deg,#38BDF0,#9B8CFB)">MS</div>
+                  <div class="avatar" style="background:linear-gradient(135deg,#2DD4A7,#38BDF0)">AC</div>
+                  <div class="avatar" style="background:linear-gradient(135deg,#FFC24B,#FF6B57)">RP</div>
+                  <div class="avatar" style="background:var(--ink-ghost);color:var(--ink-soft)">+3</div>
+                </div>
+                <button class="btn btn-primary js-ripple" style="padding:9px 16px;font-size:13px">Confirmar presença</button>
+                <button class="btn btn-ghost js-ripple" style="padding:9px 16px;font-size:13px">Ver escala</button>
+              </div>
+            </div>
+            <div class="hero-side">
+              <div class="hs-top">
+                <div>
+                  <div class="hs-label">Confirmados</div>
+                  <div class="hs-frac"><span class="count" data-to="7">0</span><small>/10</small></div>
+                </div>
+                <span class="hs-pct"><span class="count" data-to="70">0</span>%</span>
+              </div>
+              <div class="pbar"><div class="pfill" id="pfill"></div></div>
+              <div class="hs-legend">
+                <span><i style="background:var(--coral)"></i>7 confirmados</span>
+                <span><i style="background:var(--ink-ghost)"></i>3 pendentes</span>
+              </div>
+              <span class="hs-cta js-ripple">Cobrar pendentes <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="9 18 15 12 9 6"/></svg></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- STATS -->
+        <div class="stats reveal" style="animation-delay:.24s">
+          <div class="tile t-coral">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+            <div class="num"><span class="count" data-to="12">0</span></div>
+            <div class="lab">Escalas ativas</div>
+          </div>
+          <div class="tile t-sun">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></div>
+            <div class="num"><span class="count" data-to="8">0</span></div>
+            <div class="lab">Confirmações pendentes</div>
+          </div>
+          <div class="tile t-lav">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 10-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 000-7.78z"/></svg></div>
+            <div class="num"><span class="count" data-to="5">0</span></div>
+            <div class="lab">Pessoas em cuidado</div>
+          </div>
+          <div class="tile t-rose">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M12 2s5 3.8 5 9a5 5 0 01-10 0c0-1.6.6-2.7 1.2-3.4.5 1.1 1.6 1.6 2.3 1.6C9 7.5 11 4.5 12 2z"/></svg></div>
+            <div class="num"><span class="count" data-to="14">0</span></div>
+            <div class="lab">Pedidos de oração</div>
+          </div>
+        </div>
+
+        <!-- AGENDA -->
+        <div class="card lift card-pad reveal" style="animation-delay:.30s">
+          <div class="card-head"><h3>Agenda de hoje</h3><span class="link">Ver calendário →</span></div>
+          <div class="row r-coral">
+            <div class="time-chip"><div class="h">18:30</div><div class="ap">Culto</div></div>
+            <div class="bar"></div>
+            <div style="flex:1"><div class="t">Culto de Domingo</div><div class="s">Louvor · 7 escalados · Templo principal</div></div>
+            <span class="tag tag-coral">Minha escala</span>
+          </div>
+          <div class="row r-sky">
+            <div class="time-chip"><div class="h">19:00</div><div class="ap">Reunião</div></div>
+            <div class="bar"></div>
+            <div style="flex:1"><div class="t">Reunião de líderes</div><div class="s">Sala 2 · 9 confirmados</div></div>
+            <span class="tag tag-sky">Liderança</span>
+          </div>
+          <div class="row r-mint">
+            <div class="time-chip"><div class="h">20:00</div><div class="ap">Célula</div></div>
+            <div class="bar"></div>
+            <div style="flex:1"><div class="t">Célula Jardins</div><div class="s">Casa do Marcos · 12 pessoas</div></div>
+            <span class="tag tag-mint">Recorrente</span>
+          </div>
+        </div>
+
+        <!-- ATTENTION -->
+        <div class="card lift card-pad reveal" style="animation-delay:.36s">
+          <div class="card-head"><h3>Precisando de atenção</h3><span class="link">Ver todas →</span></div>
+          <div class="person">
+            <div class="avatar" style="width:40px;height:40px;font-size:13px;background:linear-gradient(135deg,#9B8CFB,#38BDF0)">CB</div>
+            <div><div class="nm">Carla Bonfim</div><div class="ctx">Sem confirmar há 5 dias</div></div>
+            <span class="chip-soft">Acompanhar</span>
+          </div>
+          <div class="person">
+            <div class="avatar" style="width:40px;height:40px;font-size:13px;background:linear-gradient(135deg,#FF6B57,#FFC24B)">DM</div>
+            <div><div class="nm">Daniel Matos</div><div class="ctx">Pedido de oração · saúde</div></div>
+            <span class="chip-soft" style="background:var(--rose-50);color:var(--rose)">Orar</span>
+          </div>
+          <div class="person">
+            <div class="avatar" style="width:40px;height:40px;font-size:13px;background:linear-gradient(135deg,#2DD4A7,#38BDF0)">LF</div>
+            <div><div class="nm">Lucas Freitas</div><div class="ctx">Visitante há 3 semanas</div></div>
+            <span class="chip-soft" style="background:var(--mint-50);color:var(--mint)">Receber</span>
+          </div>
+        </div>
+
+        <!-- VERSE -->
+        <div class="verse reveal" style="animation-delay:.42s">
+          <div class="mark">”</div>
+          <div class="q">Cada um exerça o dom que recebeu para servir os outros, administrando fielmente a graça de Deus em suas múltiplas formas.</div>
+          <div class="ref">1 Pedro 4:10</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="note">✦ Protótipo Aurora Suave · passe o mouse, clique e observe os movimentos</div>
+
+<script>
+  // animated nav pill
+  const nav = document.getElementById('nav');
+  const pill = document.getElementById('pill');
+  const items = [...nav.querySelectorAll('.nav-item')];
+  function movePill(el){ pill.style.transform = `translateY(${el.offsetTop}px)`; pill.style.height = el.offsetHeight + 'px'; }
+  movePill(nav.querySelector('.active'));
+  items.forEach(it => it.addEventListener('click', () => {
+    items.forEach(i => i.classList.remove('active'));
+    it.classList.add('active'); movePill(it);
+  }));
+  window.addEventListener('resize', () => movePill(nav.querySelector('.active')));
+
+  // count-up numbers
+  function countUp(el){
+    const to = +el.dataset.to; const dur = 1100; const start = performance.now();
+    function tick(now){ const p = Math.min((now-start)/dur,1); const e = 1-Math.pow(1-p,3);
+      el.textContent = Math.round(to*e); if(p<1) requestAnimationFrame(tick); }
+    requestAnimationFrame(tick);
+  }
+  // progress bar fill
+  const pfill = document.getElementById('pfill');
+  setTimeout(()=>{ if(pfill) pfill.style.width = '70%'; }, 500);
+  setTimeout(()=>document.querySelectorAll('.count').forEach(countUp), 500);
+
+  // ripple
+  document.querySelectorAll('.js-ripple').forEach(b => b.addEventListener('click', e => {
+    const r = document.createElement('span'); r.className='ripple';
+    const d = Math.max(b.offsetWidth,b.offsetHeight); const rect = b.getBoundingClientRect();
+    r.style.width=r.style.height=d+'px'; r.style.left=(e.clientX-rect.left-d/2)+'px'; r.style.top=(e.clientY-rect.top-d/2)+'px';
+    b.appendChild(r); setTimeout(()=>r.remove(),600);
+  }));
+</script>
+</body>
+</html>

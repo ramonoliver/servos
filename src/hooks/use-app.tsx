@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useRef } f
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { getSession, clearSession, updateSession } from "@/lib/auth/session";
+// supabase client retained for notifications polling below
 import { can, type Action } from "@/lib/auth/permissions";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import type { User, Church, Department, Session } from "@/types";
@@ -54,120 +55,80 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refresh = useCallback(async () => {
-    const localSession = getSession();
+    try {
+      const localSession = getSession();
 
-    if (!localSession) {
-      router.replace("/login");
-      return;
-    }
+      if (!localSession) {
+        router.replace("/login");
+        return;
+      }
 
-    const sessionResponse = await fetch("/api/auth/session", {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        ...(localSession.token ? { "x-servos-auth": localSession.token } : {}),
-      },
-    });
+      const authHeaders = localSession.token ? { "x-servos-auth": localSession.token } : {};
 
-    const sessionPayload = await sessionResponse.json().catch(() => null);
+      // Validate session and fetch all app data in one server-side call
+      const [sessionRes, appRes] = await Promise.all([
+        fetch("/api/auth/session", { method: "GET", credentials: "include", headers: authHeaders }),
+        fetch("/api/app/load", { method: "GET", credentials: "include", headers: authHeaders }),
+      ]);
 
-    if (!sessionResponse.ok || !sessionPayload?.authenticated || !sessionPayload?.session) {
-      clearSession();
-      router.replace("/login");
-      return;
-    }
+      const sessionPayload = await sessionRes.json().catch(() => null);
 
-    const s = {
-      ...localSession,
-      ...sessionPayload.session,
-      token: sessionPayload.token || localSession.token,
-    } as Session;
+      if (!sessionRes.ok || !sessionPayload?.authenticated || !sessionPayload?.session) {
+        clearSession();
+        router.replace("/login");
+        return;
+      }
 
-    updateSession({
-      ...sessionPayload.session,
-      token: sessionPayload.token || localSession.token,
-    });
+      const s = {
+        ...localSession,
+        ...sessionPayload.session,
+        token: sessionPayload.token || localSession.token,
+      } as Session;
 
-    // ===== USER =====
-    const { data: u, error: userError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", s.user_id)
-      .single();
+      updateSession({ ...sessionPayload.session, token: sessionPayload.token || localSession.token });
 
-    if (userError || !u) {
-      clearSession();
-      router.replace("/login");
-      return;
-    }
+      if (!appRes.ok) {
+        console.error("Erro ao carregar dados do app:", appRes.status);
+        return;
+      }
 
-    // ===== CHURCH =====
-    const { data: c, error: churchError } = await supabase
-      .from("churches")
-      .select("*")
-      .eq("id", u.church_id)
-      .single();
+      const appData = await appRes.json().catch(() => null);
+      if (!appData?.user || !appData?.church) {
+        clearSession();
+        router.replace("/login");
+        return;
+      }
 
-    if (churchError || !c) {
-      clearSession();
-      router.replace("/login");
-      return;
-    }
+      const u = appData.user;
+      const depts: Department[] = appData.departments || [];
+      const departmentLinks: Array<{ department_id: string }> = appData.departmentLinks || [];
 
-    // ===== DEPARTMENTS =====
-    const { data: depts, error: deptError } = await supabase
-      .from("departments")
-      .select("*")
-      .eq("church_id", u.church_id);
+      const leadDeptIds = depts
+        .filter((d) => (d.leader_ids || []).includes(u.id) || (d.co_leader_ids || []).includes(u.id))
+        .map((d) => d.id);
 
-    if (deptError) {
-      console.error("Erro ao buscar departamentos:", deptError);
+      const memberDeptIds = departmentLinks.map((l) => l.department_id);
+
+      const visibleDepartments =
+        u.role === "admin"
+          ? depts
+          : u.role === "leader"
+          ? depts.filter((d) => leadDeptIds.includes(d.id))
+          : depts.filter((d) => memberDeptIds.includes(d.id));
+
+      const permissionDeptIds =
+        u.role === "admin" ? depts.map((d) => d.id) : u.role === "leader" ? leadDeptIds : memberDeptIds;
+
+      setUser(u as User);
+      setSessionState(s);
+      setChurch(appData.church);
+      setDepartments(visibleDepartments);
+      setUserDeptIds(permissionDeptIds);
+    } catch (err) {
+      console.error("Erro ao carregar sessão:", err);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const { data: departmentLinks, error: departmentLinksError } = await supabase
-      .from("department_members")
-      .select("department_id")
-      .eq("user_id", u.id);
-
-    if (departmentLinksError) {
-      console.error("Erro ao buscar vínculos do usuário:", departmentLinksError);
-      setLoading(false);
-      return;
-    }
-
-    const leadDeptIds = (depts || [])
-      .filter((d: any) =>
-        (d.leader_ids || []).includes(u.id) ||
-        (d.co_leader_ids || []).includes(u.id)
-      )
-      .map((d: any) => d.id);
-
-    const memberDeptIds = ((departmentLinks || []) as Array<{ department_id: string }>).map(
-      (link) => link.department_id
-    );
-
-    const visibleDepartments =
-      u.role === "admin"
-        ? ((depts || []) as Department[])
-        : u.role === "leader"
-        ? ((depts || []) as Department[]).filter((dept) => leadDeptIds.includes(dept.id))
-        : ((depts || []) as Department[]).filter((dept) => memberDeptIds.includes(dept.id));
-
-    const permissionDeptIds =
-      u.role === "admin"
-        ? ((depts || []) as Department[]).map((dept) => dept.id)
-        : u.role === "leader"
-        ? leadDeptIds
-        : memberDeptIds;
-
-    setUser(u as User);
-    setSessionState(s);
-    setChurch(c as Church);
-    setDepartments(visibleDepartments);
-    setUserDeptIds(permissionDeptIds);
-    setLoading(false);
   }, [router]);
 
   const logout = useCallback(() => {

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { getIconEmoji } from "@/lib/utils/helpers";
+import { PageShell, PageHeader } from "@/components/ui";
 import Link from "next/link";
 import type { Schedule, Event, ScheduleMember } from "@/types";
 
@@ -134,11 +135,12 @@ export default function CalendarioPage() {
   }
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="page-title">Calendário</h1>
-        <p className="page-subtitle">Acompanhe dias com eventos recorrentes, especiais e as escalas em que você está incluído.</p>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Agenda"
+        title="Calendário"
+        subtitle="Acompanhe dias com eventos recorrentes, especiais e as escalas em que você está incluído."
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
         <div className="card p-4 sm:p-5">
@@ -387,6 +389,6 @@ export default function CalendarioPage() {
           )}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

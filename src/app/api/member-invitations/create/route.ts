@@ -19,6 +19,7 @@ const bodySchema = z.object({
   phone: z.string().optional().default(""),
   role: z.enum(["member", "leader", "admin"]),
   spouseId: z.string().optional().default(""),
+  photoUrl: z.string().nullable().optional(),
   selectedDepartments: z.array(selectedDepartmentSchema).default([]),
 });
 
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
       phone,
       role,
       spouseId,
+      photoUrl,
       selectedDepartments,
     } = parsed.data;
 
@@ -88,7 +90,7 @@ export async function POST(req: Request) {
         role,
         status: "active",
         avatar_color: `hsl(${Math.floor(Math.random() * 360)}, 40%, 55%)`,
-        photo_url: null,
+        photo_url: photoUrl ?? null,
         spouse_id: spouseId || null,
         availability: [true, true, true, true, true, true, true],
         total_schedules: 0,

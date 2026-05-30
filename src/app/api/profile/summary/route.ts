@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireApiActor } from "@/lib/auth/api-session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   try {
     const { actor, errorResponse } = await requireApiActor(req);

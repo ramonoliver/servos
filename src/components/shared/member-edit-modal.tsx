@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Modal } from "@/components/ui";
 import { formatPhoneInput } from "@/lib/invitations";
 import { getInitials, getIconEmoji } from "@/lib/utils/helpers";
+import { fileToAvatarDataUrl } from "@/lib/utils/image";
 import type { User, Department, DepartmentMember } from "@/types";
 
 type MemberRole = "admin" | "leader" | "member";
@@ -42,6 +43,21 @@ export function MemberEditModal({
   const [role, setRole] = useState<MemberRole>((member.role as MemberRole) || "member");
   const [status, setStatus] = useState<MemberStatus>((member.status as MemberStatus) || "active");
   const [spouseId, setSpouseId] = useState(member.spouse_id || "");
+  const [photo, setPhoto] = useState<string | null>(member.photo_url ?? null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  async function handlePhoto(file: File | undefined) {
+    if (!file) return;
+    setPhotoBusy(true);
+    try {
+      setPhoto(await fileToAvatarDataUrl(file));
+    } catch (error) {
+      console.error("Erro ao processar a foto:", error);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
 
   const [selectedDepartments, setSelectedDepartments] = useState<SelectedDepartment[]>(
     allDeptMembers.map((dm) => ({
@@ -102,6 +118,7 @@ export function MemberEditModal({
         role,
         status,
         spouse_id: spouseId || null,
+        photo_url: photo,
       },
       selectedDepartments,
       spouseId
@@ -127,16 +144,58 @@ export function MemberEditModal({
       <div className="space-y-6">
         <div className="rounded-2xl border border-border-soft bg-surface-alt p-4">
           <div className="flex items-center gap-4">
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
-              style={{ background: member.avatar_color }}
-            >
-              {getInitials(member.name)}
+            <div className="relative shrink-0">
+              {photo ? (
+                <img
+                  src={photo}
+                  alt={member.name}
+                  className="h-16 w-16 rounded-full object-cover ring-2 ring-white"
+                />
+              ) : (
+                <div
+                  className="flex h-16 w-16 items-center justify-center rounded-full text-base font-bold text-white"
+                  style={{ background: member.avatar_color }}
+                >
+                  {getInitials(member.name)}
+                </div>
+              )}
+              {photoBusy && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-white/60 text-[10px] font-semibold text-ink-muted">
+                  …
+                </div>
+              )}
             </div>
 
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="font-display text-lg truncate">{member.name}</div>
-              <div className="text-sm text-ink-muted truncate">{member.email}</div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="btn btn-secondary btn-sm"
+                >
+                  {photo ? "Trocar foto" : "Adicionar foto"}
+                </button>
+                {photo && (
+                  <button
+                    type="button"
+                    onClick={() => setPhoto(null)}
+                    className="text-xs font-semibold text-ink-faint transition hover:text-danger"
+                  >
+                    Remover
+                  </button>
+                )}
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  void handlePhoto(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
             </div>
           </div>
         </div>

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { getIconEmoji, getInitials } from "@/lib/utils/helpers";
-import { ConfirmDialog, Modal, MultiSelect } from "@/components/ui";
+import { ConfirmDialog, Modal, MultiSelect, PageShell, PageHeader } from "@/components/ui";
 import type { MultiSelectOption } from "@/components/ui";
 import Link from "next/link";
 import type { Department, User, DepartmentMember } from "@/types";
@@ -76,25 +76,26 @@ export default function MinisteriosPage() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="font-display text-xl font-bold text-ink">Ministérios</h1>
-          <p className="text-[12px] text-ink-faint mt-0.5">{departments.length} ministérios cadastrados</p>
-        </div>
-        {canDo("department.create") && (
-          <button onClick={() => setModal({ type: "form" })} className="btn btn-primary btn-sm">
-            + Novo
-          </button>
-        )}
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Serviço"
+        title="Ministérios"
+        subtitle={`${departments.length} ministério${departments.length === 1 ? "" : "s"} cadastrado${departments.length === 1 ? "" : "s"}`}
+        actions={
+          canDo("department.create") && (
+            <button onClick={() => setModal({ type: "form" })} className="btn btn-primary btn-sm">
+              + Novo
+            </button>
+          )
+        }
+      />
 
       {loading ? (
         <div className="py-12 text-center text-sm text-ink-faint">Carregando ministérios...</div>
       ) : departments.length === 0 ? (
         <div className="py-12 text-center text-sm text-ink-faint">Nenhum ministério cadastrado.</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {departments.map((d) => {
             const count = allDM.filter((dm) => dm.department_id === d.id).length;
             const leaderNames = (d.leader_ids || [])
@@ -102,61 +103,70 @@ export default function MinisteriosPage() {
               .filter(Boolean);
 
             return (
-              <Link
+              <div
                 key={d.id}
-                href={`/ministerios/${d.id}`}
-                className="group bg-white border border-border-soft rounded-xl overflow-hidden hover:border-black/[.12] hover:shadow-sm transition-all cursor-pointer"
+                className="group relative rounded-[14px] border border-border-soft bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
               >
-                <div
-                  className="h-16 flex items-center justify-center text-3xl relative"
-                  style={{ background: d.color + "22" }}
-                >
-                  {getIconEmoji(d.icon)}
+                <Link href={`/ministerios/${d.id}`} className="block p-4">
+                  {/* ── Icon + name row — igual ao PersonMini ── */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xl"
+                      style={{ background: d.color + "22" }}
+                    >
+                      {getIconEmoji(d.icon)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-semibold text-ink">{d.name}</div>
+                      <div className="truncate text-[11px] text-ink-faint">
+                        {count} {count === 1 ? "membro" : "membros"}
+                        {leaderNames.length ? " · " + leaderNames.join(", ") : ""}
+                      </div>
+                    </div>
+                  </div>
 
-                  <div className="absolute top-2 right-2 flex items-center gap-1">
+                  {/* ── Funções como badges — igual ao PersonTagList ── */}
+                  {d.function_names?.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {d.function_names.slice(0, 4).map((fn) => (
+                        <span key={fn} className="badge badge-secondary">{fn}</span>
+                      ))}
+                      {d.function_names.length > 4 && (
+                        <span className="text-[10px] text-ink-faint self-center">+{d.function_names.length - 4}</span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── Linha de info — igual ao grid inferior do PersonCard ── */}
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-ink-muted">
+                    <span>{d.description ? d.description : "Sem descrição"}</span>
+                  </div>
+                </Link>
+
+                {/* ── Botões de ação — fora do Link, sobrepostos ── */}
+                {(canDo("department.edit", d.id) || canDo("department.delete")) && (
+                  <div className="absolute right-3 top-3 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     {canDo("department.edit", d.id) && (
                       <button
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setModal({ type: "form", dept: d }); }}
-                        className="w-7 h-7 rounded-full bg-white/90 shadow-sm flex items-center justify-center text-xs text-ink opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        onClick={() => setModal({ type: "form", dept: d })}
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm text-xs text-ink transition hover:bg-surface-alt"
                         title="Editar ministério"
-                        aria-label="Editar ministério"
                       >
-                        &#9998;
+                        ✏️
                       </button>
                     )}
                     {canDo("department.delete") && (
                       <button
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setModal({ type: "delete", dept: d }); }}
-                        className="w-7 h-7 rounded-full bg-white/90 shadow-sm flex items-center justify-center text-xs text-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        onClick={() => setModal({ type: "delete", dept: d })}
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm text-xs text-danger transition hover:bg-danger-light"
                         title="Excluir ministério"
-                        aria-label="Excluir ministério"
                       >
-                        &#10005;
+                        ✕
                       </button>
                     )}
                   </div>
-                </div>
-
-                <div className="p-4">
-                  <div className="font-display text-[16px] font-semibold text-ink leading-snug">{d.name}</div>
-                  <div className="text-[11px] text-ink-faint mt-0.5">
-                    {count} {count === 1 ? "membro" : "membros"}{leaderNames.length ? " · " + leaderNames.join(", ") : ""}
-                  </div>
-                  {d.description && (
-                    <div className="text-xs text-ink-faint leading-relaxed line-clamp-2 mt-1">{d.description}</div>
-                  )}
-                  {d.function_names?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {d.function_names.slice(0, 3).map((fn) => (
-                        <span key={fn} className="badge badge-secondary">{fn}</span>
-                      ))}
-                      {d.function_names.length > 3 && (
-                        <span className="text-[10px] text-ink-faint self-center">+{d.function_names.length - 3}</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </Link>
+                )}
+              </div>
             );
           })}
         </div>
@@ -187,7 +197,7 @@ export default function MinisteriosPage() {
           onConfirm={() => void deleteDept(modal.dept)}
         />
       )}
-    </div>
+    </PageShell>
   );
 }
 

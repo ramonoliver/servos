@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { getSession } from "@/lib/auth/session";
 import { formatInviteOpenedAt } from "@/lib/invitations";
 import { getInitials } from "@/lib/utils/helpers";
-import { ConfirmDialog } from "@/components/ui";
+import { ConfirmDialog, PageHeader } from "@/components/ui";
 import Link from "next/link";
 import type { User, DepartmentMember, MemberInvitation } from "@/types";
 
@@ -290,60 +290,60 @@ export default function MembrosPage() {
   }
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="page-title">Membros</h1>
-          <p className="page-subtitle">{members.length} voluntarios</p>
-        </div>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Header */}
+      <PageHeader
+        className="mb-5 flex-shrink-0"
+        eyebrow="Comunidade"
+        title="Membros"
+        subtitle={`${members.length} voluntário${members.length === 1 ? "" : "s"}`}
+        actions={
+          canDo("member.invite") && (
+            <Link href="/membros/convidar" className="btn btn-primary btn-sm">
+              + Convidar
+            </Link>
+          )
+        }
+      />
 
-        {canDo("member.invite") && (
-          <Link href="/membros/convidar" className="btn btn-primary self-start sm:self-auto">
-            + Convidar
-          </Link>
-        )}
+      {/* Filters */}
+      <div className="mb-3 flex-shrink-0 rounded-[14px] border border-border-soft bg-white p-3 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          <input
+            className="input-field flex-1 min-w-[200px]"
+            placeholder="Buscar por nome ou email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            className="input-field min-w-[180px]"
+            value={deptFilter}
+            onChange={(e) => setDeptFilter(e.target.value)}
+          >
+            <option value="all">Todos os ministérios</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+          {user.role === "admin" && (
+            <select
+              className="input-field min-w-[160px]"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "active" | "inactive" | "all")}
+            >
+              <option value="active">Somente ativos</option>
+              <option value="inactive">Somente desativados</option>
+              <option value="all">Todos</option>
+            </select>
+          )}
+        </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-5">
-        <input
-          className="input-field w-full lg:max-w-[280px]"
-          placeholder="Buscar por nome ou email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-
-        <select
-          className="input-field w-full lg:max-w-[220px]"
-          value={deptFilter}
-          onChange={(e) => setDeptFilter(e.target.value)}
-        >
-          <option value="all">Todos os ministérios</option>
-          {departments.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </select>
-
-        {user.role === "admin" && (
-          <select
-            className="input-field w-full lg:max-w-[200px]"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as "active" | "inactive" | "all")}
-          >
-            <option value="active">Somente ativos</option>
-            <option value="inactive">Somente desativados</option>
-            <option value="all">Todos</option>
-          </select>
-        )}
-
+      <div className="mb-3 flex items-center justify-between flex-shrink-0">
+        <span className="text-[12px] font-semibold text-ink-faint">{filtered.length} voluntários encontrados</span>
         {(search || deptFilter !== "all" || statusFilter !== "active") && (
           <button
-            onClick={() => {
-              setSearch("");
-              setDeptFilter("all");
-              setStatusFilter("active");
-            }}
+            onClick={() => { setSearch(""); setDeptFilter("all"); setStatusFilter("active"); }}
             className="btn btn-ghost btn-sm text-ink-faint"
           >
             Limpar filtros
@@ -351,54 +351,40 @@ export default function MembrosPage() {
         )}
       </div>
 
-      <div className="card overflow-visible">
+      {/* Member list */}
+      <div className="flex-1 overflow-y-auto bg-white border border-border-soft rounded-xl">
         {loading ? (
-          <div className="px-5 py-12 text-center text-sm text-ink-faint">
-            Carregando membros...
-          </div>
+          <div className="px-5 py-12 text-center text-sm text-ink-faint">Carregando membros...</div>
         ) : filtered.length === 0 ? (
-          <div className="px-5 py-12 text-center text-sm text-ink-faint">
-            Nenhum membro encontrado.
-          </div>
+          <div className="px-5 py-12 text-center text-sm text-ink-faint">Nenhum membro encontrado.</div>
         ) : (
           filtered.map((m) => {
             const mDepts = allDM.filter((dm) => dm.user_id === m.id);
             const deptNames = mDepts
               .map((dm) => departments.find((d) => d.id === dm.department_id)?.name)
               .filter(Boolean);
-
             const functionSummary = mDepts
               .flatMap((dm) => dm.function_names?.length ? dm.function_names : dm.function_name ? [dm.function_name] : [])
-              .filter((value, index, array) => value && array.indexOf(value) === index)
+              .filter((v, i, a) => v && a.indexOf(v) === i)
               .join(", ");
             const spouse = m.spouse_id ? members.find((s) => s.id === m.spouse_id) : null;
             const latestInvite = latestInvites[m.id];
             const inviteBadge = getInviteBadge(latestInvite);
-
             const roleCls =
-              m.role === "admin"
-                ? "bg-purple-50 text-purple-600"
-                : m.role === "leader"
-                ? "bg-brand-light text-brand"
-                : "bg-success-light text-success";
-            const activityCls = m.active
-              ? "bg-success-light text-success"
-              : "bg-danger-light text-danger";
+              m.role === "admin" ? "bg-purple-50 text-purple-600"
+              : m.role === "leader" ? "bg-brand-light text-brand"
+              : "bg-success-light text-success";
 
             return (
               <div
                 key={m.id}
-                className={`flex flex-col sm:flex-row sm:items-center gap-3.5 px-5 py-3 border-t border-border-soft first:border-t-0 transition-colors group ${
-                  m.active ? "hover:bg-brand-glow" : "bg-slate-50/50"
+                className={`flex items-center gap-3 px-4 py-3 border-b border-border-soft last:border-b-0 group transition-colors ${
+                  m.active ? "hover:bg-black/[.02]" : "opacity-60"
                 }`}
               >
-                <Link href={`/membros/${m.id}`} className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
+                <Link href={`/membros/${m.id}`} className="flex items-center gap-3 flex-1 min-w-0">
                   {m.photo_url ? (
-                    <img
-                      src={m.photo_url}
-                      alt=""
-                      className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-                    />
+                    <img src={m.photo_url} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
                   ) : (
                     <div
                       className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
@@ -407,111 +393,65 @@ export default function MembrosPage() {
                       {getInitials(m.name)}
                     </div>
                   )}
-
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium break-words sm:truncate">
-                      {m.name}
-                      {m.must_change_password ? " *" : ""}
+                    <div className="text-[13px] font-semibold text-ink truncate">
+                      {m.name}{m.must_change_password ? " *" : ""}
                     </div>
-                    <div className="text-[11px] text-ink-faint break-words leading-relaxed">
+                    <div className="text-[11px] text-ink-faint truncate">
                       {functionSummary ? `${functionSummary} · ` : ""}
-                      {deptNames.length ? deptNames.join(", ") + " · " : ""}
-                      {m.email}
+                      {deptNames.length ? deptNames.join(", ") : m.email}
                     </div>
-                  </div>
-
-                  <div className="hidden sm:flex items-center gap-2">
-                    <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${roleCls}`}>
-                      {m.role === "admin" ? "Admin" : m.role === "leader" ? "Líder" : "Membro"}
-                    </span>
-                    <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${activityCls}`}>
-                      {m.active ? "Ativo" : "Desativado"}
-                    </span>
-
-                    {spouse && (
-                      <span className="text-[9px] font-semibold text-brand bg-brand-light px-1.5 py-0.5 rounded-full">
-                        &#128145; {spouse.name.split(" ")[0]}
-                      </span>
-                    )}
-
-                    {inviteBadge && (
-                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${inviteBadge.cls}`}>
-                        {inviteBadge.label}
-                      </span>
-                    )}
                   </div>
                 </Link>
 
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                  <div className="flex sm:hidden flex-wrap items-center gap-2">
-                    <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${roleCls}`}>
-                      {m.role === "admin" ? "Admin" : m.role === "leader" ? "Líder" : "Membro"}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${roleCls}`}>
+                    {m.role === "admin" ? "Admin" : m.role === "leader" ? "Líder" : "Membro"}
+                  </span>
+                  {!m.active && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-danger-light text-danger">Inativo</span>
+                  )}
+                  {spouse && (
+                    <span className="text-[9px] font-semibold text-brand bg-brand-light px-1.5 py-0.5 rounded-full hidden sm:inline">
+                      &#128145; {spouse.name.split(" ")[0]}
                     </span>
-                    <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${activityCls}`}>
-                      {m.active ? "Ativo" : "Desativado"}
+                  )}
+                  {inviteBadge && (
+                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full hidden sm:inline ${inviteBadge.cls}`}>
+                      {inviteBadge.label}
                     </span>
-                    {spouse && (
-                      <span className="text-[9px] font-semibold text-brand bg-brand-light px-1.5 py-0.5 rounded-full">
-                        &#128145; {spouse.name.split(" ")[0]}
-                      </span>
-                    )}
-                    {inviteBadge && (
-                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${inviteBadge.cls}`}>
-                        {inviteBadge.label}
-                      </span>
-                    )}
-                  </div>
+                  )}
 
                   <div className="relative" ref={openActionsFor === m.id ? actionsMenuRef : null}>
                     <button
                       type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setOpenActionsFor((current) => (current === m.id ? null : m.id));
-                      }}
-                      className="btn btn-ghost btn-sm"
+                      onClick={(e) => { e.stopPropagation(); setOpenActionsFor((c) => (c === m.id ? null : m.id)); }}
+                      className="btn btn-ghost btn-sm opacity-60 group-hover:opacity-100 transition-opacity"
                     >
-                      Ações
+                      ···
                     </button>
-
                     {openActionsFor === m.id && (
-                      <div className="absolute right-0 z-20 mt-2 min-w-[220px] rounded-2xl border border-border-soft bg-white shadow-lg p-2 flex flex-col gap-1">
-                      {canDo("member.invite") && m.must_change_password && (
-                        <button
-                          onClick={() => resendInvite(m)}
-                          disabled={resendingId === m.id}
-                          className="w-full text-left rounded-xl px-3 py-2 text-sm hover:bg-brand-glow disabled:opacity-60"
-                        >
-                          {resendingId === m.id ? "Reenviando convite..." : "Reenviar convite"}
-                        </button>
-                      )}
-
-                      {canDo("member.remove") && m.id !== user.id && m.active && (
-                        <button
-                          onClick={() => setPendingAction({ member: m, action: "deactivate" })}
-                          className="w-full text-left rounded-xl px-3 py-2 text-sm text-amber-700 hover:bg-amber-light"
-                        >
-                          Desativar membro
-                        </button>
-                      )}
-
-                      {canDo("member.remove") && m.id !== user.id && !m.active && (
-                        <button
-                          onClick={() => setPendingAction({ member: m, action: "reactivate" })}
-                          className="w-full text-left rounded-xl px-3 py-2 text-sm text-success hover:bg-success-light"
-                        >
-                          Reativar membro
-                        </button>
-                      )}
-
-                      {user.role === "admin" && canDo("member.remove") && m.id !== user.id && (
-                        <button
-                          onClick={() => setPendingAction({ member: m, action: "hard_delete" })}
-                          className="w-full text-left rounded-xl px-3 py-2 text-sm text-danger hover:bg-danger-light"
-                        >
-                          Excluir permanentemente
-                        </button>
-                      )}
+                      <div className="absolute right-0 z-20 mt-2 min-w-[200px] rounded-xl border border-border-soft bg-white shadow-lg p-1.5 flex flex-col gap-0.5">
+                        {canDo("member.invite") && m.must_change_password && (
+                          <button onClick={() => resendInvite(m)} disabled={resendingId === m.id} className="w-full text-left rounded-lg px-3 py-2 text-[13px] hover:bg-surface-alt disabled:opacity-60">
+                            {resendingId === m.id ? "Reenviando..." : "Reenviar convite"}
+                          </button>
+                        )}
+                        {canDo("member.remove") && m.id !== user.id && m.active && (
+                          <button onClick={() => setPendingAction({ member: m, action: "deactivate" })} className="w-full text-left rounded-lg px-3 py-2 text-[13px] text-amber-700 hover:bg-amber-light">
+                            Desativar membro
+                          </button>
+                        )}
+                        {canDo("member.remove") && m.id !== user.id && !m.active && (
+                          <button onClick={() => setPendingAction({ member: m, action: "reactivate" })} className="w-full text-left rounded-lg px-3 py-2 text-[13px] text-success hover:bg-success-light">
+                            Reativar membro
+                          </button>
+                        )}
+                        {user.role === "admin" && canDo("member.remove") && m.id !== user.id && (
+                          <button onClick={() => setPendingAction({ member: m, action: "hard_delete" })} className="w-full text-left rounded-lg px-3 py-2 text-[13px] text-danger hover:bg-danger-light">
+                            Excluir permanentemente
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

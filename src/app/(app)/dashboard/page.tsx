@@ -1,18 +1,48 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useApp } from "@/hooks/use-app";
-import { Avatar } from "@/components/ui";
 import { supabase } from "@/lib/supabase/client";
 import { getVerseOfDay } from "@/lib/ai/engine";
-import { getGreeting, getDayName, formatShortDate } from "@/lib/utils/helpers";
-import Link from "next/link";
-import type { Schedule, ScheduleMember, Event, User, Notification } from "@/types";
+import { getGreeting } from "@/lib/utils/helpers";
+import {
+  dashboardQuickActions,
+  getAgendaItems,
+  getAttentionItems,
+  getCommunityItems,
+  getDashboardStats,
+  getGreetingEmoji,
+  getHeroFocus,
+  getHumanSummary,
+} from "@/lib/dashboard/home";
+import {
+  AgendaRow,
+  AttentionRow,
+  DashboardHeader,
+  DashboardSkeleton,
+  DashboardStatsGrid,
+  EmptyLine,
+  HeroCard,
+  PanelLink,
+  QuietPanel,
+  VerseCard,
+} from "@/components/dashboard/home-ui";
+import {
+  careCases,
+  pastoralAlerts,
+  pastoralCells,
+  prayerRequests,
+  timelineEvents,
+} from "@/lib/pastoral/mock-data";
+import type { Event, Notification, Schedule, ScheduleMember, User } from "@/types";
 
 export default function DashboardPage() {
-  const { user, departments, canDo } = useApp();
+  const { user, departments, unreadNotifications } = useApp();
   const verse = getVerseOfDay();
-  const visibleDepartmentIds = useMemo(() => departments.map((department) => department.id), [departments]);
+  const isMember = user.role === "member";
+  const visibleDepartmentIds = useMemo(() => departments.map((d) => d.id), [departments]);
+  const quickRef = useRef<HTMLDivElement | null>(null);
 
   const [members, setMembers] = useState<User[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -20,12 +50,15 @@ export default function DashboardPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [quickOpen, setQuickOpen] = useState(false);
 
-  const todayLabel = new Date().toLocaleDateString("pt-BR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+  const today = new Date();
+  const todayIso = today.toISOString().slice(0, 10);
+  const todayWeekday = today.toLocaleDateString("pt-BR", { weekday: "long" }).replace("-feira", "");
+  const greeting = getGreeting();
+  const greetingEmoji = getGreetingEmoji(greeting);
+  const dateLabelRaw = today.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+  const dateLabel = dateLabelRaw.charAt(0).toUpperCase() + dateLabelRaw.slice(1);
 
   async function loadData() {
     setLoading(true);
@@ -39,25 +72,19 @@ export default function DashboardPage() {
       supabase.from("users").select("*").eq("church_id", user.church_id).eq("active", true),
       supabase.from("schedules").select("*").eq("church_id", user.church_id).neq("status", "cancelled"),
       supabase.from("events").select("*").eq("church_id", user.church_id),
-      supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false),
+      supabase.from("notifications").select("*").eq("user_id", user.id).eq("read", false).limit(5),
       departments.length
         ? supabase.from("department_members").select("*").in("department_id", visibleDepartmentIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
 
     if (membersError || schedulesError || eventsError || notificationsError || departmentMembersError) {
-      console.error({
-        membersError,
-        schedulesError,
-        eventsError,
-        notificationsError,
-        departmentMembersError,
-      });
+      console.error({ membersError, schedulesError, eventsError, notificationsError, departmentMembersError });
       setLoading(false);
       return;
     }
 
-    const scheduleIds = ((schedulesData || []) as Schedule[]).map((schedule) => schedule.id);
+    const scheduleIds = ((schedulesData || []) as Schedule[]).map((s) => s.id);
     const { data: smData, error: smError } = scheduleIds.length
       ? await supabase.from("schedule_members").select("*").in("schedule_id", scheduleIds)
       : { data: [], error: null };
@@ -71,25 +98,21 @@ export default function DashboardPage() {
     const scopedSchedules =
       user.role === "admin"
         ? ((schedulesData || []) as Schedule[])
-        : ((schedulesData || []) as Schedule[]).filter((schedule) =>
-            visibleDepartmentIds.includes(schedule.department_id)
-          );
-    const scopedScheduleIds = new Set(scopedSchedules.map((schedule) => schedule.id));
+        : ((schedulesData || []) as Schedule[]).filter((s) => visibleDepartmentIds.includes(s.department_id));
+    const scopedScheduleIds = new Set(scopedSchedules.map((s) => s.id));
     const scopedDepartmentIds = new Set(visibleDepartmentIds);
     const scopedMembers =
       user.role === "admin"
         ? ((membersData || []) as User[])
-        : ((membersData || []) as User[]).filter((member) =>
+        : ((membersData || []) as User[]).filter((m) =>
             ((departmentMembersData || []) as Array<{ user_id: string; department_id: string }>).some(
-              (departmentMember) =>
-                departmentMember.user_id === member.id &&
-                scopedDepartmentIds.has(departmentMember.department_id)
+              (dm) => dm.user_id === m.id && scopedDepartmentIds.has(dm.department_id)
             )
           );
 
     setMembers(scopedMembers);
     setSchedules(scopedSchedules);
-    setAllSM(((smData || []) as ScheduleMember[]).filter((scheduleMember) => scopedScheduleIds.has(scheduleMember.schedule_id)));
+    setAllSM(((smData || []) as ScheduleMember[]).filter((sm) => scopedScheduleIds.has(sm.schedule_id)));
     setEvents((eventsData || []) as Event[]);
     setNotifications((notificationsData || []) as Notification[]);
     setLoading(false);
@@ -99,323 +122,140 @@ export default function DashboardPage() {
     loadData();
   }, [user.church_id, user.id]);
 
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (!quickRef.current?.contains(event.target as Node)) setQuickOpen(false);
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
   const upcoming = useMemo(() => {
     return schedules
-      .filter((s) => s.status === "active" && s.published)
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 5);
-  }, [schedules]);
+      .filter((s) => s.status === "active" && s.published && s.date >= todayIso)
+      .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
+      .slice(0, 6);
+  }, [schedules, todayIso]);
 
   const pendingTotal = useMemo(() => {
     return allSM.filter(
-      (sm) =>
-        schedules.some((s) => s.id === sm.schedule_id && s.status === "active") &&
-        sm.status === "pending"
+      (sm) => schedules.some((s) => s.id === sm.schedule_id && s.status === "active") && sm.status === "pending"
     ).length;
   }, [allSM, schedules]);
 
   const mySchedules = useMemo(() => {
-    return allSM.filter(
-      (sm) =>
-        sm.user_id === user.id &&
-        schedules.some((s) => s.id === sm.schedule_id && s.status === "active")
-    );
+    return allSM
+      .filter((sm) => sm.user_id === user.id && schedules.some((s) => s.id === sm.schedule_id && s.status === "active"))
+      .sort((a, b) => {
+        const scheduleA = schedules.find((s) => s.id === a.schedule_id);
+        const scheduleB = schedules.find((s) => s.id === b.schedule_id);
+        return `${scheduleA?.date || ""} ${scheduleA?.time || ""}`.localeCompare(`${scheduleB?.date || ""} ${scheduleB?.time || ""}`);
+      });
   }, [allSM, schedules, user.id]);
 
-  const myPending = useMemo(() => {
-    return mySchedules.filter((sm) => sm.status === "pending");
-  }, [mySchedules]);
+  const myPending = useMemo(() => mySchedules.filter((sm) => sm.status === "pending"), [mySchedules]);
 
-  const isMember = user.role === "member";
-  const confirmedRate =
-    !isMember && allSM.length > 0
-      ? Math.round((allSM.filter((scheduleMember) => scheduleMember.status === "confirmed").length / allSM.length) * 100)
-      : null;
+  const upcomingSchedule = useMemo((): Schedule | null => {
+    if (isMember) {
+      const firstSM = mySchedules[0];
+      if (!firstSM) return null;
+      return schedules.find((s) => s.id === firstSM.schedule_id) ?? null;
+    }
+    return upcoming[0] ?? null;
+  }, [isMember, mySchedules, upcoming, schedules]);
 
-  return (
-    <div>
-      <div className="mb-6 rounded-[24px] border border-border-soft bg-[linear-gradient(135deg,rgba(189,149,90,0.16),rgba(255,255,255,0.96))] p-5 sm:p-6">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-          <div className="max-w-2xl">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand mb-2">
-              Visão geral de hoje
-            </div>
-            <h1 className="page-title mb-2">{getGreeting()}, {user.name.split(" ")[0]}</h1>
-            <p className="page-subtitle capitalize">{todayLabel}</p>
-            <p className="mt-3 text-sm leading-relaxed text-ink-muted">
-              {isMember
-                ? "Veja suas próximas escalas, pendências de confirmação e os recados que merecem sua atenção agora."
-                : "Acompanhe a saúde das escalas, respostas pendentes e a movimentação dos ministérios em um só lugar."}
-            </p>
-          </div>
+  const nextSchedSm = upcomingSchedule ? allSM.filter((sm) => sm.schedule_id === upcomingSchedule.id) : [];
+  const nextSchedConfirmed = nextSchedSm.filter((sm) => sm.status === "confirmed").length;
+  const nextSchedEvent = upcomingSchedule ? events.find((e) => e.id === upcomingSchedule.event_id) : null;
+  const nextSchedDept = upcomingSchedule ? departments.find((d) => d.id === upcomingSchedule.department_id) : null;
+  const involvedUsers = nextSchedSm.map((sm) => members.find((member) => member.id === sm.user_id)).filter(Boolean) as User[];
 
-          <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
-            {!isMember && canDo("schedule.create") && (
-              <>
-                <Link href="/escalas/nova" className="btn btn-primary btn-sm">
-                  + Nova Escala
-                </Link>
-                {canDo("member.invite") && (
-                  <Link href="/membros/convidar" className="btn btn-secondary btn-sm">
-                    Convidar Membro
-                  </Link>
-                )}
-              </>
-            )}
+  const todaysCells = pastoralCells.filter((cell) => cell.weekDay.toLowerCase().startsWith(todayWeekday.slice(0, 3)));
+  const priorityCare = careCases.find((care) => care.priority === "high" && care.status !== "finished") || careCases[0];
+  const hero = getHeroFocus({
+    upcomingSchedule,
+    nextSchedEvent,
+    nextSchedDept,
+    nextSchedConfirmed,
+    nextSchedSm,
+    todaysCells,
+    priorityCare,
+    involvedUsers,
+  });
 
-            {isMember && (
-              <Link href="/perfil" className="btn btn-secondary btn-sm self-start sm:self-auto">
-                Editar perfil
-              </Link>
-            )}
-          </div>
-        </div>
-      </div>
+  const agendaItems = getAgendaItems({
+    upcoming,
+    todayIso,
+    events,
+    departments,
+    todaysCells,
+  });
 
-      <div className={`grid ${isMember ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"} gap-3 mb-6`}>
-        {isMember ? (
-          <>
-            <Stat value={mySchedules.length} label="Minhas escalas" color="text-brand" />
-            <Stat value={myPending.length} label="Pendentes" color="text-amber" />
-            <Stat value={user.confirm_rate + "%"} label="Confirmação" color="text-success" />
-          </>
-        ) : (
-          <>
-            <Stat value={upcoming.length} label="Escalas ativas" color="text-brand" />
-            <Stat value={members.length} label="Membros" color="text-success" />
-            <Stat value={pendingTotal} label="Pendentes" color="text-amber" />
-            <Stat value={departments.length} label="Ministérios" color="text-info" />
-          </>
-        )}
-      </div>
-
-      {isMember && myPending.length > 0 && (
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-3.5 bg-amber-light rounded-[14px] border border-amber/10 mb-6">
-          <span className="text-lg">&#9888;&#65039;</span>
-          <span className="text-[13px] text-ink-soft flex-1">
-            Você tem <strong>{myPending.length} {myPending.length === 1 ? "escala" : "escalas"}</strong> aguardando sua confirmação.
-          </span>
-          <Link href="/minhas-escalas" className="text-xs font-semibold text-brand hover:underline self-start">
-            Ver &rarr;
-          </Link>
-        </div>
-      )}
-
-      {!isMember && pendingTotal > 0 && (
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-3.5 bg-amber-light rounded-[14px] border border-amber/10 mb-6">
-          <span className="text-lg">&#9888;&#65039;</span>
-          <span className="text-[13px] text-ink-soft flex-1">
-            <strong>{pendingTotal} {pendingTotal === 1 ? "membro" : "membros"}</strong> não confirmaram escalas.
-          </span>
-          <Link href="/escalas" className="text-xs font-semibold text-brand hover:underline self-start">
-            Ver escalas &rarr;
-          </Link>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
-        <div className="space-y-5">
-          <div className="card overflow-hidden">
-            <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3 border-b border-border-soft bg-surface-alt/40">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint mb-1">
-                  Agenda
-                </div>
-                <span className="font-display text-[17px] break-words">
-                  {isMember ? "Minhas próximas escalas" : "Próximas escalas"}
-                </span>
-              </div>
-              <span className="badge badge-secondary">
-                {isMember ? "Minhas próximas escalas" : "Próximas escalas"}
-              </span>
-            </div>
-
-            {loading ? (
-              <div className="px-5 pb-6 text-sm text-ink-faint text-center py-8">Carregando...</div>
-            ) : (isMember ? mySchedules : upcoming).length === 0 ? (
-              <div className="px-5 pb-6 text-sm text-ink-faint text-center py-8">Nenhuma escala encontrada.</div>
-            ) : (
-              (isMember ? mySchedules : upcoming).map((item, i) => {
-                const sched = isMember
-                  ? schedules.find((s) => s.id === (item as ScheduleMember).schedule_id)
-                  : (item as Schedule);
-
-                if (!sched) return null;
-
-                const ev = events.find((e) => e.id === sched.event_id);
-                const dept = departments.find((d) => d.id === sched.department_id);
-                const sm = allSM.filter((m) => m.schedule_id === sched.id);
-                const confirmed = sm.filter((m) => m.status === "confirmed").length;
-                const mySM = isMember ? (item as ScheduleMember) : null;
-
-                return (
-                  <Link
-                    key={sched.id + "-" + i}
-                    href={isMember ? "/minhas-escalas" : `/escalas/${sched.id}`}
-                    className="flex items-start sm:items-center gap-3.5 px-5 py-3 border-t border-border-soft hover:bg-brand-glow transition-colors"
-                  >
-                    <div className="w-12 h-[50px] rounded-[12px] border border-brand/10 bg-[linear-gradient(180deg,rgba(189,149,90,0.12),rgba(243,238,230,0.82))] flex flex-col items-center justify-center flex-shrink-0">
-                      <span className="text-[9px] font-bold uppercase text-brand tracking-wide">
-                        {getDayName(sched.date)}
-                      </span>
-                      <span className="font-display text-[20px] leading-none">
-                        {sched.date.split("-")[2]}
-                      </span>
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium break-words sm:truncate">{ev?.name || "Escala"}</div>
-                      <div className="text-[11px] text-ink-faint break-words leading-relaxed">
-                        {sched.time} &middot; {dept?.name}
-                      </div>
-                    </div>
-
-                    {isMember && mySM ? (
-                      <span
-                        className={`badge shrink-0 ${
-                          mySM.status === "confirmed"
-                            ? "badge-green"
-                            : mySM.status === "pending"
-                            ? "badge-amber"
-                            : "badge-red"
-                        }`}
-                      >
-                        {mySM.status === "confirmed"
-                          ? "Confirmado"
-                          : mySM.status === "pending"
-                          ? "Pendente"
-                          : "Recusado"}
-                      </span>
-                    ) : (
-                      <span className={`badge shrink-0 ${confirmed === sm.length && sm.length > 0 ? "badge-green" : "badge-amber"}`}>
-                        {confirmed}/{sm.length}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })
-            )}
-          </div>
-
-          {!isMember && pendingTotal > 0 && (
-            <div className="card overflow-hidden">
-              <div className="px-5 pt-4 pb-3 border-b border-border-soft bg-surface-alt/40">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint mb-1">
-                  Atenção
-                </div>
-                <span className="font-display text-[17px] break-words">Aguardando confirmação</span>
-              </div>
-
-              {allSM
-                .filter(
-                  (sm) =>
-                    sm.status === "pending" &&
-                    schedules.some((s) => s.id === sm.schedule_id && s.status === "active")
-                )
-                .slice(0, 5)
-                .map((sm) => {
-                  const m = members.find((u) => u.id === sm.user_id);
-                  const sched = schedules.find((s) => s.id === sm.schedule_id);
-                  const ev = events.find((e) => e.id === sched?.event_id);
-
-                  if (!m || !sched) return null;
-
-                  return (
-                    <div key={sm.id} className="flex items-start sm:items-center gap-3.5 px-5 py-3 border-t border-border-soft">
-                      <Avatar name={m.name} color={m.avatar_color} photoUrl={m.photo_url} size={32} />
-
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium break-words sm:truncate">{m.name}</div>
-                        <div className="text-[11px] text-ink-faint break-words leading-relaxed">
-                          {ev?.name} &middot; {formatShortDate(sched.date)}
-                        </div>
-                      </div>
-
-                      <span className="badge badge-amber">Pendente</span>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-5">
-          <div className="bg-brand-glow border border-brand/10 rounded-[14px] p-5">
-            <p className="font-display italic text-sm text-ink-soft leading-relaxed mb-1.5">
-              &ldquo;{verse.text}&rdquo;
-            </p>
-            <p className="text-[11px] text-brand font-semibold">{verse.ref}</p>
-          </div>
-
-          {!isMember && (
-            <div className="card p-5">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint mb-2">
-                Panorama rápido
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-ink-soft">Respostas confirmadas</div>
-                    <div className="text-xs text-ink-muted leading-relaxed">
-                      Percentual das respostas já confirmadas nas escalas visíveis.
-                    </div>
-                  </div>
-                  <div className="font-display text-2xl text-success leading-none">
-                    {confirmedRate !== null ? `${confirmedRate}%` : "-"}
-                  </div>
-                </div>
-
-                <div className="flex items-start justify-between gap-3 border-t border-border-soft pt-3">
-                  <div>
-                    <div className="text-sm font-semibold text-ink-soft">Eventos cadastrados</div>
-                    <div className="text-xs text-ink-muted leading-relaxed">
-                      Agenda base disponível para montar as próximas escalas.
-                    </div>
-                  </div>
-                  <div className="font-display text-2xl text-info leading-none">{events.length}</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {notifications.length > 0 && (
-            <div className="card overflow-hidden">
-              <div className="px-5 pt-4 pb-3 flex items-center justify-between gap-3 border-b border-border-soft bg-surface-alt/40">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint mb-1">
-                    Avisos
-                  </div>
-                  <span className="font-display text-[17px]">Notificações</span>
-                </div>
-                <span className="badge badge-red">{notifications.length}</span>
-              </div>
-
-              {notifications.slice(0, 3).map((n) => (
-                <div key={n.id} className="px-5 py-3 border-t border-border-soft">
-                  <div className="text-[13px] font-semibold mb-0.5 break-words">{n.title}</div>
-                  <div className="text-[11px] text-ink-muted leading-relaxed break-words">{n.body}</div>
-                </div>
-              ))}
-
-              <Link
-                href="/notificacoes"
-                className="block text-center text-xs text-brand font-semibold py-3 border-t border-border-soft hover:bg-brand-glow transition-colors"
-              >
-                Ver todas &rarr;
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+  const attentionItems = useMemo(
+    () => getAttentionItems({ careCases, prayerRequests }),
+    []
   );
-}
 
-function Stat({ value, label, color }: { value: number | string; label: string; color: string }) {
+  const communityItems = getCommunityItems({
+    involvedUsers,
+    timelineEvents,
+    notifications,
+  });
+
+  const stats = getDashboardStats({
+    isMember,
+    myPending: myPending.length,
+    pendingTotal,
+    openCareCount: careCases.filter((care) => care.status !== "finished").length,
+    prayerCount: prayerRequests.length,
+    newPeopleCount: Math.max(7, members.slice(0, 7).length),
+  });
+
+  const summary = getHumanSummary({
+    pendingTotal,
+    myPending: myPending.length,
+    todaysCells,
+    alerts: pastoralAlerts.length,
+  });
+
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
+
   return (
-    <div className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,245,239,0.9))] border border-border-soft rounded-[16px] px-5 py-4 min-w-0 shadow-sm">
-      <div className={`font-display text-[28px] tracking-tight leading-none ${color}`}>{value}</div>
-      <div className="text-xs text-ink-muted font-medium mt-1 break-words">{label}</div>
+    <div className="w-full space-y-6 pb-8">
+      <DashboardHeader
+        greeting={greeting}
+        greetingEmoji={greetingEmoji}
+        user={user}
+        summary={summary}
+        unreadNotifications={unreadNotifications}
+        dateLabel={dateLabel}
+      />
+
+      <HeroCard hero={hero} confirmed={nextSchedConfirmed} total={nextSchedSm.length || 1} />
+
+      <DashboardStatsGrid stats={stats} />
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <QuietPanel title="Agenda de hoje" action={<PanelLink href="/calendario">Ver calendário</PanelLink>}>
+          <div className="space-y-1">
+            {agendaItems.length ? agendaItems.map((item) => <AgendaRow key={item.id} item={item} />) : (
+              <EmptyLine title="Dia sem compromissos" description="Nenhum encontro precisa da sua atenção agora." />
+            )}
+          </div>
+        </QuietPanel>
+
+        <QuietPanel title="Precisando de atenção" action={<PanelLink href="/pessoas">Ver todas</PanelLink>}>
+          <div className="space-y-1">
+            {attentionItems.length ? attentionItems.map((item) => <AttentionRow key={item.id} item={item} />) : (
+              <EmptyLine title="Tudo certo por aqui" description="Ninguém precisa de acompanhamento imediato agora." />
+            )}
+          </div>
+        </QuietPanel>
+      </section>
+
+      <VerseCard text={verse.text} reference={verse.ref} />
     </div>
   );
 }

@@ -8,7 +8,10 @@ import { formatInviteDate, formatInviteOpenedAt } from "@/lib/invitations";
 import { supabase } from "@/lib/supabase/client";
 import { formatDate, formatShortDate } from "@/lib/utils/helpers";
 import { MemberEditModal } from "@/components/shared/member-edit-modal";
-import { AvailabilityGrid, Avatar } from "@/components/ui";
+import { CareNoteForm } from "@/components/shared/care-note-form";
+import { AvailabilityGrid, Avatar, ConfirmDialog } from "@/components/ui";
+import { fetchCareNotes, saveCareNote } from "@/lib/care/client";
+import { careType, CARE_TONE_CLASSES, formatCareDate, type PastoralNote } from "@/lib/care/types";
 import Link from "next/link";
 import type {
   User,
@@ -54,6 +57,29 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
   const [latestInvite, setLatestInvite] = useState<MemberInvitation | null>(null);
   const [loading, setLoading] = useState(true);
   const [resendingInvite, setResendingInvite] = useState(false);
+  const [careNotes, setCareNotes] = useState<PastoralNote[]>([]);
+  const [showCareForm, setShowCareForm] = useState(false);
+  const [deleteNote, setDeleteNote] = useState<PastoralNote | null>(null);
+  const canCare = user.role !== "member";
+
+  async function loadCare() {
+    try {
+      setCareNotes(await fetchCareNotes(params.id));
+    } catch (error) {
+      console.warn("Falha ao carregar cuidado pastoral:", error);
+    }
+  }
+
+  async function handleDeleteNote(note: PastoralNote) {
+    try {
+      await saveCareNote({ mode: "delete", personId: params.id, noteId: note.id });
+      toast("Registro removido.");
+      setDeleteNote(null);
+      await loadCare();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Erro ao remover registro.");
+    }
+  }
 
   async function loadData() {
     setLoading(true);
@@ -116,6 +142,8 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
 
   useEffect(() => {
     loadData();
+    loadCare();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id, user.church_id, departments.length]);
 
   if (loading) {
@@ -363,6 +391,40 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
             <AvailabilityGrid availability={member.availability || []} />
           </div>
 
+          {/* Cuidado pastoral */}
+          <div className="card p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="font-display text-[17px]">Cuidado pastoral</span>
+              {canCare && (
+                <button onClick={() => setShowCareForm(true)} className="btn btn-primary btn-sm">+ Registrar</button>
+              )}
+            </div>
+            {careNotes.length === 0 ? (
+              <p className="py-5 text-center text-sm text-ink-faint">Nenhum registro de cuidado ainda.</p>
+            ) : (
+              <div className="space-y-3">
+                {careNotes.map((note) => {
+                  const t = careType(note.type);
+                  return (
+                    <div key={note.id} className="group flex gap-3">
+                      <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${CARE_TONE_CLASSES[t.tone]}`}>{t.short}</div>
+                      <div className="min-w-0 flex-1 border-b border-border-soft pb-3 last:border-b-0 last:pb-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[13px] font-bold text-ink">{note.title || t.label}</span>
+                          <span className="text-[11px] font-semibold text-ink-faint">{formatCareDate(note.date)}</span>
+                          {canCare && (
+                            <button onClick={() => setDeleteNote(note)} className="ml-auto text-[11px] font-semibold text-ink-faint opacity-0 transition hover:text-danger group-hover:opacity-100">Remover</button>
+                          )}
+                        </div>
+                        {note.description && <p className="mt-1 text-[12px] leading-relaxed text-ink-muted">{note.description}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           <div className="card">
             <div className="px-5 pt-4 pb-3">
               <span className="font-display text-[17px]">Histórico de Escalas</span>
@@ -561,6 +623,25 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
               toast("Erro ao atualizar membro.");
             }
           }}
+        />
+      )}
+
+      {showCareForm && (
+        <CareNoteForm
+          personId={params.id}
+          toast={toast}
+          close={() => setShowCareForm(false)}
+          onSaved={async () => { setShowCareForm(false); await loadCare(); }}
+        />
+      )}
+
+      {deleteNote && (
+        <ConfirmDialog
+          title="Remover registro"
+          message={`Remover este registro de cuidado de <strong>${formatCareDate(deleteNote.date)}</strong>?`}
+          confirmLabel="Remover"
+          onCancel={() => setDeleteNote(null)}
+          onConfirm={() => void handleDeleteNote(deleteNote)}
         />
       )}
     </div>

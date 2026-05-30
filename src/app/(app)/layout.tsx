@@ -78,28 +78,24 @@ function ShellV2({ children }: { children: React.ReactNode }) {
 
   const navItems: NavItem[] = [
     { href: "/dashboard", label: "Início", icon: "home", show: true },
-    { href: "/escalas", label: "Escalas", icon: "calendar", show: isAdmin || isLeader },
-    { href: "/minhas-escalas", label: "Minhas Escalas", icon: "check-square", show: isMember },
-    { href: "/ministerios", label: "Ministérios", icon: "users", show: canDo("department.view") && !isMember },
-    { href: "/membros", label: "Membros", icon: "user", show: canDo("member.view") },
-    { href: "/eventos", label: "Eventos", icon: "star", show: canDo("event.view") && !isMember },
-    { href: "/calendario", label: "Calendário", icon: "calendar-days", show: true },
-    { href: "/notificacoes", label: "Notificações", icon: "bell", show: true, badge: unreadNotifications || undefined },
-    { href: "/rankings", label: "Ranking", icon: "bar-chart", show: true },
-    { href: "/mensagens", label: "Mensagens", icon: "message-circle", show: canDo("message.send") },
-    { href: "/relatorios", label: "Relatórios", icon: "bar-chart", show: canDo("report.view") },
-    { href: "/configuracoes", label: "Configurações", icon: "settings", show: isAdmin },
-    { href: "/perfil", label: "Meu Perfil", icon: "user", show: isMember },
+    { href: "/calendario", label: "Agenda", icon: "calendar-days", show: true },
+    { href: "/pessoas", label: "Pessoas", icon: "users", show: !isMember },
+    { href: "/celulas", label: "Células", icon: "house", show: !isMember },
+    { href: isMember ? "/minhas-escalas" : "/ministerios", label: "Ministérios", icon: "heart", show: true },
+    { href: "/comunicacao", label: "Comunicação", icon: "message-circle", show: canDo("message.send") || !isAdmin },
+    { href: "/relatorios", label: "Relatórios", icon: "bar-chart", show: canDo("report.view"), group: "Gestão" },
+    { href: "/configuracoes", label: "Configurações", icon: "settings", show: isAdmin, group: "Gestão" },
+    { href: "/perfil", label: "Meu Perfil", icon: "user", show: isMember, group: "Gestão" },
   ].filter((n) => n.show) as NavItem[];
 
   const mobileTabs: MobileTab[] = [
     { href: "/dashboard", label: "Início", icon: <HomeIcon /> },
     {
-      href: isAdmin || isLeader ? "/escalas" : "/minhas-escalas",
-      label: "Escalas",
+      href: "/calendario",
+      label: "Agenda",
       icon: <CalendarIcon />,
     },
-    { href: "/membros", label: "Membros", icon: <UsersIcon /> },
+    { href: isMember ? "/ministerios" : "/pessoas", label: isMember ? "Ministérios" : "Pessoas", icon: <UsersIcon /> },
     {
       href: "/notificacoes",
       label: "Mais",
@@ -111,7 +107,14 @@ function ShellV2({ children }: { children: React.ReactNode }) {
   const isSplitPage = SPLIT_PAGES.some((p) => pathname.startsWith(p));
 
   return (
-    <div className="flex min-h-screen bg-bg overflow-hidden">
+    <div className="relative flex min-h-screen overflow-hidden">
+      {/* Aurora background layer */}
+      <div className="fixed inset-0 -z-10 overflow-hidden bg-[radial-gradient(60%_50%_at_12%_8%,rgba(255,107,87,0.10),transparent_60%),radial-gradient(55%_45%_at_92%_4%,rgba(56,189,240,0.09),transparent_60%),radial-gradient(50%_50%_at_82%_92%,rgba(155,140,251,0.09),transparent_60%),radial-gradient(45%_45%_at_6%_94%,rgba(45,212,167,0.08),transparent_60%),linear-gradient(180deg,#FBFAFF_0%,#F7F6FC_100%)]">
+        <span className="aurora-blob b1" />
+        <span className="aurora-blob b2" />
+        <span className="aurora-blob b3" />
+        <div className="aurora-grain" />
+      </div>
       {/* Desktop sidebar */}
       {!isMobile && (
         <SidebarV2
@@ -155,11 +158,11 @@ function ShellV2({ children }: { children: React.ReactNode }) {
         {/* Page content */}
         {isSplitPage ? (
           <main className={`flex-1 overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8 ${isMobile ? "pb-20" : ""}`}>
-            {children}
+            <div className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col">{children}</div>
           </main>
         ) : (
-          <main className={`flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8 ${isMobile ? "pb-20" : ""}`}>
-            <div className="mx-auto w-full max-w-[1400px]">{children}</div>
+          <main className={`flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8 xl:px-10 ${isMobile ? "pb-20" : ""}`}>
+            <div className="mx-auto w-full max-w-[1200px]">{children}</div>
           </main>
         )}
       </div>

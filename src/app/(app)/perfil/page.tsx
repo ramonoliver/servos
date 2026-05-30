@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { updateSession } from "@/lib/auth/session";
 import { getInitials } from "@/lib/utils/helpers";
-import { AvailabilityEditor, Skeleton } from "@/components/ui";
+import { AvailabilityEditor, Skeleton, PageHeader } from "@/components/ui";
 
 export default function PerfilPage() {
   const { user, toast, refresh, pushPermission, pushEnabled, registeringPush, enablePushNotifications, retryPushNotifications } = useApp();
@@ -181,10 +181,8 @@ export default function PerfilPage() {
   }
 
   return (
-    <div className="max-w-[600px]">
-      <div className="mb-6">
-        <h1 className="page-title">Meu Perfil</h1>
-      </div>
+    <div className="w-full">
+      <PageHeader className="mb-6" eyebrow="Conta" title="Meu Perfil" />
 
       {user.must_change_password && (
         <div className="bg-amber-light text-amber text-sm px-4 py-3 rounded-[14px] border border-amber/10 mb-5 flex items-center gap-2">
