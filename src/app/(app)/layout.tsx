@@ -85,7 +85,7 @@ function ShellV2({ children }: { children: React.ReactNode }) {
     { href: "/comunicacao", label: "Comunicação", icon: "message-circle", show: canDo("message.send") || !isAdmin },
     { href: "/relatorios", label: "Relatórios", icon: "bar-chart", show: canDo("report.view"), group: "Gestão" },
     { href: "/configuracoes", label: "Configurações", icon: "settings", show: isAdmin, group: "Gestão" },
-    { href: "/perfil", label: "Meu Perfil", icon: "user", show: isMember, group: "Gestão" },
+    { href: "/perfil", label: "Meu Perfil", icon: "user", show: true, group: "Gestão" },
   ].filter((n) => n.show) as NavItem[];
 
   const mobileTabs: MobileTab[] = [

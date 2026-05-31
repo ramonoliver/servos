@@ -194,23 +194,29 @@ export function SidebarV2({
             compact ? "justify-center p-2" : "p-2.5"
           }`}
         >
-          <Avatar name={user.name} color={user.avatar_color} photoUrl={user.photo_url} size={38} />
-          {!compact && (
-            <>
+          <Link
+            href="/perfil"
+            title="Meu perfil"
+            className={`flex min-w-0 items-center gap-3 ${compact ? "" : "flex-1"}`}
+          >
+            <Avatar name={user.name} color={user.avatar_color} photoUrl={user.photo_url} size={38} />
+            {!compact && (
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13.5px] font-bold text-ink">{user.name}</div>
                 <div className="text-[11.5px] text-ink-faint">
                   {user.role === "admin" ? "Administrador" : user.role === "leader" ? "Líder" : "Membro"}
                 </div>
               </div>
-              <button
-                onClick={onLogout}
-                className="rounded-full p-1.5 text-ink-faint transition hover:bg-danger-light hover:text-danger"
-                title="Sair"
-              >
-                <SvgIcon name="log-out" size={15} />
-              </button>
-            </>
+            )}
+          </Link>
+          {!compact && (
+            <button
+              onClick={onLogout}
+              className="rounded-full p-1.5 text-ink-faint transition hover:bg-danger-light hover:text-danger"
+              title="Sair"
+            >
+              <SvgIcon name="log-out" size={15} />
+            </button>
           )}
         </div>
         {!compact && (
