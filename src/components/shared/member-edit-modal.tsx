@@ -22,6 +22,7 @@ interface MemberEditModalProps {
   allDeptMembers: DepartmentMember[];
   allMembers: User[];
   onClose: () => void;
+  canAssignCellRole?: boolean;
   onSave: (
     updates: Partial<User>,
     selectedDepartments: SelectedDepartment[],
@@ -35,6 +36,7 @@ export function MemberEditModal({
   allDeptMembers,
   allMembers,
   onClose,
+  canAssignCellRole = false,
   onSave,
 }: MemberEditModalProps) {
   const [name, setName] = useState(member.name || "");
@@ -42,6 +44,7 @@ export function MemberEditModal({
   const [phone, setPhone] = useState(member.phone || "");
   const [role, setRole] = useState<MemberRole>((member.role as MemberRole) || "member");
   const [status, setStatus] = useState<MemberStatus>((member.status as MemberStatus) || "active");
+  const [cellRole, setCellRole] = useState<string>(member.cell_role ?? "");
   const [spouseId, setSpouseId] = useState(member.spouse_id || "");
   const [photo, setPhoto] = useState<string | null>(member.photo_url ?? null);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -119,6 +122,7 @@ export function MemberEditModal({
         status,
         spouse_id: spouseId || null,
         photo_url: photo,
+        ...(canAssignCellRole ? { cell_role: (cellRole || null) as User["cell_role"] } : {}),
       },
       selectedDepartments,
       spouseId
@@ -275,6 +279,18 @@ export function MemberEditModal({
             </select>
           </div>
         </div>
+
+        {canAssignCellRole && (
+          <div>
+            <label className="input-label">Papel em células (igreja)</label>
+            <select className="input-field" value={cellRole} onChange={(e) => setCellRole(e.target.value)}>
+              <option value="">Nenhum</option>
+              <option value="pastor">Pastor — vê tudo</option>
+              <option value="coordenacao">Coordenação — vê todas as células</option>
+            </select>
+            <p className="mt-1 text-[11px] text-ink-faint">Supervisão é definida nas Redes/Setores, não aqui.</p>
+          </div>
+        )}
 
         <div>
           <div className="mb-2">

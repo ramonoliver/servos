@@ -588,6 +588,7 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
           departments={departments}
           allDeptMembers={dms}
           allMembers={members}
+          canAssignCellRole={user.role === "admin" || user.cell_role === "pastor"}
           onClose={() => setShowEdit(false)}
           onSave={async (updates, selectedDepartments, spouseId) => {
             try {

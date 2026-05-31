@@ -15,9 +15,14 @@ export interface Cell {
   name: string;
   description: string;
   cover_color: string;
-  leader_id: string | null;
-  co_leader_id: string | null;
-  supervisor_id: string | null;
+  leader_ids: string[];
+  co_leader_ids: string[];
+  network_id: string | null;
+  /** @deprecated use leader_ids/co_leader_ids */
+  leader_id?: string | null;
+  /** @deprecated */
+  co_leader_id?: string | null;
+  supervisor_id?: string | null;
   address: string;
   week_day: string;
   time: string;
@@ -27,6 +32,18 @@ export interface Cell {
   health: CellHealth;
   created_at: string;
 }
+
+export interface CellNetwork {
+  id: string;
+  church_id: string;
+  name: string;
+  description: string;
+  supervisor_ids: string[];
+  color: string;
+  created_at: string;
+}
+
+export type CellRole = "pastor" | "coordenacao" | null;
 
 export interface CellMemberRow {
   id: string;

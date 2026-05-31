@@ -36,17 +36,10 @@ export default function CalendarioPage() {
   async function loadData() {
     setLoading(true);
 
-    // Cells (independent of schedules). Admin sees all; others see the cells
-    // they lead/co-lead or are members of.
+    // Cells already come scoped by role from the server (admin/pastor/coord
+    // see all; supervisor sees their networks; leader/member see their cells).
     try {
-      const { cells: allCells, cellMembers: cm } = await fetchCells();
-      const myCellIds = new Set(cm.filter((x) => x.user_id === user.id).map((x) => x.cell_id));
-      const visibleCells =
-        user.role === "admin"
-          ? allCells
-          : allCells.filter(
-              (c) => c.leader_id === user.id || c.co_leader_id === user.id || myCellIds.has(c.id)
-            );
+      const { cells: visibleCells, cellMembers: cm } = await fetchCells();
       setCellList(visibleCells);
       setCellMembers(cm);
     } catch (cellsError) {
@@ -126,7 +119,7 @@ export default function CalendarioPage() {
   const myCellIds = useMemo(() => {
     const set = new Set<string>();
     cellList.forEach((c) => {
-      if (c.leader_id === user.id || c.co_leader_id === user.id) set.add(c.id);
+      if ((c.leader_ids || []).includes(user.id) || (c.co_leader_ids || []).includes(user.id)) set.add(c.id);
     });
     cellMembers.forEach((cm) => {
       if (cm.user_id === user.id) set.add(cm.cell_id);
@@ -296,8 +289,11 @@ export default function CalendarioPage() {
                       </span>
                     )}
                     {hasCell && (
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-white/80 text-[#5b4aa8]"}`}>
-                        Célula
+                      <span
+                        title={dayCellList.map((c) => c.name).join(", ")}
+                        className={`max-w-[58px] truncate text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-white/80 text-[#5b4aa8]"}`}
+                      >
+                        {dayCellList[0].name}{dayCellList.length > 1 ? ` +${dayCellList.length - 1}` : ""}
                       </span>
                     )}
                   </div>

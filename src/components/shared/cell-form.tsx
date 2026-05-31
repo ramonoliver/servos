@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Modal, MultiSelect } from "@/components/ui";
 import type { MultiSelectOption } from "@/components/ui";
-import { WEEK_DAYS, DEFAULT_HEALTH, type Cell, type CellMemberRow } from "@/lib/cells/types";
+import { WEEK_DAYS, DEFAULT_HEALTH, type Cell, type CellMemberRow, type CellNetwork } from "@/lib/cells/types";
 import { saveCell } from "@/lib/cells/client";
 import type { User } from "@/types";
 
@@ -11,6 +11,7 @@ export function CellForm({
   cell,
   members,
   cellMembers,
+  networks = [],
   toast,
   close,
   onSaved,
@@ -18,6 +19,7 @@ export function CellForm({
   cell?: Cell;
   members: User[];
   cellMembers: CellMemberRow[];
+  networks?: CellNetwork[];
   toast: (msg: string) => void;
   close: () => void;
   onSaved: () => void;
@@ -28,25 +30,40 @@ export function CellForm({
     : [];
 
   const [name, setName] = useState(cell?.name || "");
-  const [leaderId, setLeaderId] = useState(cell?.leader_id || "");
-  const [coLeaderId, setCoLeaderId] = useState(cell?.co_leader_id || "");
+  const [leaderIds, setLeaderIds] = useState<string[]>(cell?.leader_ids || []);
+  const [coLeaderIds, setCoLeaderIds] = useState<string[]>(cell?.co_leader_ids || []);
   const [weekDay, setWeekDay] = useState(cell?.week_day || "");
   const [time, setTime] = useState(cell?.time || "");
   const [audience, setAudience] = useState(cell?.audience || "");
   const [address, setAddress] = useState(cell?.address || "");
   const [description, setDescription] = useState(cell?.description || "");
   const [maxMembers, setMaxMembers] = useState(cell?.max_members ?? 12);
+  const [networkId, setNetworkId] = useState(cell?.network_id || "");
   const [memberIds, setMemberIds] = useState<string[]>(
-    existingMemberIds.filter((id) => id !== cell?.leader_id && id !== cell?.co_leader_id)
+    existingMemberIds.filter(
+      (id) => !(cell?.leader_ids || []).includes(id) && !(cell?.co_leader_ids || []).includes(id)
+    )
   );
   const [saving, setSaving] = useState(false);
 
-  const memberOptions: MultiSelectOption[] = members.map((m) => ({
+  const allOptions: MultiSelectOption[] = members.map((m) => ({
     id: m.id,
     label: m.name,
     sublabel: m.role === "admin" ? "Admin" : m.role === "leader" ? "Líder" : "Membro",
     avatarColor: m.avatar_color,
   }));
+  const coLeaderOptions = allOptions.filter((o) => !leaderIds.includes(o.id));
+
+  function addSpouses(ids: string[], setter: (v: string[]) => void) {
+    const spouses = ids
+      .map((id) => members.find((m) => m.id === id)?.spouse_id)
+      .filter((s): s is string => !!s);
+    if (!spouses.length) {
+      toast("Nenhum cônjuge cadastrado para os selecionados.");
+      return;
+    }
+    setter(Array.from(new Set([...ids, ...spouses])));
+  }
 
   async function submit() {
     if (!name.trim()) {
@@ -58,9 +75,9 @@ export function CellForm({
       name: name.trim(),
       description,
       cover_color: cell?.cover_color || "#FF6B57",
-      leader_id: leaderId || null,
-      co_leader_id: coLeaderId || null,
-      supervisor_id: cell?.supervisor_id || null,
+      leader_ids: leaderIds,
+      co_leader_ids: coLeaderIds.filter((id) => !leaderIds.includes(id)),
+      network_id: networkId || null,
       address,
       week_day: weekDay,
       time,
@@ -99,22 +116,40 @@ export function CellForm({
           <input className="input-field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Célula Jardins" autoFocus />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="input-label">Líder</label>
-            <select className="input-field" value={leaderId} onChange={(e) => setLeaderId(e.target.value)}>
-              <option value="">Selecione…</option>
-              {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+        <div>
+          <div className="flex items-center justify-between">
+            <label className="input-label">Líderes</label>
+            <button type="button" onClick={() => addSpouses(leaderIds, setLeaderIds)} className="text-[11px] font-bold text-brand-deep hover:text-brand">
+              + Incluir cônjuge
+            </button>
           </div>
-          <div>
-            <label className="input-label">Co-líder (opcional)</label>
-            <select className="input-field" value={coLeaderId} onChange={(e) => setCoLeaderId(e.target.value)}>
-              <option value="">Nenhum</option>
-              {members.filter((m) => m.id !== leaderId).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-          </div>
+          <MultiSelect options={allOptions} selected={leaderIds} onChange={setLeaderIds} placeholder="Selecionar líder(es)... (casal pode ser os dois)" />
         </div>
+
+        <div>
+          <div className="flex items-center justify-between">
+            <label className="input-label">Co-líderes (opcional)</label>
+            <button type="button" onClick={() => addSpouses(coLeaderIds, (v) => setCoLeaderIds(v.filter((id) => !leaderIds.includes(id))))} className="text-[11px] font-bold text-brand-deep hover:text-brand">
+              + Incluir cônjuge
+            </button>
+          </div>
+          <MultiSelect
+            options={coLeaderOptions}
+            selected={coLeaderIds}
+            onChange={(ids) => setCoLeaderIds(ids.filter((id) => !leaderIds.includes(id)))}
+            placeholder="Selecionar co-líder(es)..."
+          />
+        </div>
+
+        {networks.length > 0 && (
+          <div>
+            <label className="input-label">Rede / Setor (opcional)</label>
+            <select className="input-field" value={networkId} onChange={(e) => setNetworkId(e.target.value)}>
+              <option value="">Sem rede</option>
+              {networks.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
+            </select>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -154,12 +189,12 @@ export function CellForm({
         <div>
           <label className="input-label">Membros</label>
           <MultiSelect
-            options={memberOptions}
+            options={allOptions}
             selected={memberIds}
-            onChange={(ids) => setMemberIds(ids.filter((id) => id !== leaderId && id !== coLeaderId))}
+            onChange={(ids) => setMemberIds(ids.filter((id) => !leaderIds.includes(id) && !coLeaderIds.includes(id)))}
             placeholder="Adicionar membros..."
           />
-          <p className="mt-1.5 text-[11px] text-ink-faint">O líder e o co-líder já entram como membros automaticamente.</p>
+          <p className="mt-1.5 text-[11px] text-ink-faint">Líderes e co-líderes já entram como membros automaticamente.</p>
         </div>
       </div>
     </Modal>

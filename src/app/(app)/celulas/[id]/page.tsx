@@ -18,6 +18,7 @@ import {
   type CellHealth,
   type CellMeeting,
   type CellAttendanceRow,
+  type CellNetwork,
 } from "@/lib/cells/types";
 import type { User } from "@/types";
 
@@ -41,11 +42,14 @@ export default function CellDetailPage() {
   const cellId = params?.id;
   const router = useRouter();
   const { user, toast } = useApp();
-  const canManage = user.role !== "member";
+  const canDelete =
+    user.role === "admin" || user.cell_role === "pastor" || user.cell_role === "coordenacao";
 
   const [cell, setCell] = useState<Cell | null>(null);
   const [cellMembers, setCellMembers] = useState<CellMemberRow[]>([]);
   const [members, setMembers] = useState<User[]>([]);
+  const [networks, setNetworks] = useState<CellNetwork[]>([]);
+  const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -86,6 +90,8 @@ export default function CellDetailPage() {
       setMembers((usersData || []) as User[]);
       setCellMembers(cellsData.cellMembers.filter((cm) => cm.cell_id === cellId));
       setCell(cellsData.cells.find((c) => c.id === cellId) ?? null);
+      setNetworks(cellsData.networks);
+      setCanManage(cellsData.manageableIds.includes(cellId as string));
     } catch (error) {
       console.warn("Falha ao carregar célula:", error);
       setCell(null);
@@ -144,8 +150,8 @@ export default function CellDetailPage() {
     );
   }
 
-  const leader = cell.leader_id ? memberById.get(cell.leader_id) : null;
-  const coLeader = cell.co_leader_id ? memberById.get(cell.co_leader_id) : null;
+  const leaders = (cell.leader_ids || []).map((id) => memberById.get(id)).filter(Boolean) as User[];
+  const coLeaders = (cell.co_leader_ids || []).map((id) => memberById.get(id)).filter(Boolean) as User[];
   const average = cellHealthAverage(cell.health);
   const healthChip = average >= 75 ? "text-success bg-success-light" : average >= 50 ? "text-amber bg-amber-light" : "text-danger bg-danger-light";
 
@@ -172,10 +178,10 @@ export default function CellDetailPage() {
           <div className="flex items-center gap-2 self-start">
             <span className={`rounded-full px-3 py-1.5 text-[12px] font-bold ${healthChip}`}>{average}% saúde</span>
             {canManage && (
-              <>
-                <button onClick={() => setShowEdit(true)} className="btn btn-secondary btn-sm">Editar</button>
-                <button onClick={() => setShowDelete(true)} className="btn btn-danger btn-sm">Excluir</button>
-              </>
+              <button onClick={() => setShowEdit(true)} className="btn btn-secondary btn-sm">Editar</button>
+            )}
+            {canDelete && (
+              <button onClick={() => setShowDelete(true)} className="btn btn-danger btn-sm">Excluir</button>
             )}
           </div>
         </div>
@@ -195,7 +201,7 @@ export default function CellDetailPage() {
           ) : (
             <div className="grid gap-2 sm:grid-cols-2">
               {memberUsers.map((m) => {
-                const roleTag = m.id === cell.leader_id ? "Líder" : m.id === cell.co_leader_id ? "Co-líder" : null;
+                const roleTag = (cell.leader_ids || []).includes(m.id) ? "Líder" : (cell.co_leader_ids || []).includes(m.id) ? "Co-líder" : null;
                 return (
                   <Link key={m.id} href={`/membros/${m.id}`} className="flex items-center gap-3 rounded-[14px] border border-border-soft bg-white/60 p-2.5 transition hover:-translate-y-0.5 hover:shadow-soft">
                     <Avatar name={m.name} color={m.avatar_color} photoUrl={m.photo_url} size={36} />
@@ -255,24 +261,28 @@ export default function CellDetailPage() {
         <div className="space-y-5">
           <div className="rounded-[20px] border border-border-soft bg-white/70 p-5 shadow-soft backdrop-blur">
             <h2 className="mb-3 font-display text-[15px] font-bold text-ink">Liderança</h2>
-            {leader ? (
-              <div className="flex items-center gap-3">
-                <Avatar name={leader.name} color={leader.avatar_color} photoUrl={leader.photo_url} size={40} />
-                <div className="min-w-0">
-                  <div className="truncate text-[13px] font-bold text-ink">{leader.name}</div>
-                  <div className="text-[11px] text-ink-faint">Líder</div>
-                </div>
-              </div>
+            {leaders.length === 0 && coLeaders.length === 0 ? (
+              <p className="text-sm text-ink-faint">Sem liderança definida.</p>
             ) : (
-              <p className="text-sm text-ink-faint">Sem líder definido.</p>
-            )}
-            {coLeader && (
-              <div className="mt-3 flex items-center gap-3 border-t border-border-soft pt-3">
-                <Avatar name={coLeader.name} color={coLeader.avatar_color} photoUrl={coLeader.photo_url} size={40} />
-                <div className="min-w-0">
-                  <div className="truncate text-[13px] font-bold text-ink">{coLeader.name}</div>
-                  <div className="text-[11px] text-ink-faint">Co-líder</div>
-                </div>
+              <div className="space-y-3">
+                {leaders.map((p) => (
+                  <div key={p.id} className="flex items-center gap-3">
+                    <Avatar name={p.name} color={p.avatar_color} photoUrl={p.photo_url} size={40} />
+                    <div className="min-w-0">
+                      <div className="truncate text-[13px] font-bold text-ink">{p.name}</div>
+                      <div className="text-[11px] text-ink-faint">{leaders.length > 1 ? "Líder (casal)" : "Líder"}</div>
+                    </div>
+                  </div>
+                ))}
+                {coLeaders.map((p) => (
+                  <div key={p.id} className="flex items-center gap-3 border-t border-border-soft pt-3">
+                    <Avatar name={p.name} color={p.avatar_color} photoUrl={p.photo_url} size={40} />
+                    <div className="min-w-0">
+                      <div className="truncate text-[13px] font-bold text-ink">{p.name}</div>
+                      <div className="text-[11px] text-ink-faint">Co-líder</div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -308,6 +318,7 @@ export default function CellDetailPage() {
           cell={cell}
           members={members}
           cellMembers={cellMembers}
+          networks={networks}
           toast={toast}
           close={() => setShowEdit(false)}
           onSaved={async () => { setShowEdit(false); await loadData(); }}

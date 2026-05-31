@@ -21,6 +21,7 @@ const bodySchema = z.object({
     status: z.enum(["active", "inactive", "paused", "vacation"]),
     spouse_id: z.string().nullable(),
     photo_url: z.string().nullable().optional(),
+    cell_role: z.enum(["pastor", "coordenacao"]).nullable().optional(),
   }),
   selectedDepartments: z.array(selectedDepartmentSchema).default([]),
   spouseId: z.string().default(""),
@@ -125,6 +126,13 @@ export async function POST(req: Request) {
 
     if (!actor?.active || !can(actor.role, "member.edit")) {
       return NextResponse.json({ error: "Sem permissao para editar membros." }, { status: 403 });
+    }
+
+    // Only admin/pastor may assign the cell_role (pastor/coordenação).
+    if ((updates as { cell_role?: unknown }).cell_role !== undefined) {
+      const { data: actorRoleRow } = await supabase.from("users").select("cell_role").eq("id", actorId).maybeSingle();
+      const canAssignCellRole = actor.role === "admin" || (actorRoleRow as any)?.cell_role === "pastor";
+      if (!canAssignCellRole) delete (updates as { cell_role?: unknown }).cell_role;
     }
 
     if (!member) {

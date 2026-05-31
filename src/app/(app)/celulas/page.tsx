@@ -8,22 +8,26 @@ import { getInitials } from "@/lib/utils/helpers";
 import { Avatar, ConfirmDialog, PageShell, PageHeader } from "@/components/ui";
 import { CellForm } from "@/components/shared/cell-form";
 import { fetchCells, saveCell } from "@/lib/cells/client";
-import { cellHealthAverage, type Cell, type CellMemberRow } from "@/lib/cells/types";
+import { cellHealthAverage, type Cell, type CellMemberRow, type CellNetwork } from "@/lib/cells/types";
 import type { User } from "@/types";
 
 type ModalState = null | { type: "form"; cell?: Cell } | { type: "delete"; cell: Cell };
 
 export default function CelulasPage() {
   const { user, toast } = useApp();
-  const canManage = user.role !== "member";
+  const canCreate =
+    user.role === "admin" || user.cell_role === "pastor" || user.cell_role === "coordenacao";
 
   const [cells, setCells] = useState<Cell[]>([]);
   const [cellMembers, setCellMembers] = useState<CellMemberRow[]>([]);
   const [members, setMembers] = useState<User[]>([]);
+  const [networks, setNetworks] = useState<CellNetwork[]>([]);
+  const [manageableIds, setManageableIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [healthFilter, setHealthFilter] = useState("all");
   const [modal, setModal] = useState<ModalState>(null);
+  const manageable = useMemo(() => new Set(manageableIds), [manageableIds]);
 
   async function loadData() {
     setLoading(true);
@@ -35,10 +39,13 @@ export default function CelulasPage() {
       setMembers((usersData || []) as User[]);
       setCells(cellsData.cells);
       setCellMembers(cellsData.cellMembers);
+      setNetworks(cellsData.networks);
+      setManageableIds(cellsData.manageableIds);
     } catch (error) {
       console.warn("Falha ao carregar células:", error);
       setCells([]);
       setCellMembers([]);
+      setManageableIds([]);
     } finally {
       setLoading(false);
     }
@@ -61,7 +68,7 @@ export default function CelulasPage() {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return cells.filter((cell) => {
-      const leader = cell.leader_id ? memberById.get(cell.leader_id) : null;
+      const leader = cell.leader_ids?.[0] ? memberById.get(cell.leader_ids[0]) : null;
       const average = cellHealthAverage(cell.health);
       const matchesSearch =
         !term ||
@@ -98,10 +105,13 @@ export default function CelulasPage() {
         title="Células"
         subtitle="Acompanhe líderes, membros, reuniões e saúde de cada célula."
         actions={
-          canManage && (
-            <button onClick={() => setModal({ type: "form" })} className="btn btn-primary btn-sm">
-              + Nova célula
-            </button>
+          canCreate && (
+            <div className="flex gap-2">
+              <Link href="/celulas/redes" className="btn btn-secondary btn-sm">Redes</Link>
+              <button onClick={() => setModal({ type: "form" })} className="btn btn-primary btn-sm">
+                + Nova célula
+              </button>
+            </div>
           )
         }
       />
@@ -144,7 +154,9 @@ export default function CelulasPage() {
       ) : filtered.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((cell) => {
-            const leader = cell.leader_id ? memberById.get(cell.leader_id) : null;
+            const leader = cell.leader_ids?.[0] ? memberById.get(cell.leader_ids[0]) : null;
+            const extraLeaders = Math.max((cell.leader_ids?.length || 0) - 1, 0);
+            const canManageThis = manageable.has(cell.id);
             const average = cellHealthAverage(cell.health);
             const healthBar = average >= 75 ? "bg-success" : average >= 50 ? "bg-amber" : "bg-danger";
             const healthChip =
@@ -174,8 +186,10 @@ export default function CelulasPage() {
                     <div className="flex items-center gap-2 min-w-0">
                       <Avatar name={leader.name} color={leader.avatar_color} photoUrl={leader.photo_url} size={30} />
                       <div className="min-w-0">
-                        <div className="text-[12px] font-semibold text-ink truncate">{leader.name.split(" ")[0]}</div>
-                        <div className="text-[10px] text-ink-faint">Líder</div>
+                        <div className="text-[12px] font-semibold text-ink truncate">
+                          {leader.name.split(" ")[0]}{extraLeaders > 0 ? ` +${extraLeaders}` : ""}
+                        </div>
+                        <div className="text-[10px] text-ink-faint">{cell.leader_ids.length > 1 ? "Líderes" : "Líder"}</div>
                       </div>
                     </div>
                   ) : (
@@ -189,11 +203,11 @@ export default function CelulasPage() {
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9}><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" /><circle cx="12" cy="12" r="3" /></svg>
                     Visualizar
                   </Link>
-                  {canManage && (
-                    <>
-                      <button onClick={() => setModal({ type: "form", cell })} className="btn btn-secondary btn-sm">Editar</button>
-                      <button onClick={() => setModal({ type: "delete", cell })} className="btn btn-danger btn-sm">Excluir</button>
-                    </>
+                  {canManageThis && (
+                    <button onClick={() => setModal({ type: "form", cell })} className="btn btn-secondary btn-sm">Editar</button>
+                  )}
+                  {canCreate && (
+                    <button onClick={() => setModal({ type: "delete", cell })} className="btn btn-danger btn-sm">Excluir</button>
                   )}
                 </div>
               </div>
@@ -206,7 +220,7 @@ export default function CelulasPage() {
           <p className="mt-1 text-sm text-ink-muted">
             {hasFilters ? "Tente ajustar os filtros de busca." : "Crie a primeira célula da sua igreja."}
           </p>
-          {!hasFilters && canManage && (
+          {!hasFilters && canCreate && (
             <button onClick={() => setModal({ type: "form" })} className="mt-4 btn btn-primary btn-sm">+ Nova célula</button>
           )}
           {hasFilters && (
@@ -220,6 +234,7 @@ export default function CelulasPage() {
           cell={modal.cell}
           members={members}
           cellMembers={cellMembers}
+          networks={networks}
           toast={toast}
           close={() => setModal(null)}
           onSaved={async () => { setModal(null); await loadData(); }}

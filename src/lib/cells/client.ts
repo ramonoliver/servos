@@ -1,12 +1,17 @@
 import { getSession } from "@/lib/auth/session";
-import type { Cell, CellMemberRow, CellMeeting, CellAttendanceRow } from "./types";
+import type { Cell, CellMemberRow, CellMeeting, CellAttendanceRow, CellNetwork } from "./types";
 
 export function cellAuthHeaders(): Record<string, string> {
   const token = getSession()?.token;
   return { "Content-Type": "application/json", ...(token ? { "x-servos-auth": token } : {}) };
 }
 
-export async function fetchCells(): Promise<{ cells: Cell[]; cellMembers: CellMemberRow[] }> {
+export async function fetchCells(): Promise<{
+  cells: Cell[];
+  cellMembers: CellMemberRow[];
+  networks: CellNetwork[];
+  manageableIds: string[];
+}> {
   const res = await fetch("/api/cells/list", {
     method: "POST",
     credentials: "include",
@@ -14,7 +19,12 @@ export async function fetchCells(): Promise<{ cells: Cell[]; cellMembers: CellMe
   });
   const payload = await res.json().catch(() => null);
   if (!res.ok) throw new Error(payload?.error || "Falha ao carregar células.");
-  return { cells: (payload?.cells || []) as Cell[], cellMembers: (payload?.cellMembers || []) as CellMemberRow[] };
+  return {
+    cells: (payload?.cells || []) as Cell[],
+    cellMembers: (payload?.cellMembers || []) as CellMemberRow[],
+    networks: (payload?.networks || []) as CellNetwork[],
+    manageableIds: (payload?.manageableIds || []) as string[],
+  };
 }
 
 type SaveCellInput = {
@@ -34,6 +44,23 @@ export async function saveCell(input: SaveCellInput): Promise<{ id?: string }> {
   const payload = await res.json().catch(() => null);
   if (!res.ok) throw new Error(payload?.error || "Falha ao salvar célula.");
   return payload || {};
+}
+
+type SaveNetworkInput = {
+  mode: "create" | "update" | "delete";
+  networkId?: string;
+  data?: Record<string, unknown>;
+};
+
+export async function saveNetwork(input: SaveNetworkInput): Promise<void> {
+  const res = await fetch("/api/cells/networks/manage", {
+    method: "POST",
+    credentials: "include",
+    headers: cellAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  const payload = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(payload?.error || "Falha ao salvar rede.");
 }
 
 export async function fetchMeetings(cellId: string): Promise<{ meetings: CellMeeting[]; attendance: CellAttendanceRow[] }> {
