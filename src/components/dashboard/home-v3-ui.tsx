@@ -506,24 +506,79 @@ export function PersonalizedEmptyState() {
 }
 
 export function DashboardV3Topbar({ unreadNotifications }: { unreadNotifications: number }) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
   return (
-    <div className="sticky top-0 z-20 -mx-4 mb-6 border-b border-white/70 bg-[#FAFAF8]/75 px-4 py-4 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 xl:-mx-10 xl:px-10">
+    <div
+      data-section="topbar"
+      className="sticky top-0 z-20 -mx-4 mb-6 border-b border-white/70 bg-[#FAFAF8]/75 px-4 py-4 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 xl:-mx-10 xl:px-10"
+    >
       <div className="mx-auto flex min-h-[56px] max-w-[1240px] items-center gap-4">
-        <label className="mx-auto flex h-12 w-full max-w-[620px] items-center gap-3 rounded-full border border-[#F0EFEB] bg-white px-4 text-[14px] text-[#777777] shadow-[0_14px_35px_-28px_rgba(25,25,25,0.45)]">
+        <label className="mx-auto flex h-12 w-full max-w-[620px] items-center gap-3 rounded-full border border-[#F0EFEB] bg-white px-4 text-[14px] text-[#777777] shadow-[0_14px_35px_-28px_rgba(25,25,25,0.25)]">
           <Icon name="search" size={17} />
           <input
             className="min-w-0 flex-1 border-0 bg-transparent text-[#191919] outline-none placeholder:text-[#AAAAAA]"
             placeholder="Buscar pessoas, escalas, células, ministérios..."
           />
         </label>
-        <Link href="/notificacoes" className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-[#F0EFEB] bg-white text-[#777777] transition hover:bg-[#FAFAF8]">
+        <Link
+          href="/notificacoes"
+          className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-[#F0EFEB] bg-white text-[#777777] transition hover:bg-[#FAFAF8]"
+        >
           <Icon name="bell" size={18} />
-          {unreadNotifications > 0 && <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-[#F4532A]" />}
+          {unreadNotifications > 0 && (
+            <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-[#F4532A]" />
+          )}
         </Link>
-        <Link href="/escalas/nova" className="hidden min-h-12 flex-shrink-0 items-center gap-2 rounded-full bg-[linear-gradient(135deg,#F4532A_0%,#F4532A_100%)] px-5 text-[14px] font-semibold text-white shadow-[0_16px_34px_-18px_rgba(244,83,42,0.8)] transition hover:brightness-[0.98] md:inline-flex">
-          <Icon name="plus" size={17} />
-          Nova ação
-        </Link>
+        <div ref={dropdownRef} className="relative hidden md:block">
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className="flex min-h-12 flex-shrink-0 items-center gap-2 rounded-full bg-[#F4532A] px-5 text-[14px] font-semibold text-white shadow-[0_16px_34px_-18px_rgba(244,83,42,0.55)] transition hover:brightness-[0.97]"
+          >
+            <Icon name="plus" size={17} />
+            Ações rápidas
+            <Icon
+              name="chevron"
+              size={14}
+              className={cn("transition-transform duration-200", open && "rotate-90")}
+            />
+          </button>
+          {open && (
+            <div className="absolute right-0 top-[calc(100%+8px)] w-44 overflow-hidden rounded-[14px] border border-[#F0EFEB] bg-white shadow-[0_12px_32px_-16px_rgba(25,25,25,0.25)]">
+              {(
+                [
+                  { label: "Nova escala", href: "/escalas/nova", icon: "plus" as const },
+                  { label: "Nova célula", href: "/celulas", icon: "home" as const },
+                  { label: "Nova pessoa", href: "/pessoas", icon: "users" as const },
+                ] as const
+              ).map((item, i, arr) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    "flex items-center gap-2.5 px-4 py-3 text-[13px] font-medium text-[#191919] transition hover:bg-[#FAFAF8]",
+                    i < arr.length - 1 && "border-b border-[#F0EFEB]",
+                  )}
+                >
+                  <Icon name={item.icon} size={14} />
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
