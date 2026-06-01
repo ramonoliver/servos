@@ -295,24 +295,50 @@ export function PriorityCards({ items }: { items: PriorityCard[] }) {
   );
 }
 
+const priorityBadgeColors: Record<string, string> = {
+  Escalas: "bg-[#FFF0EC] text-[#D94420]",
+  Cuidado: "bg-[#FFF8ED] text-[#C07B1A]",
+  Células: "bg-[#EEF1FF] text-[#4A5ADE]",
+  Pessoas: "bg-[#EEFAF2] text-[#1F8044]",
+  Hoje: "bg-[#FFF0EC] text-[#F4532A] font-bold",
+};
+
+const priorityIconColors: Record<string, string> = {
+  Escalas: "bg-[#FFF0EC] text-[#F4532A]",
+  Cuidado: "bg-[#FFF8ED] text-[#C07B1A]",
+  Células: "bg-[#EEF1FF] text-[#4A5ADE]",
+  Pessoas: "bg-[#EEFAF2] text-[#1F8044]",
+  Hoje: "bg-[#FFF0EC] text-[#F4532A]",
+};
+
+const priorityFallbackColors = { badge: "bg-[#F0EFEB] text-[#777777]", icon: "bg-[#FAFAF8] text-[#777777]" };
+
 export function PriorityList({ items }: { items: PriorityListItem[] }) {
   return (
     <Panel className="p-6">
       <SectionTitle title="Prioridades de hoje" eyebrow="Ações" />
       <div className="space-y-2">
-        {items.map((item) => (
-          <Link key={item.title} href={item.href} className="group flex items-center gap-3 rounded-[18px] px-2.5 py-3 transition hover:bg-[#FAFAF8]">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#FFF0EC] text-[#F4532A]">
-              <Icon name={item.icon} size={18} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[14px] font-semibold text-[#191919]">{item.title}</div>
-              <div className="truncate text-[12px] text-[#777777]">{item.meta}</div>
-            </div>
-            <span className="rounded-full bg-[#FAFAF8] px-2.5 py-1 text-[11px] font-semibold text-[#777777]">{item.badge}</span>
-            <Icon name="chevron" size={16} className="text-[#AAAAAA] transition group-hover:text-[#191919]" />
-          </Link>
-        ))}
+        {items.map((item) => {
+          const badgeClass = priorityBadgeColors[item.badge] ?? priorityFallbackColors.badge;
+          const iconClass = priorityIconColors[item.badge] ?? priorityFallbackColors.icon;
+          return (
+            <Link
+              key={item.title}
+              href={item.href}
+              className="group flex items-center gap-3 rounded-[18px] px-2.5 py-3 transition hover:bg-[#FAFAF8]"
+            >
+              <div className={cn("flex h-10 w-10 items-center justify-center rounded-2xl", iconClass)}>
+                <Icon name={item.icon} size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[14px] font-semibold text-[#191919]">{item.title}</div>
+                <div className="truncate text-[12px] text-[#777777]">{item.meta}</div>
+              </div>
+              <span className={cn("rounded-full px-2.5 py-1 text-[11px]", badgeClass)}>{item.badge}</span>
+              <Icon name="chevron" size={16} className="text-[#AAAAAA] transition group-hover:text-[#191919]" />
+            </Link>
+          );
+        })}
       </div>
     </Panel>
   );
