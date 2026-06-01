@@ -200,12 +200,10 @@ function Panel({ children, className }: { children: React.ReactNode; className?:
 export function DashboardHero({
   title,
   summary,
-  profileMode,
   churchName,
 }: {
   title: string;
   summary: string;
-  profileMode: ProfileMode;
   churchName: string;
 }) {
   const [namePart, ...rest] = title.split(". ");
@@ -542,7 +540,6 @@ export function DashboardV3Home({ data }: { data: DashboardV3Data }) {
         <DashboardHero
           title={data.heroTitle}
           summary={data.heroSummary}
-          profileMode={data.profileMode}
           churchName={data.churchName}
         />
         <QuickActions items={data.quickActions} />
