@@ -197,31 +197,64 @@ function Panel({ children, className }: { children: React.ReactNode; className?:
   );
 }
 
-export function DashboardHero({ title, summary, profileMode }: { title: string; summary: string; profileMode: ProfileMode }) {
-  const label = profileMode === "connect" ? "Boas-vindas" : profileMode === "cellMember" ? "Comunhão" : "Operação pastoral";
+export function DashboardHero({
+  title,
+  summary,
+  profileMode,
+  churchName,
+}: {
+  title: string;
+  summary: string;
+  profileMode: ProfileMode;
+  churchName: string;
+}) {
+  const [namePart, ...rest] = title.split(". ");
+  const subtitlePart = rest.join(". ");
+  const emoji = title.startsWith("Bom dia")
+    ? "☀️"
+    : title.startsWith("Boa tarde")
+    ? "🌤️"
+    : title.startsWith("Boa noite")
+    ? "🌙"
+    : "👋";
+
   return (
-    <section className="relative overflow-hidden rounded-[36px] border border-white bg-[linear-gradient(135deg,#FFFFFF_0%,#FFF0EC_48%,#FAFAF8_100%)] px-6 py-8 shadow-[0_28px_80px_-50px_rgba(244,83,42,0.45)] md:px-10 md:py-10">
+    <section
+      data-section="hero"
+      className="relative overflow-hidden rounded-[36px] border border-white bg-[linear-gradient(135deg,#FFFFFF_0%,#FFF0EC_48%,#FAFAF8_100%)] px-6 py-8 shadow-[0_28px_80px_-50px_rgba(244,83,42,0.30)] md:px-10 md:py-10"
+    >
       <div className="pointer-events-none absolute -right-28 -top-36 h-72 w-72 rounded-full bg-[#F4532A]/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-32 left-16 h-64 w-64 rounded-full bg-[#F4532A]/8 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-32 left-16 h-64 w-64 rounded-full bg-[#F4532A]/6 blur-3xl" />
       <div className="relative grid gap-8 lg:grid-cols-[1fr_320px] lg:items-end">
         <div>
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#F0EFEB] bg-white/75 px-3 py-1.5 text-[12px] font-semibold text-[#777777] shadow-[0_8px_24px_-18px_rgba(25,25,25,0.28)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#F4532A]" />
-            {label}
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#F0EFEB] bg-white/75 px-3 py-1.5 text-[12px] font-semibold text-[#777777] shadow-[0_8px_24px_-18px_rgba(25,25,25,0.20)]">
+            <span className="aurora-pulse h-1.5 w-1.5 rounded-full bg-[#F4532A]" />
+            {churchName}
           </div>
-          <h1 className="max-w-[860px] text-[38px] font-bold leading-[1.03] tracking-[-0.055em] text-[#191919] md:text-[48px]">
-            {title}
+          <h1 className="max-w-[860px] leading-[1.03] tracking-[-0.055em] text-[#191919]">
+            <span className="text-[38px] font-bold md:text-[48px]">
+              {namePart} <span className="aurora-wave inline-block">{emoji}</span>
+            </span>
+            {subtitlePart && (
+              <span className="mt-2 block text-[18px] font-normal text-[#777777]">
+                {subtitlePart}
+              </span>
+            )}
           </h1>
-          <p className="mt-5 max-w-[690px] text-[15px] leading-7 text-[#777777] md:text-[16px]">{summary}</p>
+          <p className="mt-5 max-w-[690px] text-[15px] leading-7 text-[#777777] md:text-[16px]">
+            {summary}
+          </p>
         </div>
-        <div className="rounded-[26px] border border-[#F0EFEB] bg-white/78 p-4 shadow-[0_18px_45px_-32px_rgba(25,25,25,0.45)] backdrop-blur">
+        <div className="rounded-[26px] border border-[#F0EFEB] bg-white/80 p-4 shadow-[0_18px_45px_-32px_rgba(25,25,25,0.35)] backdrop-blur">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#FFF0EC] text-[#F4532A]">
               <Icon name="spark" size={20} />
             </div>
             <div>
               <div className="text-[13px] font-semibold text-[#191919]">Radar inteligente</div>
-              <div className="text-[12px] leading-5 text-[#777777]">Prioridades, cuidado e agenda em um só lugar.</div>
+              <div className="text-[12px] leading-5 text-[#777777]">
+                Prioridades, cuidado e agenda em um só lugar.
+              </div>
             </div>
           </div>
         </div>
@@ -506,7 +539,12 @@ export function DashboardV3Home({ data }: { data: DashboardV3Data }) {
     <div className="min-h-screen bg-[#FAFAF8]">
       <DashboardV3Topbar unreadNotifications={data.unreadNotifications} />
       <div className="mx-auto max-w-[1240px] space-y-6 pb-12">
-        <DashboardHero title={data.heroTitle} summary={data.heroSummary} profileMode={data.profileMode} />
+        <DashboardHero
+          title={data.heroTitle}
+          summary={data.heroSummary}
+          profileMode={data.profileMode}
+          churchName={data.churchName}
+        />
         <QuickActions items={data.quickActions} />
         {data.profileMode === "connect" && <PersonalizedEmptyState />}
         <PriorityCards items={data.priorities} />
