@@ -184,13 +184,25 @@ function SectionTitle({ eyebrow, title, action }: { eyebrow?: string; title: str
   );
 }
 
-function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
+function Panel({
+  children,
+  className,
+  dataSectionId,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  dataSectionId?: string;
+}) {
   return (
     <motion.section
+      data-section={dataSectionId}
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: "easeOut" }}
-      className={cn("rounded-[28px] border border-[#F0EFEB] bg-white shadow-[0_18px_50px_-34px_rgba(25,25,25,0.35)]", className)}
+      className={cn(
+        "rounded-[28px] border border-[#F0EFEB] bg-white shadow-[0_18px_50px_-34px_rgba(25,25,25,0.35)]",
+        className,
+      )}
     >
       {children}
     </motion.section>
@@ -263,7 +275,7 @@ export function DashboardHero({
 
 export function PriorityCards({ items }: { items: PriorityCard[] }) {
   return (
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section data-section="priority-cards" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {items.map((item, index) => (
         <motion.div
           key={item.label}
@@ -315,7 +327,7 @@ const priorityFallbackColors = { badge: "bg-[#F0EFEB] text-[#777777]", icon: "bg
 
 export function PriorityList({ items }: { items: PriorityListItem[] }) {
   return (
-    <Panel className="p-6">
+    <Panel className="p-6" dataSectionId="priority-list">
       <SectionTitle title="Prioridades de hoje" eyebrow="Ações" />
       <div className="space-y-2">
         {items.map((item) => {
@@ -346,7 +358,7 @@ export function PriorityList({ items }: { items: PriorityListItem[] }) {
 
 export function ActivityTimeline({ items }: { items: TimelineItem[] }) {
   return (
-    <Panel className="p-6">
+    <Panel className="p-6" dataSectionId="timeline">
       <SectionTitle title="Timeline viva" eyebrow="Comunidade" />
       <div className="relative space-y-1 pl-3">
         <div className="absolute bottom-6 left-[31px] top-3 w-px bg-[#F0EFEB]" />
@@ -378,7 +390,7 @@ const eventIconFallback = { bg: "bg-[#FAFAF8]", text: "text-[#777777]" };
 
 export function UpcomingEvents({ items }: { items: UpcomingEventItem[] }) {
   return (
-    <Panel className="p-6">
+    <Panel className="p-6" dataSectionId="upcoming-events">
       <SectionTitle title="Próximos encontros" eyebrow="Agenda" />
       <div className="space-y-3">
         {items.map((item) => {
@@ -420,7 +432,7 @@ export function UpcomingEvents({ items }: { items: UpcomingEventItem[] }) {
 
 export function CarePeopleSection({ people }: { people: CarePerson[] }) {
   return (
-    <Panel className="p-6">
+    <Panel className="p-6" dataSectionId="care-people">
       <SectionTitle title="Pessoas precisando de cuidado" eyebrow="Cuidado pastoral" />
       <div className="grid gap-4 lg:grid-cols-2">
         {people.map((person) => (
@@ -452,7 +464,7 @@ export function CarePeopleSection({ people }: { people: CarePerson[] }) {
 
 export function InsightCards({ items }: { items: Insight[] }) {
   return (
-    <Panel className="p-6">
+    <Panel className="p-6" dataSectionId="insights">
       <SectionTitle title="Insights da semana" eyebrow="Leitura pastoral" />
       <div className="grid gap-3 sm:grid-cols-2">
         {items.map((item) => (
@@ -470,7 +482,7 @@ export function InsightCards({ items }: { items: Insight[] }) {
 export function CellCard({ cell }: { cell?: CellSummary }) {
   if (!cell) return null;
   return (
-    <Panel className="bg-[#F5F0FF] p-6">
+    <Panel className="bg-[#F5F0FF] p-6" dataSectionId="cell">
       <SectionTitle title="Minha célula" eyebrow="Comunhão" />
       <div className="rounded-[24px] bg-white/70 p-5">
         <div className="flex items-start justify-between gap-4">
@@ -501,7 +513,7 @@ export function CellCard({ cell }: { cell?: CellSummary }) {
 export function PrayerRequestCard({ items }: { items: PrayerRequestCardData[] }) {
   if (!items.length) return null;
   return (
-    <Panel className="p-6">
+    <Panel className="p-6" dataSectionId="prayer-requests">
       <SectionTitle title="Pedidos de oração" eyebrow="Cuidado" />
       <div className="space-y-3">
         {items.map((item) => (
@@ -538,7 +550,7 @@ export function QuickActions({ items }: { items: QuickActionItem[] }) {
 
 export function PersonalizedEmptyState() {
   return (
-    <Panel className="p-6">
+    <Panel className="p-6" dataSectionId="empty-state">
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="text-[20px] font-semibold tracking-[-0.025em] text-[#191919]">Vamos ajudar você a se conectar.</div>
