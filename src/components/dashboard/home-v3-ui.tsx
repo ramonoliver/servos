@@ -346,7 +346,7 @@ export function PriorityList({ items }: { items: PriorityListItem[] }) {
                 <div className="truncate text-[14px] font-semibold text-[#191919]">{item.title}</div>
                 <div className="truncate text-[12px] text-[#777777]">{item.meta}</div>
               </div>
-              <span className={cn("rounded-full px-2.5 py-1 text-[11px]", badgeClass)}>{item.badge}</span>
+              <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-semibold", badgeClass)}>{item.badge}</span>
               <Icon name="chevron" size={16} className="text-[#AAAAAA] transition group-hover:text-[#191919]" />
             </Link>
           );
