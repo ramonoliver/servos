@@ -524,7 +524,7 @@ export function UpcomingEvents({ items }: { items: UpcomingEventItem[] }) {
     <Panel className="p-6" dataSectionId="upcoming-events">
       <SectionTitle title="Próximos encontros" eyebrow="Agenda" />
       <div className="grid gap-3">
-        {items.slice(0, 3).map((item) => {
+        {items.slice(0, 4).map((item) => {
           const iconStyle = eventIconColors[item.icon] ?? eventIconFallback;
           return (
             <Link
@@ -550,7 +550,6 @@ export function UpcomingEvents({ items }: { items: UpcomingEventItem[] }) {
                     </span>
                   </div>
                   <div className="mt-1 text-[12px] font-medium text-[#777777]">{item.time}</div>
-                  <div className="mt-1 truncate text-[12px] text-[#AAAAAA]">{item.meta}</div>
                 </div>
               </div>
             </Link>

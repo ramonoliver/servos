@@ -325,7 +325,7 @@ export default function DashboardV3Page() {
       })),
     ].slice(0, 5);
 
-    const upcomingFromSchedules: UpcomingEventItem[] = upcomingSchedules.slice(0, 2).map((schedule) => {
+    const upcomingFromSchedules: UpcomingEventItem[] = upcomingSchedules.slice(0, 3).map((schedule) => {
       const event = events.find((item) => item.id === schedule.event_id);
       const department = departments.find((item) => item.id === schedule.department_id);
       return {
@@ -338,7 +338,7 @@ export default function DashboardV3Page() {
         icon: "calendar",
       };
     });
-    const upcomingFromCells: UpcomingEventItem[] = pastoralCells.slice(0, Math.max(0, 2 - upcomingFromSchedules.length)).map((cell) => ({
+    const upcomingFromCells: UpcomingEventItem[] = pastoralCells.slice(0, Math.max(0, 3 - upcomingFromSchedules.length)).map((cell) => ({
       title: cell.name,
       meta: cell.audience,
       time: `${cell.weekDay} · ${cell.time}`,
@@ -359,6 +359,15 @@ export default function DashboardV3Page() {
         badge: "Culto",
         href: "/eventos",
         icon: "spark" as const,
+      },
+      {
+        title: "Ensaio Geral",
+        meta: "Louvor",
+        time: "Sábado · 16:00",
+        location: "Sala de ensaios",
+        badge: "Ensaio",
+        href: "/escalas",
+        icon: "calendar" as const,
       },
     ];
 
