@@ -136,7 +136,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-2 flex h-[58px] w-full items-center justify-center rounded-full bg-brand px-6 text-[15px] font-extrabold text-white shadow-[0_20px_36px_rgba(255,107,87,0.38)] transition hover:-translate-y-0.5 hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-2 flex h-[58px] w-full items-center justify-center rounded-full bg-brand px-6 text-[15px] font-extrabold text-white shadow-[0_20px_36px_rgba(255,107,87,0.38)] transition hover:bg-brand-deep hover:shadow-[0_18px_32px_rgba(255,107,87,0.44)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Entrando..." : "Entrar"}
             </button>

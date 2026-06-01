@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import ReactDOM from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils/helpers";
 
@@ -45,7 +46,8 @@ export function DateField({
   min?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);  const lastPosRef = useRef<{ top: number; left: number }>({ top: 0, left: 0 });  const ref = useRef<HTMLDivElement | null>(null);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
   const selected = parseISO(value);
   const today = new Date();
 
@@ -60,10 +62,14 @@ export function DateField({
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      // close if click is outside the trigger button (portal content is in body, not in ref)
+      if (!btnRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+        setDropdownPos(null);
+      }
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") { setOpen(false); setDropdownPos(null); }
     }
     if (open) {
       document.addEventListener("mousedown", onDocClick);
@@ -93,8 +99,22 @@ export function DateField({
   return (
     <div className={cn("relative", className)} ref={ref}>
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (open) { setOpen(false); setDropdownPos(null); return; }
+          if (btnRef.current) {
+            const rect = btnRef.current.getBoundingClientRect();
+            // flip upward if not enough space below
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const dropH = 340;
+            const top = spaceBelow < dropH + 8 ? rect.top - dropH - 4 : rect.bottom + 4;
+            const pos = { top, left: rect.left };
+            lastPosRef.current = pos;
+            setDropdownPos(pos);
+          }
+          setOpen(true);
+        }}
         className={cn(
           "input-field flex items-center justify-between text-left",
           open && "border-brand ring-[3px] ring-brand/10"
@@ -109,14 +129,17 @@ export function DateField({
         </svg>
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.98 }}
-            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute left-0 z-50 mt-2 w-[286px] rounded-[18px] border border-border-soft bg-white p-3.5 shadow-[0_24px_60px_-22px_rgba(70,45,110,0.35),0_6px_18px_rgba(27,23,38,0.06)]"
+      {typeof document !== "undefined" && ReactDOM.createPortal(
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              key="datepicker-calendar"
+              initial={{ opacity: 0, y: -6, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.98 }}
+              transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+              style={{ position: "fixed", top: lastPosRef.current.top, left: lastPosRef.current.left, width: 286, zIndex: 9999 }}
+              className="rounded-[18px] border border-border-soft bg-white p-3.5 shadow-[0_24px_60px_-22px_rgba(70,45,110,0.35),0_6px_18px_rgba(27,23,38,0.06)]"
           >
             {/* header */}
             <div className="mb-3 flex items-center justify-between">
@@ -161,7 +184,7 @@ export function DateField({
                     key={iso}
                     type="button"
                     disabled={disabled}
-                    onClick={() => { onChange(iso); setOpen(false); }}
+                    onClick={() => { onChange(iso); setOpen(false); setDropdownPos(null); }}
                     className={cn(
                       "mx-auto flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-semibold transition",
                       disabled && "cursor-not-allowed text-ink-ghost opacity-40",
@@ -182,7 +205,7 @@ export function DateField({
             <div className="mt-3 flex items-center justify-between border-t border-border-soft pt-2.5">
               <button
                 type="button"
-                onClick={() => { onChange(toISO(today)); setOpen(false); }}
+                onClick={() => { onChange(toISO(today)); setOpen(false); setDropdownPos(null); }}
                 className="text-[12px] font-bold text-brand-deep transition hover:text-brand"
               >
                 Hoje
@@ -190,7 +213,7 @@ export function DateField({
               {selected && (
                 <button
                   type="button"
-                  onClick={() => { onChange(""); setOpen(false); }}
+                  onClick={() => { onChange(""); setOpen(false); setDropdownPos(null); }}
                   className="text-[12px] font-semibold text-ink-faint transition hover:text-ink"
                 >
                   Limpar
@@ -198,8 +221,10 @@ export function DateField({
               )}
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

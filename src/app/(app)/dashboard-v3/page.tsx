@@ -182,6 +182,12 @@ export default function DashboardV3Page() {
         : nextMemberSchedule
         ? `Sua próxima escala acontece em ${formatShortDate(nextMemberSchedule.date)} às ${nextMemberSchedule.time}.`
         : `Sua próxima célula acontece ${pastoralCells[0]?.weekDay.toLowerCase() || "esta semana"} às ${pastoralCells[0]?.time || "20:00"}.`;
+    const heroFocus =
+      profileMode === "connect"
+        ? "Complete seu cadastro, encontre uma célula e conheça ministérios para servir."
+        : isAdminLike
+        ? `Hoje você possui ${pendingConfirmations} confirmações pendentes e ${openCareCount} pessoas precisando de cuidado.`
+        : heroSummary;
 
     const priorities: PriorityCard[] = isAdminLike
       ? [
@@ -319,7 +325,7 @@ export default function DashboardV3Page() {
       })),
     ].slice(0, 5);
 
-    const upcomingFromSchedules: UpcomingEventItem[] = upcomingSchedules.slice(0, 3).map((schedule) => {
+    const upcomingFromSchedules: UpcomingEventItem[] = upcomingSchedules.slice(0, 2).map((schedule) => {
       const event = events.find((item) => item.id === schedule.event_id);
       const department = departments.find((item) => item.id === schedule.department_id);
       return {
@@ -332,18 +338,28 @@ export default function DashboardV3Page() {
         icon: "calendar",
       };
     });
+    const upcomingFromCells: UpcomingEventItem[] = pastoralCells.slice(0, Math.max(0, 2 - upcomingFromSchedules.length)).map((cell) => ({
+      title: cell.name,
+      meta: cell.audience,
+      time: `${cell.weekDay} · ${cell.time}`,
+      location: cell.address,
+      badge: "Célula",
+      href: `/celulas/${cell.id}`,
+      icon: "home" as const,
+    }));
 
     const upcoming: UpcomingEventItem[] = [
       ...upcomingFromSchedules,
-      ...pastoralCells.slice(0, Math.max(0, 3 - upcomingFromSchedules.length)).map((cell) => ({
-        title: cell.name,
-        meta: cell.audience,
-        time: `${cell.weekDay} · ${cell.time}`,
-        location: cell.address,
-        badge: "Célula",
-        href: `/celulas/${cell.id}`,
-        icon: "home" as const,
-      })),
+      ...upcomingFromCells,
+      {
+        title: "Culto de Celebração",
+        meta: "Celebração principal",
+        time: "Domingo · 18:00",
+        location: "Auditório principal",
+        badge: "Culto",
+        href: "/eventos",
+        icon: "spark" as const,
+      },
     ];
 
     const carePeople: CarePerson[] = careCases.map((care) => {
@@ -411,6 +427,7 @@ export default function DashboardV3Page() {
       greeting,
       heroTitle,
       heroSummary,
+      heroFocus,
       user,
       churchName: church.name,
       unreadNotifications,

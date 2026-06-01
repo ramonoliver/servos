@@ -105,7 +105,7 @@ export default function MinisteriosPage() {
             return (
               <div
                 key={d.id}
-                className="group relative rounded-[14px] border border-border-soft bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                className="group relative rounded-[14px] border border-border-soft bg-white shadow-sm transition-all hover:border-ink-ghost hover:bg-surface-alt hover:shadow-md"
               >
                 <Link href={`/ministerios/${d.id}`} className="block p-4">
                   {/* ── Icon + name row — igual ao PersonMini ── */}
@@ -158,10 +158,10 @@ export default function MinisteriosPage() {
                     {canDo("department.delete") && (
                       <button
                         onClick={() => setModal({ type: "delete", dept: d })}
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm text-xs text-danger transition hover:bg-danger-light"
+                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm text-danger transition hover:bg-danger-light"
                         title="Excluir ministério"
                       >
-                        ✕
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                       </button>
                     )}
                   </div>

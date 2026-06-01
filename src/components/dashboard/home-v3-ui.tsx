@@ -104,6 +104,7 @@ export type DashboardV3Data = {
   greeting: string;
   heroTitle: string;
   heroSummary: string;
+  heroFocus: string;
   user: User;
   churchName: string;
   unreadNotifications: number;
@@ -134,12 +135,28 @@ const toneIcon: Record<Tone, string> = {
   neutral: "bg-[#FAFAF8] text-[#777777]",
 };
 
+const toneActionButton: Record<Tone, string> = {
+  coral: "bg-[#F4532A] text-white shadow-[0_16px_30px_-20px_rgba(244,83,42,0.9)] hover:bg-[#D94420]",
+  care: "bg-[#E7A13A] text-white shadow-[0_16px_30px_-20px_rgba(215,143,36,0.85)] hover:bg-[#C07B1A]",
+  cell: "bg-[#6D5DF0] text-white shadow-[0_16px_30px_-20px_rgba(109,93,240,0.88)] hover:bg-[#4A5ADE]",
+  visitor: "bg-[#2A9A57] text-white shadow-[0_16px_30px_-20px_rgba(42,154,87,0.85)] hover:bg-[#1F8044]",
+  neutral: "bg-[#ECEAE4] text-[#191919] hover:bg-[#E0DDD5]",
+};
+
 const toneDot: Record<Tone, string> = {
   coral: "bg-[#F4532A]",
   care: "bg-[#E7A13A]",
   cell: "bg-[#8C72FF]",
   visitor: "bg-[#45A86B]",
   neutral: "bg-[#B9B5C9]",
+};
+
+const toneIconStyle: Record<Tone, string> = {
+  coral:   "bg-[#FFF0EC] text-[#F4532A]",
+  care:    "bg-[#FFF8ED] text-[#C07B1A]",
+  cell:    "bg-[#EEF1FF] text-[#4A5ADE]",
+  visitor: "bg-[#EEFAF2] text-[#1F8044]",
+  neutral: "bg-[#FAFAF8] text-[#777777]",
 };
 
 function Icon({ name, size = 18, className }: { name: IconName; size?: number; className?: string }) {
@@ -149,16 +166,18 @@ function Icon({ name, size = 18, className }: { name: IconName; size?: number; c
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    strokeWidth: 1.85,
+    strokeWidth: 1.75,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
-    className: cn("overflow-visible", className),
+    vectorEffect: "non-scaling-stroke" as const,
+    shapeRendering: "geometricPrecision" as const,
+    className: cn("block overflow-visible antialiased", className),
   };
   const icons: Record<IconName, React.ReactNode> = {
     arrow: <><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></>,
     bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></>,
     calendar: <><rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" /></>,
-    check: <><path d="M20 6 9 17l-5-5" /><path d="M21 12a9 9 0 1 1-4.8-8" /></>,
+    check: <><circle cx="12" cy="12" r="9" /><path d="m8.8 12.2 2.2 2.2 4.2-4.4" /></>,
     chevron: <path d="m9 18 6-6-6-6" />,
     heart: <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21.2l8.8-8.8a5.5 5.5 0 0 0 0-7.8Z" />,
     home: <><path d="M3 10 12 3l9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V10Z" /><path d="M9 22V12h6v10" /></>,
@@ -200,7 +219,7 @@ function Panel({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: "easeOut" }}
       className={cn(
-        "rounded-[28px] border border-[#F0EFEB] bg-white shadow-[0_18px_50px_-34px_rgba(25,25,25,0.35)]",
+        "min-w-0 rounded-[28px] border border-[#F0EFEB] bg-white shadow-[0_18px_50px_-34px_rgba(25,25,25,0.35)]",
         className,
       )}
     >
@@ -211,13 +230,18 @@ function Panel({
 
 export function DashboardHero({
   title,
-  summary,
-  churchName,
+  unreadNotifications,
 }: {
   title: string;
-  summary: string;
-  churchName: string;
+  unreadNotifications: number;
 }) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const searchWrapperRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   const [namePart, ...rest] = title.split(". ");
   const subtitlePart = rest.join(". ");
   const emoji = title.startsWith("Bom dia")
@@ -228,44 +252,114 @@ export function DashboardHero({
     ? "🌙"
     : "👋";
 
+  useEffect(() => {
+    if (!searchOpen) return;
+    searchInputRef.current?.focus();
+  }, [searchOpen]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (actionsRef.current && !actionsRef.current.contains(e.target as Node)) {
+        setQuickActionsOpen(false);
+      }
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
     <section
       data-section="hero"
-      className="relative overflow-hidden rounded-[36px] border border-white bg-[linear-gradient(135deg,#FFFFFF_0%,#FFF0EC_48%,#FAFAF8_100%)] px-6 py-8 shadow-[0_28px_80px_-50px_rgba(244,83,42,0.30)] md:px-10 md:py-10"
+      className="rounded-[34px] border border-white/90 bg-[linear-gradient(135deg,#FFFFFF_0%,#FFF0EC_48%,#FAFAF8_100%)] px-6 py-6 shadow-[0_14px_36px_-28px_rgba(25,25,25,0.35)] md:px-10 md:py-8"
     >
-      <div className="pointer-events-none absolute -right-28 -top-36 h-72 w-72 rounded-full bg-[#F4532A]/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-32 left-16 h-64 w-64 rounded-full bg-[#F4532A]/6 blur-3xl" />
-      <div className="relative grid gap-8 lg:grid-cols-[1fr_320px] lg:items-end">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-6">
         <div>
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#F0EFEB] bg-white/75 px-3 py-1.5 text-[12px] font-semibold text-[#777777] shadow-[0_8px_24px_-18px_rgba(25,25,25,0.20)]">
-            <span className="aurora-pulse h-1.5 w-1.5 rounded-full bg-[#F4532A]" />
-            {churchName}
-          </div>
-          <h1 className="max-w-[860px] leading-[1.03] tracking-[-0.055em] text-[#191919]">
-            <span className="text-[38px] font-bold md:text-[48px]">
-              {namePart} <span className="aurora-wave inline-block">{emoji}</span>
+          <h1 className="leading-[1.04] tracking-[-0.03em] text-[#1F1F2B]">
+            <span className="text-[32px] font-semibold">
+              {namePart} <span className="aurora-wave inline-block text-[0.78em]">{emoji}</span>
             </span>
             {subtitlePart && (
-              <span className="mt-2 block text-[18px] font-normal text-[#777777]">
+              <span className="mt-1 block text-[15px] font-normal text-[#5D5D66]">
                 {subtitlePart}
               </span>
             )}
           </h1>
-          <p className="mt-5 max-w-[690px] text-[15px] leading-7 text-[#777777] md:text-[16px]">
-            {summary}
-          </p>
         </div>
-        <div className="rounded-[26px] border border-[#F0EFEB] bg-white/80 p-4 shadow-[0_18px_45px_-32px_rgba(25,25,25,0.35)] backdrop-blur">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#FFF0EC] text-[#F4532A]">
-              <Icon name="spark" size={20} />
-            </div>
-            <div>
-              <div className="text-[13px] font-semibold text-[#191919]">Radar inteligente</div>
-              <div className="text-[12px] leading-5 text-[#777777]">
-                Prioridades, cuidado e agenda em um só lugar.
+
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <div ref={searchWrapperRef} className="relative">
+            <button
+              onClick={() => setSearchOpen((prev) => !prev)}
+              className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-white/40 text-[#888888] backdrop-blur transition hover:bg-white/70"
+              aria-label="Abrir busca"
+            >
+              <Icon name="search" size={16} />
+            </button>
+            {searchOpen && (
+              <div className="absolute right-0 top-[calc(100%+8px)] z-30 w-[min(92vw,380px)] rounded-[16px] border border-[#F0EFEB] bg-white p-2 shadow-[0_18px_45px_-25px_rgba(25,25,25,0.35)]">
+                <label className="flex h-10 items-center gap-2 rounded-full border border-[#F0EFEB] bg-white px-3 text-[13px] text-[#777777]">
+                  <Icon name="search" size={15} />
+                  <input
+                    ref={searchInputRef}
+                    value={searchValue}
+                    onChange={(e) => setSearchValue(e.target.value)}
+                    className="min-w-0 flex-1 border-0 bg-transparent text-[#191919] outline-none placeholder:text-[#AAAAAA]"
+                    placeholder="Buscar pessoas, escalas, células, ministérios..."
+                  />
+                </label>
               </div>
-            </div>
+            )}
+          </div>
+
+          <Link
+            href="/notificacoes"
+            className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/60 bg-white/40 text-[#888888] backdrop-blur transition hover:bg-white/70"
+            aria-label="Notificações"
+          >
+            <Icon name="bell" size={17} />
+            {unreadNotifications > 0 && (
+              <span className="absolute right-2 top-2.5 h-2 w-2 rounded-full bg-[#F4532A]" />
+            )}
+          </Link>
+
+          <div ref={actionsRef} className="relative">
+            <button
+              onClick={() => setQuickActionsOpen((v) => !v)}
+              className="flex h-11 items-center gap-2 rounded-full bg-[#F4532A] px-5 text-[13px] font-semibold text-white shadow-[0_16px_34px_-18px_rgba(244,83,42,0.55)] transition hover:brightness-[0.97]"
+            >
+              <Icon name="plus" size={16} />
+              <span>Ações rápidas</span>
+              <Icon name="chevron" size={14} className={cn("transition-transform duration-200", quickActionsOpen && "rotate-90")} />
+            </button>
+
+            {quickActionsOpen && (
+              <div className="absolute right-0 top-[calc(100%+8px)] z-30 w-44 overflow-hidden rounded-[14px] border border-[#F0EFEB] bg-white shadow-[0_12px_32px_-16px_rgba(25,25,25,0.25)]">
+                {(
+                  [
+                    { label: "Nova escala", href: "/escalas/nova", icon: "plus" as const },
+                    { label: "Nova célula", href: "/celulas", icon: "home" as const },
+                    { label: "Nova pessoa", href: "/pessoas", icon: "users" as const },
+                  ] as const
+                ).map((item, i, arr) => (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    onClick={() => setQuickActionsOpen(false)}
+                    className={cn(
+                      "flex items-center gap-2.5 px-4 py-3 text-[13px] font-medium text-[#191919] transition hover:bg-[#FAFAF8]",
+                      i < arr.length - 1 && "border-b border-[#F0EFEB]",
+                    )}
+                  >
+                    <Icon name={item.icon} size={14} />
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -274,35 +368,71 @@ export function DashboardHero({
 }
 
 export function PriorityCards({ items }: { items: PriorityCard[] }) {
+  const getActionState = (item: PriorityCard) => {
+    const isZero = typeof item.value === "number" && item.value === 0;
+    if (!isZero) {
+      return { label: item.action, resolved: false };
+    }
+
+    if (item.label === "Confirmações pendentes") {
+      return { label: "Sem pendências", resolved: true };
+    }
+    if (item.label === "Pessoas em cuidado") {
+      return { label: "Tudo em dia", resolved: true };
+    }
+    if (item.label === "Células acontecendo") {
+      return { label: "Sem células hoje", resolved: true };
+    }
+    if (item.label === "Visitantes sem acompanhamento") {
+      return { label: "Visitantes acolhidos", resolved: true };
+    }
+
+    return { label: "Tudo em dia", resolved: true };
+  };
+
   return (
-    <section data-section="priority-cards" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {items.map((item, index) => (
-        <motion.div
-          key={item.label}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.24, delay: index * 0.04 }}
-        >
-          <Link
-            href={item.href}
-            className={cn(
-              "group block min-h-[220px] rounded-[30px] border border-white/70 p-6 shadow-[0_18px_50px_-36px_rgba(25,25,25,0.4)] transition hover:border-white hover:shadow-[0_24px_60px_-36px_rgba(25,25,25,0.42)]",
-              toneSurface[item.tone]
-            )}
+    <section id="priority-cards" data-section="priority-cards" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {items.map((item, index) => {
+        const actionState = getActionState(item);
+        return (
+          <motion.div
+            key={item.label}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.24, delay: index * 0.04 }}
           >
-            <div className="flex items-start justify-between gap-5">
-              <div className={cn("flex h-14 w-14 items-center justify-center rounded-[22px] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]", toneIcon[item.tone])}>
-                <Icon name={item.icon} size={24} />
+            <Link
+              href={item.href}
+              className={cn(
+                "group flex min-h-[168px] flex-col rounded-[26px] border border-white/70 p-5 shadow-[0_18px_50px_-36px_rgba(25,25,25,0.4)] transition hover:border-white hover:shadow-[0_24px_60px_-36px_rgba(25,25,25,0.42)]",
+                toneSurface[item.tone]
+              )}
+            >
+              <div className="flex items-start justify-between gap-5">
+                <div className={cn("flex h-12 w-12 items-center justify-center rounded-[18px] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]", toneIcon[item.tone])}>
+                  <Icon name={item.icon} size={22} />
+                </div>
+                <Icon name="arrow" size={16} className="mt-2 text-[#AAAAAA] transition group-hover:text-[#191919]" />
               </div>
-              <Icon name="arrow" size={18} className="mt-2 text-[#AAAAAA] transition group-hover:text-[#191919]" />
-            </div>
-            <div className="mt-8 text-[42px] font-bold leading-none tracking-[-0.055em] text-[#191919]">{item.value}</div>
-            <div className="mt-3 text-[16px] font-semibold tracking-[-0.015em] text-[#191919]">{item.label}</div>
-            <p className="mt-1.5 text-[14px] leading-6 text-[#777777]">{item.description}</p>
-            <div className="mt-6 text-[13px] font-semibold text-[#191919]/72">{item.action}</div>
-          </Link>
-        </motion.div>
-      ))}
+              <div className="mt-6 text-[36px] font-bold leading-none tracking-[-0.055em] text-[#191919]">{item.value}</div>
+              <div className="mt-2 text-[15px] font-semibold leading-snug tracking-[-0.015em] text-[#191919]">{item.label}</div>
+              <div className="mt-auto pt-5">
+                <span
+                  className={cn(
+                    "inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-[12px] font-semibold transition",
+                    actionState.resolved
+                      ? "bg-white/78 text-[#191919] ring-1 ring-white/70"
+                      : toneActionButton[item.tone],
+                  )}
+                >
+                  {actionState.label}
+                  <Icon name="arrow" size={14} />
+                </span>
+              </div>
+            </Link>
+          </motion.div>
+        );
+      })}
     </section>
   );
 }
@@ -361,11 +491,11 @@ export function ActivityTimeline({ items }: { items: TimelineItem[] }) {
     <Panel className="p-6" dataSectionId="timeline">
       <SectionTitle title="Timeline viva" eyebrow="Comunidade" />
       <div className="relative space-y-1 pl-3">
-        <div className="absolute bottom-6 left-[31px] top-3 w-px bg-[#F0EFEB]" />
-        {items.map((item) => (
+        <div className="absolute bottom-6 left-[32px] top-3 w-px bg-[#F0EFEB]" />
+        {items.slice(0, 4).map((item) => (
           <div key={`${item.title}-${item.time}`} className="relative flex gap-4 py-3">
-            <div className={cn("relative z-10 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border-[5px] border-white text-white", toneDot[item.tone])}>
-              <Icon name={item.icon} size={13} />
+            <div className={cn("relative z-10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[15px]", toneIconStyle[item.tone])}>
+              <Icon name={item.icon} size={17} />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-3">
@@ -384,6 +514,7 @@ export function ActivityTimeline({ items }: { items: TimelineItem[] }) {
 const eventIconColors: Record<string, { bg: string; text: string }> = {
   calendar: { bg: "bg-[#FFF0EC]", text: "text-[#F4532A]" },
   home: { bg: "bg-[#EEF1FF]", text: "text-[#4A5ADE]" },
+  spark: { bg: "bg-[#FFF8ED]", text: "text-[#C07B1A]" },
 };
 
 const eventIconFallback = { bg: "bg-[#FAFAF8]", text: "text-[#777777]" };
@@ -392,19 +523,19 @@ export function UpcomingEvents({ items }: { items: UpcomingEventItem[] }) {
   return (
     <Panel className="p-6" dataSectionId="upcoming-events">
       <SectionTitle title="Próximos encontros" eyebrow="Agenda" />
-      <div className="space-y-3">
-        {items.map((item) => {
+      <div className="grid gap-3">
+        {items.slice(0, 3).map((item) => {
           const iconStyle = eventIconColors[item.icon] ?? eventIconFallback;
           return (
             <Link
               key={`${item.title}-${item.time}`}
               href={item.href}
-              className="block rounded-[20px] border border-[#F0EFEB] bg-white p-4 transition hover:border-[#F0EFEB] hover:bg-[#FAFAF8]"
+              className="block rounded-[20px] border border-[#F0EFEB] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFFCFA_100%)] p-3.5 transition hover:border-[#E6E0D7] hover:bg-white"
             >
-              <div className="flex gap-3">
+              <div className="flex items-start gap-3">
                 <div
                   className={cn(
-                    "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl",
+                    "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[15px]",
                     iconStyle.bg,
                     iconStyle.text,
                   )}
@@ -412,15 +543,15 @@ export function UpcomingEvents({ items }: { items: UpcomingEventItem[] }) {
                   <Icon name={item.icon} size={18} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[14px] font-semibold text-[#191919]">{item.title}</div>
-                  <div className="mt-1 text-[12px] text-[#777777]">
-                    {item.time} · {item.location}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="truncate text-[14px] font-semibold text-[#191919]">{item.title}</div>
+                    <span className="flex-shrink-0 rounded-full bg-[#FFF0EC] px-2 py-0.5 text-[10px] font-semibold text-[#D94420]">
+                      {item.badge}
+                    </span>
                   </div>
-                  <div className="mt-1 text-[12px] text-[#AAAAAA]">{item.meta}</div>
+                  <div className="mt-1 text-[12px] font-medium text-[#777777]">{item.time}</div>
+                  <div className="mt-1 truncate text-[12px] text-[#AAAAAA]">{item.meta}</div>
                 </div>
-                <span className="h-fit rounded-full bg-[#FFF0EC] px-2.5 py-1 text-[11px] font-semibold text-[#D94420]">
-                  {item.badge}
-                </span>
               </div>
             </Link>
           );
@@ -430,30 +561,47 @@ export function UpcomingEvents({ items }: { items: UpcomingEventItem[] }) {
   );
 }
 
+const careBadgeColors: Record<string, string> = {
+  "Atenção pastoral": "bg-[#FFF0EC] text-[#D94420]",
+  "Participação baixa": "bg-[#FFF8ED] text-[#C07B1A]",
+  "Visitante":         "bg-[#EEF1FF] text-[#4A5ADE]",
+  "Reconectado":       "bg-[#EEFAF2] text-[#1F8044]",
+};
+const careBadgeFallback = "bg-[#F0EFEB] text-[#777777]";
+
 export function CarePeopleSection({ people }: { people: CarePerson[] }) {
   return (
-    <Panel className="p-6" dataSectionId="care-people">
+    <Panel className="flex h-full flex-col p-6" dataSectionId="care-people">
       <SectionTitle title="Pessoas precisando de cuidado" eyebrow="Cuidado pastoral" />
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid flex-1 gap-4 lg:grid-cols-2">
         {people.map((person) => (
-          <div key={person.id} className="rounded-[24px] border border-[#F0EFEB] bg-white p-5">
-            <div className="flex items-start gap-3">
-              <Avatar name={person.name} color={person.avatarColor} photoUrl={person.photoUrl} size={44} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[15px] font-semibold text-[#191919]">{person.name}</div>
-                <div className="mt-1 text-[13px] leading-5 text-[#777777]">{person.reason}</div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-[#FFF0EC] px-2.5 py-1 text-[11px] font-semibold text-[#D94420]">{person.badge}</span>
-                  <span className="text-[11px] text-[#AAAAAA]">{person.lastPresence}</span>
+          <div key={person.id} className="flex min-h-[214px] flex-col rounded-[24px] border border-[#F0EFEB] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFFCFA_100%)] p-5 shadow-[0_14px_38px_-34px_rgba(25,25,25,0.35)]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar name={person.name} color={person.avatarColor} photoUrl={person.photoUrl} size={46} />
+                <div className="min-w-0">
+                  <div className="truncate text-[15px] font-semibold text-[#191919]">{person.name}</div>
+                  <div className="mt-0.5 truncate text-[12px] text-[#AAAAAA]">{person.lastPresence}</div>
                 </div>
               </div>
+              <span className={cn("flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold", careBadgeColors[person.badge] ?? careBadgeFallback)}>{person.badge}</span>
             </div>
-            <div className="mt-5 grid grid-cols-3 gap-2">
-              {["Contato", "Acompanhar", "Orar"].map((label) => (
-                <button key={label} className="min-h-10 rounded-full border border-[#F0EFEB] px-3 text-[12px] font-semibold text-[#191919] transition hover:bg-[#FAFAF8]">
-                  {label}
-                </button>
-              ))}
+
+            <div className="mt-4 flex-1 rounded-[18px] border border-[#F0EFEB] bg-white/72 px-4 py-3">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#AAAAAA]">Motivo do cuidado</div>
+              <p className="text-[13px] leading-5 text-[#777777]">{person.reason}</p>
+            </div>
+
+            <div className="mt-4 grid grid-cols-[1fr_auto_auto] gap-2">
+              <button className="min-h-10 rounded-full bg-[#F4532A] px-4 text-[12px] font-semibold text-white shadow-[0_12px_24px_-16px_rgba(244,83,42,0.75)] transition hover:bg-[#D94420]">
+                Acompanhar
+              </button>
+              <button className="min-h-10 rounded-full border border-[#F0EFEB] px-3 text-[12px] font-semibold text-[#191919] transition hover:bg-[#FAFAF8]">
+                Contato
+              </button>
+              <button className="min-h-10 rounded-full border border-[#F0EFEB] px-3 text-[12px] font-semibold text-[#191919] transition hover:bg-[#FAFAF8]">
+                Orar
+              </button>
             </div>
           </div>
         ))}
@@ -462,16 +610,29 @@ export function CarePeopleSection({ people }: { people: CarePerson[] }) {
   );
 }
 
-export function InsightCards({ items }: { items: Insight[] }) {
+export function InsightCards({ items, className }: { items: Insight[]; className?: string }) {
+  const insightStyles = [
+    "text-[#D94420]",
+    "text-[#1F8044]",
+    "text-[#6D5DF0]",
+    "text-[#C07B1A]",
+  ];
   return (
-    <Panel className="p-6" dataSectionId="insights">
+    <Panel
+      className={cn(
+        "flex h-full flex-col border-white bg-[linear-gradient(135deg,#FFFFFF_0%,#FFF0EC_48%,#FAFAF8_100%)] p-6 shadow-[0_28px_80px_-50px_rgba(244,83,42,0.30)]",
+        className,
+      )}
+      dataSectionId="insights"
+    >
       <SectionTitle title="Insights da semana" eyebrow="Leitura pastoral" />
-      <div className="grid gap-3 sm:grid-cols-2">
-        {items.map((item) => (
-          <div key={item.label} className="rounded-[22px] border border-[#F0EFEB] bg-[#FAFAF8] p-4">
-            <div className="text-[27px] font-bold leading-none tracking-[-0.045em] text-[#191919]">{item.value}</div>
-            <div className="mt-2 text-[13px] font-semibold text-[#191919]">{item.label}</div>
-            <p className="mt-1 text-[12px] leading-5 text-[#777777]">{item.description}</p>
+      <div className="grid flex-1 auto-rows-fr gap-3 sm:grid-cols-2">
+        {items.map((item, index) => (
+          <div key={item.label} className="flex h-full flex-col justify-between rounded-[24px] border border-white/80 bg-white/72 p-5 shadow-[0_14px_36px_-30px_rgba(25,25,25,0.28)] backdrop-blur">
+            <div className={cn("text-[34px] font-bold leading-none tracking-[-0.06em]", insightStyles[index % insightStyles.length])}>
+              {item.value}
+            </div>
+            <div className="mt-3 text-[14px] font-semibold text-[#191919]">{item.label}</div>
           </div>
         ))}
       </div>
@@ -567,112 +728,31 @@ export function PersonalizedEmptyState() {
   );
 }
 
-export function DashboardV3Topbar({ unreadNotifications }: { unreadNotifications: number }) {
-  const [open, setOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    if (open) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
-
-  return (
-    <div
-      data-section="topbar"
-      className="sticky top-0 z-20 -mx-4 mb-6 border-b border-white/70 bg-[#FAFAF8]/75 px-4 py-4 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 xl:-mx-10 xl:px-10"
-    >
-      <div className="mx-auto flex min-h-[56px] max-w-[1240px] items-center gap-4">
-        <label className="mx-auto flex h-12 w-full max-w-[620px] items-center gap-3 rounded-full border border-[#F0EFEB] bg-white px-4 text-[14px] text-[#777777] shadow-[0_14px_35px_-28px_rgba(25,25,25,0.25)]">
-          <Icon name="search" size={17} />
-          <input
-            className="min-w-0 flex-1 border-0 bg-transparent text-[#191919] outline-none placeholder:text-[#AAAAAA]"
-            placeholder="Buscar pessoas, escalas, células, ministérios..."
-          />
-        </label>
-        <Link
-          href="/notificacoes"
-          className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-[#F0EFEB] bg-white text-[#777777] transition hover:bg-[#FAFAF8]"
-        >
-          <Icon name="bell" size={18} />
-          {unreadNotifications > 0 && (
-            <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-[#F4532A]" />
-          )}
-        </Link>
-        <div ref={dropdownRef} className="relative hidden md:block">
-          <button
-            onClick={() => setOpen((v) => !v)}
-            className="flex min-h-12 flex-shrink-0 items-center gap-2 rounded-full bg-[#F4532A] px-5 text-[14px] font-semibold text-white shadow-[0_16px_34px_-18px_rgba(244,83,42,0.55)] transition hover:brightness-[0.97]"
-          >
-            <Icon name="plus" size={17} />
-            Ações rápidas
-            <Icon
-              name="chevron"
-              size={14}
-              className={cn("transition-transform duration-200", open && "rotate-90")}
-            />
-          </button>
-          {open && (
-            <div className="absolute right-0 top-[calc(100%+8px)] w-44 overflow-hidden rounded-[14px] border border-[#F0EFEB] bg-white shadow-[0_12px_32px_-16px_rgba(25,25,25,0.25)]">
-              {(
-                [
-                  { label: "Nova escala", href: "/escalas/nova", icon: "plus" as const },
-                  { label: "Nova célula", href: "/celulas", icon: "home" as const },
-                  { label: "Nova pessoa", href: "/pessoas", icon: "users" as const },
-                ] as const
-              ).map((item, i, arr) => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className={cn(
-                    "flex items-center gap-2.5 px-4 py-3 text-[13px] font-medium text-[#191919] transition hover:bg-[#FAFAF8]",
-                    i < arr.length - 1 && "border-b border-[#F0EFEB]",
-                  )}
-                >
-                  <Icon name={item.icon} size={14} />
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function DashboardV3Home({ data }: { data: DashboardV3Data }) {
   const showPastoralManagement = data.profileMode === "admin" || data.profileMode === "hybrid";
   const showCellLife = data.profileMode === "hybrid" || data.profileMode === "cellMember";
 
   return (
-    <div className="min-h-screen bg-[#FAFAF8]">
-      <DashboardV3Topbar unreadNotifications={data.unreadNotifications} />
-      <div className="mx-auto max-w-[1240px] space-y-6 pb-12">
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-full space-y-6 pb-12">
         <DashboardHero
           title={data.heroTitle}
-          summary={data.heroSummary}
-          churchName={data.churchName}
+          unreadNotifications={data.unreadNotifications}
         />
         {data.profileMode === "connect" && <PersonalizedEmptyState />}
         <PriorityCards items={data.priorities} />
 
-        <section className="grid gap-6 xl:grid-cols-[1fr_1fr_360px]">
+        <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(280px,340px)]">
           {showPastoralManagement ? <PriorityList items={data.priorityItems} /> : <ActivityTimeline items={data.timeline} />}
           {showPastoralManagement ? <ActivityTimeline items={data.timeline} /> : <PrayerRequestCard items={data.prayers} />}
           <UpcomingEvents items={data.upcoming} />
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
+        <section className="grid min-w-0 items-stretch gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
           {showPastoralManagement ? <CarePeopleSection people={data.carePeople} /> : showCellLife ? <CellCard cell={data.cell} /> : <PrayerRequestCard items={data.prayers} />}
-          <div className="space-y-6">
+          <div className={cn("space-y-6", showPastoralManagement && !showCellLife && "flex h-full flex-col")}> 
             {showCellLife && showPastoralManagement && <CellCard cell={data.cell} />}
-            <InsightCards items={data.insights} />
+            <InsightCards items={data.insights} className={showPastoralManagement && !showCellLife ? "h-full" : undefined} />
             {!showPastoralManagement && showCellLife && <PrayerRequestCard items={data.prayers} />}
           </div>
         </section>

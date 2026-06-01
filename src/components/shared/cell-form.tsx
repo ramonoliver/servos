@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Modal, MultiSelect } from "@/components/ui";
 import type { MultiSelectOption } from "@/components/ui";
-import { WEEK_DAYS, DEFAULT_HEALTH, type Cell, type CellMemberRow, type CellNetwork } from "@/lib/cells/types";
+import { WEEK_DAYS, CELL_TYPES, DEFAULT_HEALTH, type Cell, type CellMemberRow, type CellNetwork } from "@/lib/cells/types";
 import { saveCell } from "@/lib/cells/client";
 import type { User } from "@/types";
 
@@ -143,9 +143,9 @@ export function CellForm({
 
         {networks.length > 0 && (
           <div>
-            <label className="input-label">Rede / Setor (opcional)</label>
+            <label className="input-label">Supervisão (opcional)</label>
             <select className="input-field" value={networkId} onChange={(e) => setNetworkId(e.target.value)}>
-              <option value="">Sem rede</option>
+              <option value="">Sem supervisão</option>
               {networks.map((n) => <option key={n.id} value={n.id}>{n.name}</option>)}
             </select>
           </div>
@@ -167,8 +167,16 @@ export function CellForm({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="input-label">Público</label>
-            <input className="input-field" value={audience} onChange={(e) => setAudience(e.target.value)} placeholder="Ex: Casais, Jovens..." />
+            <label className="input-label">Tipo / Público</label>
+            <select className="input-field" value={audience} onChange={(e) => setAudience(e.target.value)}>
+              <option value="">Selecione…</option>
+              {CELL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              <option value="Outros">Outros</option>
+            </select>
+            {/* Allow custom value if not in list */}
+            {audience && !([...CELL_TYPES, "Outros", ""] as string[]).includes(audience) && (
+              <input className="input-field mt-1.5" value={audience} onChange={(e) => setAudience(e.target.value)} placeholder="Tipo personalizado" />
+            )}
           </div>
           <div>
             <label className="input-label">Máx. de membros</label>

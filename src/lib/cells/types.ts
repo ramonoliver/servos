@@ -63,6 +63,42 @@ export const WEEK_DAYS = [
   "Domingo",
 ] as const;
 
+export const CELL_TYPES = [
+  "Casados",
+  "Solteiros",
+  "Crianças",
+  "Mulheres",
+  "Homens",
+  "Jovens",
+  "Adolescentes",
+  "Outros",
+] as const;
+
+export type CellType = (typeof CELL_TYPES)[number];
+
+export type CellHealthStatus = "Saudável" | "Em crescimento" | "Atenção" | "Crítica" | "Nova";
+
+export function cellHealthStatus(health: CellHealth, createdAt?: string): CellHealthStatus {
+  // "Nova" if created within the last 30 days
+  if (createdAt) {
+    const days = (Date.now() - new Date(createdAt).getTime()) / 86_400_000;
+    if (days <= 30) return "Nova";
+  }
+  const avg = cellHealthAverage(health);
+  if (avg >= 80) return "Saudável";
+  if (avg >= 60) return "Em crescimento";
+  if (avg >= 40) return "Atenção";
+  return "Crítica";
+}
+
+export const HEALTH_STATUS_STYLES: Record<CellHealthStatus, string> = {
+  "Saudável": "text-success bg-success-light",
+  "Em crescimento": "text-info bg-info-light",
+  "Atenção": "text-amber bg-amber-light",
+  "Crítica": "text-danger bg-danger-light",
+  "Nova": "text-[#8B5BD6] bg-[#f4ecff]",
+};
+
 export const DEFAULT_HEALTH: CellHealth = {
   frequency: 70,
   communion: 70,

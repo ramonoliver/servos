@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { ActionDrawer } from "@/components/ui/action-drawer";
 import { PageIntro, PersonCard, SoftCard } from "@/components/pastoral/pastoral-ui";
 import { pastoralCells, pastoralMinistries, pastoralPeople, pastoralTags } from "@/lib/pastoral/mock-data";
@@ -10,10 +10,66 @@ const kindOptions: { value: PersonKind | "all"; label: string }[] = [
   { value: "all", label: "Todas" },
   { value: "member", label: "Membros" },
   { value: "visitor", label: "Visitantes" },
-  { value: "leader", label: "Lideres" },
-  { value: "volunteer", label: "Voluntarios" },
+  { value: "leader", label: "Líderes" },
+  { value: "volunteer", label: "Voluntários" },
   { value: "pastor", label: "Pastores" },
 ];
+
+function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length === 0) return "";
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function formatCep(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 5) return digits;
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+}
+
+/** Aplica máscara dd/mm/aaaa ao digitar e retorna a string mascarada. */
+function formatDateMask(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+/** Converte dd/mm/aaaa → YYYY-MM-DD para armazenamento. Retorna "" se inválido. */
+function parseDateMask(masked: string): string {
+  const parts = masked.split("/");
+  if (parts.length !== 3) return "";
+  const [dd, mm, yyyy] = parts;
+  if (dd.length !== 2 || mm.length !== 2 || yyyy.length !== 4) return "";
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Converte YYYY-MM-DD → dd/mm/aaaa para exibição. */
+function toDateMask(iso: string): string {
+  if (!iso || iso.length !== 10) return iso;
+  const [yyyy, mm, dd] = iso.split("-");
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+const emptyForm = {
+  fullName: "",
+  phone: "",
+  email: "",
+  birthDate: "",
+  kind: "visitor" as PersonKind,
+  cellId: "",
+  ministryId: "",
+  cep: "",
+  street: "",
+  number: "",
+  complement: "",
+  neighborhood: "",
+  city: "",
+  state: "",
+};
 
 export default function PessoasPage() {
   const [peopleData, setPeopleData] = useState<PastoralPerson[]>(pastoralPeople);
@@ -22,16 +78,11 @@ export default function PessoasPage() {
   const [tagId, setTagId] = useState("all");
   const [special, setSpecial] = useState<"all" | "without-cell" | "in-care" | "new-converts">("all");
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [newPerson, setNewPerson] = useState({
-    fullName: "",
-    phone: "",
-    email: "",
-    roleTitle: "",
-    kind: "visitor" as PersonKind,
-    cellId: "",
-    ministryId: "",
-    tagId: "visitante",
-  });
+  const [newPerson, setNewPerson] = useState(emptyForm);
+  const [birthDateMask, setBirthDateMask] = useState("");
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [cepLoading, setCepLoading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const people = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -55,21 +106,69 @@ export default function PessoasPage() {
     });
   }, [peopleData, search, kind, tagId, special]);
 
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setPhotoPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  async function handleCepBlur() {
+    const digits = newPerson.cep.replace(/\D/g, "");
+    if (digits.length !== 8) return;
+    setCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      if (!res.ok) return;
+      const data = await res.json() as { erro?: boolean; logradouro?: string; bairro?: string; localidade?: string; uf?: string };
+      if (data.erro) return;
+      setNewPerson((prev) => ({
+        ...prev,
+        street: data.logradouro || prev.street,
+        neighborhood: data.bairro || prev.neighborhood,
+        city: data.localidade || prev.city,
+        state: data.uf || prev.state,
+      }));
+    } catch {
+      // silently ignore network errors
+    } finally {
+      setCepLoading(false);
+    }
+  }
+
+  function closeDrawer() {
+    setDrawerOpen(false);
+    setNewPerson(emptyForm);
+    setBirthDateMask("");
+    setPhotoPreview(null);
+  }
+
   function createPerson() {
     const name = newPerson.fullName.trim();
     if (!name) return;
+
+    const addressParts = [
+      newPerson.street,
+      newPerson.number,
+      newPerson.complement,
+      newPerson.neighborhood,
+      newPerson.city,
+      newPerson.state,
+      newPerson.cep,
+    ].filter(Boolean);
 
     const created: PastoralPerson = {
       id: `local-${Date.now()}`,
       fullName: name,
       avatarColor: "#F4532A",
-      photoUrl: null,
+      photoUrl: photoPreview,
       phone: newPerson.phone,
       email: newPerson.email,
-      birthDate: "",
+      birthDate: newPerson.birthDate,
       gender: "nao_informado",
       maritalStatus: "nao_informado",
-      address: "",
+      address: addressParts.join(", "),
       instagram: "",
       arrivalDate: new Date().toISOString().slice(0, 10),
       kinds: [newPerson.kind],
@@ -78,15 +177,14 @@ export default function PessoasPage() {
       participatesInCell: Boolean(newPerson.cellId),
       cellId: newPerson.cellId || null,
       ministryIds: newPerson.ministryId ? [newPerson.ministryId] : [],
-      roleTitle: newPerson.roleTitle || (newPerson.kind === "visitor" ? "Visitante" : "Pessoa cadastrada"),
-      tagIds: [newPerson.tagId],
-      notes: "Cadastro local para validacao da experiencia. Ainda nao foi salvo no Supabase.",
+      roleTitle: newPerson.kind === "visitor" ? "Visitante" : "Pessoa cadastrada",
+      tagIds: ["visitante"],
+      notes: "",
       lastContactAt: null,
     };
 
     setPeopleData((current) => [created, ...current]);
-    setDrawerOpen(false);
-    setNewPerson({ fullName: "", phone: "", email: "", roleTitle: "", kind: "visitor", cellId: "", ministryId: "", tagId: "visitante" });
+    closeDrawer();
   }
 
   return (
@@ -94,7 +192,7 @@ export default function PessoasPage() {
       <PageIntro
         eyebrow="Pessoas & Cuidado"
         title="Pessoas"
-        description="Uma visao unica para membros, visitantes, voluntarios, lideres e pessoas em acompanhamento."
+        description="Uma visão única para membros, visitantes, voluntários, líderes e pessoas em acompanhamento."
         action={<button className="btn btn-primary btn-sm" onClick={() => setDrawerOpen(true)}>+ Nova pessoa</button>}
       />
 
@@ -119,7 +217,7 @@ export default function PessoasPage() {
           </select>
           <select className="input-field" value={special} onChange={(event) => setSpecial(event.target.value as typeof special)}>
             <option value="all">Todos os filtros</option>
-            <option value="without-cell">Pessoas sem celula</option>
+            <option value="without-cell">Pessoas sem célula</option>
             <option value="in-care">Em acompanhamento</option>
             <option value="new-converts">Novos convertidos</option>
           </select>
@@ -145,62 +243,223 @@ export default function PessoasPage() {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {people.map((person) => (
-          <PersonCard key={person.id} person={person} />
+          <PersonCard
+            key={person.id}
+            person={person}
+            cellName={pastoralCells.find((c) => c.id === person.cellId)?.name}
+          />
         ))}
       </div>
 
-      <ActionDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Nova pessoa" width={420}>
-        <div className="space-y-4">
+      <ActionDrawer open={drawerOpen} onClose={closeDrawer} title="Nova pessoa" width={480}>
+        <div className="space-y-6">
+
+          {/* Foto */}
+          <div className="flex flex-col items-center gap-2 pt-1">
+            <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              className="relative w-20 h-20 rounded-full overflow-hidden bg-surface-alt border-2 border-dashed border-border hover:border-brand transition-colors flex items-center justify-center group"
+            >
+              {photoPreview ? (
+                <img src={photoPreview} alt="Foto" className="w-full h-full object-cover" />
+              ) : (
+                <div className="flex flex-col items-center gap-1 text-ink-faint group-hover:text-brand transition-colors">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4 20c0-4 3.58-7 8-7s8 3 8 7" />
+                  </svg>
+                  <span className="text-[10px] font-semibold leading-none">Foto</span>
+                </div>
+              )}
+            </button>
+            {photoPreview && (
+              <button
+                type="button"
+                className="text-[11px] text-ink-faint hover:text-danger transition-colors"
+                onClick={() => { setPhotoPreview(null); if (photoInputRef.current) photoInputRef.current.value = ""; }}
+              >
+                Remover foto
+              </button>
+            )}
+          </div>
+
+          {/* Identificação */}
           <div>
-            <label className="input-label">Nome completo</label>
-            <input className="input-field" value={newPerson.fullName} onChange={(event) => setNewPerson((current) => ({ ...current, fullName: event.target.value }))} />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="input-label">Telefone</label>
-              <input className="input-field" value={newPerson.phone} onChange={(event) => setNewPerson((current) => ({ ...current, phone: event.target.value }))} />
+            <p className="text-[11px] font-bold uppercase tracking-wider text-ink-faint mb-3">Identificação</p>
+            <div className="space-y-3">
+              <div>
+                <label className="input-label">Nome completo *</label>
+                <input
+                  className="input-field"
+                  placeholder="Ex: João da Silva"
+                  value={newPerson.fullName}
+                  onChange={(e) => setNewPerson((p) => ({ ...p, fullName: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="input-label">Telefone</label>
+                  <input
+                    className="input-field"
+                    placeholder="(00) 00000-0000"
+                    value={newPerson.phone}
+                    onChange={(e) => setNewPerson((p) => ({ ...p, phone: formatPhone(e.target.value) }))}
+                  />
+                </div>
+                <div>
+                  <label className="input-label">Data de nascimento</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="input-field"
+                    placeholder="dd/mm/aaaa"
+                    maxLength={10}
+                    value={birthDateMask}
+                    onChange={(e) => {
+                      const masked = formatDateMask(e.target.value);
+                      setBirthDateMask(masked);
+                      setNewPerson((p) => ({ ...p, birthDate: parseDateMask(masked) }));
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="input-label">E-mail</label>
+                <input
+                  type="email"
+                  className="input-field"
+                  placeholder="email@exemplo.com"
+                  value={newPerson.email}
+                  onChange={(e) => setNewPerson((p) => ({ ...p, email: e.target.value }))}
+                />
+              </div>
             </div>
-            <div>
-              <label className="input-label">Email</label>
-              <input className="input-field" value={newPerson.email} onChange={(event) => setNewPerson((current) => ({ ...current, email: event.target.value }))} />
-            </div>
           </div>
+
+          {/* Perfil */}
           <div>
-            <label className="input-label">Cargo/função</label>
-            <input className="input-field" value={newPerson.roleTitle} onChange={(event) => setNewPerson((current) => ({ ...current, roleTitle: event.target.value }))} />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="input-label">Tipo</label>
-              <select className="input-field" value={newPerson.kind} onChange={(event) => setNewPerson((current) => ({ ...current, kind: event.target.value as PersonKind }))}>
-                {kindOptions.filter((option) => option.value !== "all").map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-ink-faint mb-3">Perfil</p>
+            <div className="space-y-3">
+              <div>
+                <label className="input-label">Tipo</label>
+                <select className="input-field" value={newPerson.kind} onChange={(e) => setNewPerson((p) => ({ ...p, kind: e.target.value as PersonKind }))}>
+                  {kindOptions.filter((o) => o.value !== "all").map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="input-label">Célula</label>
+                <select className="input-field" value={newPerson.cellId} onChange={(e) => setNewPerson((p) => ({ ...p, cellId: e.target.value }))}>
+                  <option value="">Sem célula por enquanto</option>
+                  {pastoralCells.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="input-label">Ministério</label>
+                <select className="input-field" value={newPerson.ministryId} onChange={(e) => setNewPerson((p) => ({ ...p, ministryId: e.target.value }))}>
+                  <option value="">Sem ministério por enquanto</option>
+                  {pastoralMinistries.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="input-label">Tag inicial</label>
-              <select className="input-field" value={newPerson.tagId} onChange={(event) => setNewPerson((current) => ({ ...current, tagId: event.target.value }))}>
-                {pastoralTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.label}</option>)}
-              </select>
+          </div>
+
+          {/* Endereço */}
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-ink-faint mb-3">Endereço</p>
+            <div className="space-y-3">
+              <div>
+                <label className="input-label">CEP</label>
+                <div className="relative">
+                  <input
+                    className="input-field"
+                    placeholder="00000-000"
+                    value={newPerson.cep}
+                    onChange={(e) => setNewPerson((p) => ({ ...p, cep: formatCep(e.target.value) }))}
+                    onBlur={handleCepBlur}
+                  />
+                  {cepLoading && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <svg className="animate-spin w-4 h-4 text-brand" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="input-label">Rua</label>
+                <input
+                  className="input-field"
+                  placeholder="Preenchido automaticamente pelo CEP"
+                  value={newPerson.street}
+                  onChange={(e) => setNewPerson((p) => ({ ...p, street: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="input-label">Número</label>
+                  <input
+                    className="input-field"
+                    placeholder="Ex: 123"
+                    value={newPerson.number}
+                    onChange={(e) => setNewPerson((p) => ({ ...p, number: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="input-label">Complemento</label>
+                  <input
+                    className="input-field"
+                    placeholder="Apto, Bloco..."
+                    value={newPerson.complement}
+                    onChange={(e) => setNewPerson((p) => ({ ...p, complement: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="input-label">Bairro</label>
+                <input
+                  className="input-field"
+                  placeholder="Preenchido automaticamente pelo CEP"
+                  value={newPerson.neighborhood}
+                  onChange={(e) => setNewPerson((p) => ({ ...p, neighborhood: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-[1fr_80px]">
+                <div>
+                  <label className="input-label">Cidade</label>
+                  <input
+                    className="input-field"
+                    placeholder="Preenchido automaticamente pelo CEP"
+                    value={newPerson.city}
+                    onChange={(e) => setNewPerson((p) => ({ ...p, city: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="input-label">Estado</label>
+                  <input
+                    className="input-field"
+                    placeholder="UF"
+                    maxLength={2}
+                    value={newPerson.state}
+                    onChange={(e) => setNewPerson((p) => ({ ...p, state: e.target.value.toUpperCase() }))}
+                  />
+                </div>
+              </div>
             </div>
           </div>
-          <div>
-            <label className="input-label">Célula</label>
-            <select className="input-field" value={newPerson.cellId} onChange={(event) => setNewPerson((current) => ({ ...current, cellId: event.target.value }))}>
-              <option value="">Sem célula por enquanto</option>
-              {pastoralCells.map((cell) => <option key={cell.id} value={cell.id}>{cell.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="input-label">Ministério</label>
-            <select className="input-field" value={newPerson.ministryId} onChange={(event) => setNewPerson((current) => ({ ...current, ministryId: event.target.value }))}>
-              <option value="">Sem ministério por enquanto</option>
-              {pastoralMinistries.map((ministry) => <option key={ministry.id} value={ministry.id}>{ministry.name}</option>)}
-            </select>
-          </div>
-          <div className="rounded-[12px] bg-brand-light px-3 py-2 text-[12px] text-brand">
-            Cadastro local para validacao. Nada sera salvo no Supabase nesta etapa.
-          </div>
-          <button className="btn btn-primary w-full" onClick={createPerson}>Criar pessoa</button>
+
+          <button
+            className="btn btn-primary w-full"
+            onClick={createPerson}
+            disabled={!newPerson.fullName.trim()}
+          >
+            Criar pessoa
+          </button>
         </div>
       </ActionDrawer>
     </div>

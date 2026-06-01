@@ -27,7 +27,7 @@ export function Icon({ name, size = 18, className = "" }: { name: string; size?:
     strokeWidth: 1.9,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
-    className,
+    className: cn("overflow-visible", className),
   };
   const icons: Record<string, React.ReactNode> = {
     plus: <><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>,
@@ -99,7 +99,7 @@ export function DashboardHeader({
         <div className="flex items-center gap-2.5">
           <Link
             href="/notificacoes"
-            className="relative flex h-11 w-11 items-center justify-center rounded-[14px] border border-border-soft bg-white/70 text-ink-soft shadow-soft backdrop-blur transition hover:-translate-y-0.5 hover:text-brand-deep hover:shadow-lift"
+            className="relative flex h-11 w-11 items-center justify-center rounded-[14px] border border-border-soft bg-white/70 text-ink-soft shadow-soft backdrop-blur transition hover:border-brand/20 hover:bg-white hover:text-brand-deep hover:shadow-lift"
           >
             <Icon name="bell" size={19} />
             {unreadNotifications > 0 && (
@@ -240,8 +240,7 @@ export function DashboardStatsGrid({ stats }: { stats: DashboardStat[] }) {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.22, delay: 0.04 * i }}
-            whileHover={{ y: -4 }}
-            className="rounded-[22px] border border-border-soft bg-white/70 p-5 shadow-soft backdrop-blur transition-shadow hover:shadow-lift"
+            className="rounded-[22px] border border-border-soft bg-white/70 p-5 shadow-soft backdrop-blur transition hover:border-white hover:bg-white/85 hover:shadow-lift"
           >
             <div className={cn("mb-3.5 flex h-11 w-11 items-center justify-center rounded-[14px]", tone.icon)}>
               <Icon name={stat.icon} size={21} />

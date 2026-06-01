@@ -28,14 +28,14 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 bg-ink/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="!mt-0 fixed inset-0 bg-ink/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={e => e.target === e.currentTarget && close()}
       role="presentation"
     >
       <div className="bg-white rounded-xl w-full shadow-xl max-h-[90vh] overflow-y-auto animate-in" style={{ maxWidth: width }} role="dialog" aria-modal="true" aria-label={title}>
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border-soft sticky top-0 bg-white z-[1] rounded-t-xl">
           <span className="font-display text-xl">{title}</span>
-          <button ref={closeButtonRef} onClick={close} className="w-8 h-8 rounded-full bg-surface-alt flex items-center justify-center hover:bg-border text-ink-muted transition-colors" aria-label="Fechar modal">&times;</button>
+          <button ref={closeButtonRef} onClick={close} className="w-8 h-8 rounded-full bg-surface-alt flex items-center justify-center hover:bg-border text-ink-muted transition-colors" aria-label="Fechar modal"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button>
         </div>
         <div className="px-6 py-5">{children}</div>
         {footer && <div className="px-6 py-4 border-t border-border-soft flex gap-2 justify-end">{footer}</div>}

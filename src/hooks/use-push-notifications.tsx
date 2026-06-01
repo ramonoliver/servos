@@ -40,15 +40,16 @@ export function usePushNotifications(userId: string | null, toast: (message: str
       return false;
     }
 
+    const isUnset = (value?: string) => !value || value.startsWith("your_") || value.includes("your_firebase");
     if (
-      !firebaseConfig.apiKey ||
-      !firebaseConfig.projectId ||
-      !firebaseConfig.messagingSenderId ||
-      !firebaseConfig.appId ||
-      !process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY
+      isUnset(firebaseConfig.apiKey) ||
+      isUnset(firebaseConfig.projectId) ||
+      isUnset(firebaseConfig.messagingSenderId) ||
+      isUnset(firebaseConfig.appId) ||
+      isUnset(process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY)
     ) {
       if (showErrorToast) {
-        toast("Configuração de Firebase incompleta. Configure as variáveis de ambiente de push.");
+        toast("Notificações ainda não configuradas. O Firebase precisa ser configurado (peça ao administrador).");
       }
       return false;
     }
@@ -102,7 +103,8 @@ export function usePushNotifications(userId: string | null, toast: (message: str
     } catch (error) {
       console.error("Push registration failed:", error);
       if (showErrorToast) {
-        toast("Falha ao ativar notificações. Tente novamente.");
+        const msg = error instanceof Error ? error.message : "";
+        toast(msg ? `Falha ao ativar notificações: ${msg}` : "Falha ao ativar notificações. Tente novamente.");
       }
       setPushEnabled(false);
       return false;

@@ -141,7 +141,6 @@ export function SectionCard({
     ? {
         initial: { opacity: 0, y: 8 },
         animate: { opacity: 1, y: 0 },
-        whileHover: href ? { y: -2 } : undefined,
         transition: { duration: 0.2, ease: "easeOut" },
       }
     : {};

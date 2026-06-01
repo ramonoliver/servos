@@ -11,6 +11,8 @@ import { CellMeetingForm } from "@/components/shared/cell-meeting-form";
 import { fetchCells, saveCell, fetchMeetings, saveMeeting } from "@/lib/cells/client";
 import {
   cellHealthAverage,
+  cellHealthStatus,
+  HEALTH_STATUS_STYLES,
   formatMeetingDate,
   MEETING_FEELINGS,
   type Cell,
@@ -153,7 +155,10 @@ export default function CellDetailPage() {
   const leaders = (cell.leader_ids || []).map((id) => memberById.get(id)).filter(Boolean) as User[];
   const coLeaders = (cell.co_leader_ids || []).map((id) => memberById.get(id)).filter(Boolean) as User[];
   const average = cellHealthAverage(cell.health);
-  const healthChip = average >= 75 ? "text-success bg-success-light" : average >= 50 ? "text-amber bg-amber-light" : "text-danger bg-danger-light";
+  const healthStatus = cellHealthStatus(cell.health, cell.created_at);
+  const healthStatusCls = HEALTH_STATUS_STYLES[healthStatus];
+  const network = cell.network_id ? networks.find((n) => n.id === cell.network_id) : null;
+  const networkSupervisors = (network?.supervisor_ids || []).map((id) => memberById.get(id)).filter(Boolean) as User[];
 
   return (
     <PageShell>
@@ -171,12 +176,12 @@ export default function CellDetailPage() {
             </div>
             <h1 className="font-display text-[28px] font-extrabold leading-tight tracking-tight text-ink">{cell.name}</h1>
             <p className="mt-1 text-[14px] text-ink-muted">
-              {[cell.week_day, cell.time, cell.audience].filter(Boolean).join(" · ") || "Sem horário definido"}
+              {[cell.audience, cell.week_day, cell.time].filter(Boolean).join(" · ") || "Sem horário definido"}
             </p>
             {cell.address && <p className="mt-1 text-[13px] text-ink-faint">📍 {cell.address}</p>}
           </div>
-          <div className="flex items-center gap-2 self-start">
-            <span className={`rounded-full px-3 py-1.5 text-[12px] font-bold ${healthChip}`}>{average}% saúde</span>
+          <div className="flex items-center gap-2 self-start flex-shrink-0">
+            <span className={`rounded-full px-3 py-1.5 text-[12px] font-bold ${healthStatusCls}`}>{healthStatus}</span>
             {canManage && (
               <button onClick={() => setShowEdit(true)} className="btn btn-secondary btn-sm">Editar</button>
             )}
@@ -186,6 +191,66 @@ export default function CellDetailPage() {
           </div>
         </div>
         {cell.description && <p className="relative mt-4 max-w-[680px] text-[14px] leading-relaxed text-ink-soft">{cell.description}</p>}
+      </div>
+
+      {/* Stats cards */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {/* Supervisão */}
+        <div className="rounded-[18px] border border-border-soft bg-white/70 p-4 shadow-soft backdrop-blur">
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink-faint">Supervisão</p>
+          {network ? (
+            <>
+              <p className="mt-1.5 font-display text-[15px] font-bold text-ink leading-tight">{network.name}</p>
+              {networkSupervisors.length > 0 && (
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  {networkSupervisors.slice(0, 2).map((s) => (
+                    <Avatar key={s.id} name={s.name} color={s.avatar_color} photoUrl={s.photo_url} size={22} />
+                  ))}
+                  <span className="text-[11px] text-ink-muted">{networkSupervisors[0]?.name.split(" ")[0]}{networkSupervisors.length > 1 ? ` & ${networkSupervisors[1]?.name.split(" ")[0]}` : ""}</span>
+                </div>
+              )}
+              <Link href="/celulas/estrutura" className="mt-2 block text-[11px] font-semibold text-brand-deep hover:underline">Ver estrutura →</Link>
+            </>
+          ) : (
+            <p className="mt-1.5 text-[13px] text-ink-faint">Sem supervisão</p>
+          )}
+        </div>
+
+        {/* Participantes */}
+        <div className="rounded-[18px] border border-border-soft bg-white/70 p-4 shadow-soft backdrop-blur">
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink-faint">Participantes</p>
+          <p className="mt-1.5 font-display text-[28px] font-extrabold text-ink leading-none">{memberUsers.length}</p>
+          <p className="mt-0.5 text-[12px] text-ink-muted">de {cell.max_members} vagas</p>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-alt">
+            <div className="h-1.5 rounded-full bg-brand" style={{ width: `${Math.min((memberUsers.length / Math.max(cell.max_members, 1)) * 100, 100)}%` }} />
+          </div>
+        </div>
+
+        {/* Saúde */}
+        <div className="rounded-[18px] border border-border-soft bg-white/70 p-4 shadow-soft backdrop-blur">
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink-faint">Saúde da célula</p>
+          <div className="mt-1.5 flex items-end gap-2">
+            <p className="font-display text-[28px] font-extrabold text-ink leading-none">{average}%</p>
+            <span className={`mb-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${healthStatusCls}`}>{healthStatus}</span>
+          </div>
+          <p className="mt-1 text-[11px] text-ink-muted">
+            {average >= 80 ? "Boa frequência e crescimento estável." : average >= 60 ? "Crescimento progressivo, em boa direção." : average >= 40 ? "Requer atenção pastoral." : "Necessita acompanhamento urgente."}
+          </p>
+        </div>
+
+        {/* Próximo encontro */}
+        <div className="rounded-[18px] border border-border-soft bg-white/70 p-4 shadow-soft backdrop-blur">
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-ink-faint">Próximo encontro</p>
+          {cell.week_day ? (
+            <>
+              <p className="mt-1.5 font-display text-[15px] font-bold text-ink">{cell.week_day}</p>
+              <p className="text-[13px] text-ink-muted">{cell.time ? `às ${cell.time}` : "Horário não definido"}</p>
+              {cell.address && <p className="mt-1 text-[11px] text-ink-faint truncate">📍 {cell.address}</p>}
+            </>
+          ) : (
+            <p className="mt-1.5 text-[13px] text-ink-faint">Não definido</p>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[1fr_320px] lg:items-start">
@@ -203,7 +268,7 @@ export default function CellDetailPage() {
               {memberUsers.map((m) => {
                 const roleTag = (cell.leader_ids || []).includes(m.id) ? "Líder" : (cell.co_leader_ids || []).includes(m.id) ? "Co-líder" : null;
                 return (
-                  <Link key={m.id} href={`/membros/${m.id}`} className="flex items-center gap-3 rounded-[14px] border border-border-soft bg-white/60 p-2.5 transition hover:-translate-y-0.5 hover:shadow-soft">
+                  <Link key={m.id} href={`/membros/${m.id}`} className="flex items-center gap-3 rounded-[14px] border border-border-soft bg-white/60 p-2.5 transition hover:border-ink-ghost hover:bg-white hover:shadow-soft">
                     <Avatar name={m.name} color={m.avatar_color} photoUrl={m.photo_url} size={36} />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[13px] font-semibold text-ink">{m.name}</div>

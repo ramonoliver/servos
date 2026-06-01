@@ -89,6 +89,14 @@ export interface User {
   status: UserStatus;
   avatar_color: string;
   photo_url: string | null;   // Profile photo URL or base64
+  birth_date: string | null;   // ISO date YYYY-MM-DD
+  address_cep: string;
+  address_street: string;
+  address_number: string;
+  address_complement: string;
+  address_neighborhood: string;
+  address_city: string;
+  address_state: string;
   spouse_id: string | null;
   availability: boolean[]; // 7 days Mon-Sun
   total_schedules: number;

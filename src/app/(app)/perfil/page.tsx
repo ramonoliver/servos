@@ -6,6 +6,42 @@ import { updateSession } from "@/lib/auth/session";
 import { getInitials } from "@/lib/utils/helpers";
 import { AvailabilityEditor, Skeleton, PageHeader } from "@/components/ui";
 
+function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length === 0) return "";
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function formatCep(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 5) return digits;
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+}
+
+function formatDateMask(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+function parseDateMask(masked: string): string {
+  const parts = masked.split("/");
+  if (parts.length !== 3) return "";
+  const [dd, mm, yyyy] = parts;
+  if (dd.length !== 2 || mm.length !== 2 || yyyy.length !== 4) return "";
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function isoToMask(iso: string | null | undefined): string {
+  if (!iso || iso.length !== 10) return "";
+  const [yyyy, mm, dd] = iso.split("-");
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 export default function PerfilPage() {
   const { user, toast, refresh, pushPermission, pushEnabled, registeringPush, enablePushNotifications, retryPushNotifications } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -14,7 +50,17 @@ export default function PerfilPage() {
   );
 
   const [name, setName] = useState(user.name);
-  const [phone, setPhone] = useState(user.phone || "");
+  const [phone, setPhone] = useState(formatPhone(user.phone || ""));
+  const [birthDateMask, setBirthDateMask] = useState(isoToMask(user.birth_date));
+  const [birthDate, setBirthDate] = useState(user.birth_date || "");
+  const [cep, setCep] = useState(formatCep(user.address_cep || ""));
+  const [street, setStreet] = useState(user.address_street || "");
+  const [number, setNumber] = useState(user.address_number || "");
+  const [complement, setComplement] = useState(user.address_complement || "");
+  const [neighborhood, setNeighborhood] = useState(user.address_neighborhood || "");
+  const [city, setCity] = useState(user.address_city || "");
+  const [addressState, setAddressState] = useState(user.address_state || "");
+  const [cepLoading, setCepLoading] = useState(false);
   const [photoUrl, setPhotoUrl] = useState(user.photo_url || "");
   const [avail, setAvail] = useState([
     ...(user.availability || [true, true, true, true, true, true, true]),
@@ -36,8 +82,7 @@ export default function PerfilPage() {
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState("");
 
-  function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {    const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
@@ -55,6 +100,26 @@ export default function PerfilPage() {
 
   function removePhoto() {
     setPhotoUrl("");
+  }
+
+  async function handleCepBlur() {
+    const digits = cep.replace(/\D/g, "");
+    if (digits.length !== 8) return;
+    setCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      if (!res.ok) return;
+      const data = await res.json() as { erro?: boolean; logradouro?: string; bairro?: string; localidade?: string; uf?: string };
+      if (data.erro) return;
+      if (data.logradouro) setStreet(data.logradouro);
+      if (data.bairro) setNeighborhood(data.bairro);
+      if (data.localidade) setCity(data.localidade);
+      if (data.uf) setAddressState(data.uf);
+    } catch {
+      // silently ignore
+    } finally {
+      setCepLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -105,6 +170,14 @@ export default function PerfilPage() {
           phone: phone.trim(),
           availability: avail,
           photoUrl: photoUrl || null,
+          birthDate: birthDate || null,
+          addressCep: cep.replace(/\D/g, "") ? cep : "",
+          addressStreet: street.trim(),
+          addressNumber: number.trim(),
+          addressComplement: complement.trim(),
+          addressNeighborhood: neighborhood.trim(),
+          addressCity: city.trim(),
+          addressState: addressState.trim(),
         }),
       });
 
@@ -362,13 +435,90 @@ export default function PerfilPage() {
           </div>
 
           <div>
-            <label className="input-label">Nome</label>
+            <label className="input-label">Nome completo</label>
             <input className="input-field" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="input-label">Telefone</label>
+              <input
+                className="input-field"
+                placeholder="(00) 00000-0000"
+                value={phone}
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="input-label">Data de nascimento</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                className="input-field"
+                placeholder="dd/mm/aaaa"
+                maxLength={10}
+                value={birthDateMask}
+                onChange={(e) => {
+                  const masked = formatDateMask(e.target.value);
+                  setBirthDateMask(masked);
+                  setBirthDate(parseDateMask(masked));
+                }}
+              />
+            </div>
+          </div>
+
           <div>
-            <label className="input-label">Telefone</label>
-            <input className="input-field" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <p className="text-[11px] font-bold uppercase tracking-wider text-ink-faint mb-3">Endereço</p>
+            <div className="space-y-3">
+              <div>
+                <label className="input-label">CEP</label>
+                <div className="relative">
+                  <input
+                    className="input-field"
+                    placeholder="00000-000"
+                    value={cep}
+                    onChange={(e) => setCep(formatCep(e.target.value))}
+                    onBlur={() => void handleCepBlur()}
+                  />
+                  {cepLoading && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <svg className="animate-spin w-4 h-4 text-brand" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="input-label">Rua</label>
+                <input className="input-field" placeholder="Preenchido pelo CEP" value={street} onChange={(e) => setStreet(e.target.value)} />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="input-label">Número</label>
+                  <input className="input-field" placeholder="Ex: 123" value={number} onChange={(e) => setNumber(e.target.value)} />
+                </div>
+                <div>
+                  <label className="input-label">Complemento</label>
+                  <input className="input-field" placeholder="Apto, Bloco..." value={complement} onChange={(e) => setComplement(e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <label className="input-label">Bairro</label>
+                <input className="input-field" placeholder="Preenchido pelo CEP" value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-[1fr_80px]">
+                <div>
+                  <label className="input-label">Cidade</label>
+                  <input className="input-field" placeholder="Preenchido pelo CEP" value={city} onChange={(e) => setCity(e.target.value)} />
+                </div>
+                <div>
+                  <label className="input-label">Estado</label>
+                  <input className="input-field" placeholder="UF" maxLength={2} value={addressState} onChange={(e) => setAddressState(e.target.value.toUpperCase())} />
+                </div>
+              </div>
+            </div>
           </div>
 
           <div>

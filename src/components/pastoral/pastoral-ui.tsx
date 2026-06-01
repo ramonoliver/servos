@@ -69,7 +69,6 @@ export function SoftCard({
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: href ? -2 : 0 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
       className={cn("bg-white border border-border-soft rounded-[14px] shadow-sm", className)}
     >
@@ -142,7 +141,7 @@ export function PersonMini({
   return body;
 }
 
-export function PersonCard({ person }: { person: PastoralPerson }) {
+export function PersonCard({ person, cellName }: { person: PastoralPerson; cellName?: string }) {
   return (
     <SoftCard href={`/pessoas/${person.id}`} className="p-4">
       <PersonMini person={person} />
@@ -150,7 +149,13 @@ export function PersonCard({ person }: { person: PastoralPerson }) {
         <PersonTagList tagIds={person.tagIds} />
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-ink-muted">
-        <span>{person.participatesInCell ? "Com celula" : "Sem celula"}</span>
+        <span>
+          {person.participatesInCell
+            ? cellName
+              ? `Célula ${cellName}`
+              : "Com célula"
+            : "Sem célula"}
+        </span>
         <span className="text-right">{person.kinds.includes("visitor") ? "Visitante" : "Membro"}</span>
       </div>
     </SoftCard>

@@ -3,7 +3,7 @@ import { requireApiActor } from "@/lib/auth/api-session";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 type Actor = { id: string; role: string; cell_role?: string | null };
-type Net = { id: string; supervisor_ids: string[] };
+type Net = { id: string; name: string; description: string; supervisor_ids: string[]; color: string; church_id: string; created_at: string };
 
 function seesAll(actor: Actor) {
   return actor.role === "admin" || actor.cell_role === "pastor" || actor.cell_role === "coordenacao";
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
       await Promise.all([
         supabase.from("cells").select("*").eq("church_id", churchId).order("created_at", { ascending: false }),
         supabase.from("cell_members").select("*"),
-        supabase.from("cell_networks").select("id, supervisor_ids").eq("church_id", churchId),
+        supabase.from("cell_networks").select("*").eq("church_id", churchId),
       ]);
     if (cellsError) throw cellsError;
     if (cmError) throw cmError;

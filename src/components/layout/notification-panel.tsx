@@ -55,10 +55,10 @@ export function NotificationPanel({ open, onClose, userId, onMarkAllRead }: Noti
             </button>
             <button
               onClick={onClose}
-              className="w-7 h-7 rounded-full bg-surface-alt flex items-center justify-center text-ink-muted hover:bg-border transition-colors text-lg leading-none"
+              className="w-7 h-7 rounded-full bg-surface-alt flex items-center justify-center text-ink-muted hover:bg-border transition-colors"
               aria-label="Fechar"
             >
-              ×
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
             </button>
           </div>
         </div>

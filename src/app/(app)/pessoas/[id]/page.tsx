@@ -23,9 +23,54 @@ import {
   getPersonRelationships,
   getPersonTimeline,
 } from "@/lib/pastoral/selectors";
-import type { CareCase, PastoralPerson, TimelineEvent } from "@/lib/pastoral/types";
+import { pastoralCells, pastoralMinistries } from "@/lib/pastoral/mock-data";
+import type { CareCase, PastoralPerson, PersonKind, TimelineEvent } from "@/lib/pastoral/types";
 
 const tabs = ["Timeline", "Acompanhamentos", "Pedidos de Oração", "Escalas", "Observações"];
+
+const kindOptions: { value: PersonKind; label: string }[] = [
+  { value: "member", label: "Membro" },
+  { value: "visitor", label: "Visitante" },
+  { value: "leader", label: "Líder" },
+  { value: "volunteer", label: "Voluntário" },
+  { value: "pastor", label: "Pastor" },
+];
+
+function formatCep(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 5) return digits;
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+}
+
+function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length === 0) return "";
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function formatDateMask(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+function parseDateMask(masked: string): string {
+  const parts = masked.split("/");
+  if (parts.length !== 3) return "";
+  const [dd, mm, yyyy] = parts;
+  if (dd.length !== 2 || mm.length !== 2 || yyyy.length !== 4) return "";
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function toDateMask(iso: string): string {
+  if (!iso || iso.length !== 10) return iso;
+  const [yyyy, mm, dd] = iso.split("-");
+  return `${dd}/${mm}/${yyyy}`;
+}
 
 function BackIcon() {
   return (
@@ -94,11 +139,22 @@ export default function PessoaPerfilPage({ params }: { params: { id: string } })
     fullName: initialPerson?.fullName || "",
     phone: initialPerson?.phone || "",
     email: initialPerson?.email || "",
+    birthDate: initialPerson?.birthDate || "",
+    kind: (initialPerson?.kinds[0] || "member") as PersonKind,
+    cellId: initialPerson?.cellId || "",
     instagram: initialPerson?.instagram || "",
-    address: initialPerson?.address || "",
+    cep: "",
+    street: "",
+    number: "",
+    complement: "",
+    neighborhood: "",
+    city: "",
+    state: "",
     roleTitle: initialPerson?.roleTitle || "",
     notes: initialPerson?.notes || "",
   }));
+  const [editBirthDateMask, setEditBirthDateMask] = useState(() => toDateMask(initialPerson?.birthDate || ""));
+  const [editCepLoading, setEditCepLoading] = useState(false);
   const [contactForm, setContactForm] = useState({ title: "Contato registrado", description: "" });
   const [careForm, setCareForm] = useState({ title: "", reason: "", priority: "medium" as CareCase["priority"], nextStep: "" });
   const [timelineItems, setTimelineItems] = useState<TimelineEvent[]>(() => initialPerson ? getPersonTimeline(initialPerson.id) : []);
@@ -123,8 +179,44 @@ export default function PessoaPerfilPage({ params }: { params: { id: string } })
   const relationships = getPersonRelationships(person.id);
   const canEdit = user.role === "admin" || user.role === "leader";
 
+  async function handleEditCepBlur() {
+    const digits = editForm.cep.replace(/\D/g, "");
+    if (digits.length !== 8) return;
+    setEditCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      if (!res.ok) return;
+      const data = await res.json() as { erro?: boolean; logradouro?: string; bairro?: string; localidade?: string; uf?: string };
+      if (data.erro) return;
+      setEditForm((f) => ({
+        ...f,
+        street: data.logradouro || f.street,
+        neighborhood: data.bairro || f.neighborhood,
+        city: data.localidade || f.city,
+        state: data.uf || f.state,
+      }));
+    } catch {
+      // silently ignore
+    } finally {
+      setEditCepLoading(false);
+    }
+  }
+
   function saveProfile() {
-    setPerson((current) => current ? { ...current, ...editForm } : current);
+    setPerson((current) => {
+      if (!current) return current;
+      const { kind, cellId, cep, street, number, complement, neighborhood, city, state, ...rest } = editForm;
+      const addressParts = [street, number, complement, neighborhood, city, state, cep].filter(Boolean);
+      const address = addressParts.length > 0 ? addressParts.join(", ") : current.address;
+      return {
+        ...current,
+        ...rest,
+        address,
+        kinds: [kind],
+        cellId: cellId || null,
+        participatesInCell: Boolean(cellId),
+      };
+    });
     setEditOpen(false);
   }
 
@@ -373,38 +465,173 @@ export default function PessoaPerfilPage({ params }: { params: { id: string } })
       </div>
 
       {/* Edit drawer */}
-      <ActionDrawer open={editOpen} onClose={() => setEditOpen(false)} title="Editar pessoa" width={440}>
-        <div className="space-y-4">
+      <ActionDrawer open={editOpen} onClose={() => setEditOpen(false)} title="Editar pessoa" width={480}>
+        <div className="space-y-6">
+
+          {/* Identificação */}
           <div>
-            <label className="input-label">Nome completo</label>
-            <input className="input-field" value={editForm.fullName} onChange={(e) => setEditForm((f) => ({ ...f, fullName: e.target.value }))} />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="input-label">Telefone</label>
-              <input className="input-field" value={editForm.phone} onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} />
+            <p className="text-[11px] font-bold uppercase tracking-wider text-ink-faint mb-3">Identificação</p>
+            <div className="space-y-3">
+              <div>
+                <label className="input-label">Nome completo</label>
+                <input className="input-field" value={editForm.fullName} onChange={(e) => setEditForm((f) => ({ ...f, fullName: e.target.value }))} />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="input-label">Telefone</label>
+                  <input
+                    className="input-field"
+                    placeholder="(00) 00000-0000"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm((f) => ({ ...f, phone: formatPhone(e.target.value) }))}
+                  />
+                </div>
+                <div>
+                  <label className="input-label">Data de nascimento</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="input-field"
+                    placeholder="dd/mm/aaaa"
+                    maxLength={10}
+                    value={editBirthDateMask}
+                    onChange={(e) => {
+                      const masked = formatDateMask(e.target.value);
+                      setEditBirthDateMask(masked);
+                      setEditForm((f) => ({ ...f, birthDate: parseDateMask(masked) }));
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="input-label">Email</label>
+                <input type="email" className="input-field" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div>
+                <label className="input-label">Instagram</label>
+                <input className="input-field" value={editForm.instagram} onChange={(e) => setEditForm((f) => ({ ...f, instagram: e.target.value }))} />
+              </div>
             </div>
-            <div>
-              <label className="input-label">Email</label>
-              <input className="input-field" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} />
+          </div>
+
+          {/* Perfil */}
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-ink-faint mb-3">Perfil</p>
+            <div className="space-y-3">
+              <div>
+                <label className="input-label">Tipo</label>
+                <select className="input-field" value={editForm.kind} onChange={(e) => setEditForm((f) => ({ ...f, kind: e.target.value as PersonKind }))}>
+                  {kindOptions.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="input-label">Função</label>
+                <input className="input-field" value={editForm.roleTitle} onChange={(e) => setEditForm((f) => ({ ...f, roleTitle: e.target.value }))} />
+              </div>
+              <div>
+                <label className="input-label">Célula</label>
+                <select className="input-field" value={editForm.cellId} onChange={(e) => setEditForm((f) => ({ ...f, cellId: e.target.value }))}>
+                  <option value="">Sem célula</option>
+                  {pastoralCells.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
             </div>
           </div>
+
+          {/* Endereço */}
           <div>
-            <label className="input-label">Função</label>
-            <input className="input-field" value={editForm.roleTitle} onChange={(e) => setEditForm((f) => ({ ...f, roleTitle: e.target.value }))} />
+            <p className="text-[11px] font-bold uppercase tracking-wider text-ink-faint mb-3">Endereço</p>
+            <div className="space-y-3">
+              <div>
+                <label className="input-label">CEP</label>
+                <div className="relative">
+                  <input
+                    className="input-field"
+                    placeholder="00000-000"
+                    value={editForm.cep}
+                    onChange={(e) => setEditForm((f) => ({ ...f, cep: formatCep(e.target.value) }))}
+                    onBlur={handleEditCepBlur}
+                  />
+                  {editCepLoading && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <svg className="animate-spin w-4 h-4 text-brand" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="input-label">Rua</label>
+                <input
+                  className="input-field"
+                  placeholder="Preenchido automaticamente pelo CEP"
+                  value={editForm.street}
+                  onChange={(e) => setEditForm((f) => ({ ...f, street: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="input-label">Número</label>
+                  <input
+                    className="input-field"
+                    placeholder="Ex: 123"
+                    value={editForm.number}
+                    onChange={(e) => setEditForm((f) => ({ ...f, number: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="input-label">Complemento</label>
+                  <input
+                    className="input-field"
+                    placeholder="Apto, Bloco..."
+                    value={editForm.complement}
+                    onChange={(e) => setEditForm((f) => ({ ...f, complement: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="input-label">Bairro</label>
+                <input
+                  className="input-field"
+                  placeholder="Preenchido automaticamente pelo CEP"
+                  value={editForm.neighborhood}
+                  onChange={(e) => setEditForm((f) => ({ ...f, neighborhood: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-[1fr_80px]">
+                <div>
+                  <label className="input-label">Cidade</label>
+                  <input
+                    className="input-field"
+                    placeholder="Preenchido automaticamente pelo CEP"
+                    value={editForm.city}
+                    onChange={(e) => setEditForm((f) => ({ ...f, city: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="input-label">Estado</label>
+                  <input
+                    className="input-field"
+                    placeholder="UF"
+                    maxLength={2}
+                    value={editForm.state}
+                    onChange={(e) => setEditForm((f) => ({ ...f, state: e.target.value.toUpperCase() }))}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Observações */}
           <div>
-            <label className="input-label">Instagram</label>
-            <input className="input-field" value={editForm.instagram} onChange={(e) => setEditForm((f) => ({ ...f, instagram: e.target.value }))} />
-          </div>
-          <div>
-            <label className="input-label">Endereço</label>
-            <input className="input-field" value={editForm.address} onChange={(e) => setEditForm((f) => ({ ...f, address: e.target.value }))} />
-          </div>
-          <div>
-            <label className="input-label">Observações</label>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-ink-faint mb-3">Observações</p>
             <textarea className="input-field min-h-[120px]" value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} />
           </div>
+
           <div className="rounded-[12px] bg-brand-light px-3 py-2 text-[12px] text-brand">
             Alteração local para validação. Ainda não salva no Supabase.
           </div>
