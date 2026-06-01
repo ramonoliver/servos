@@ -369,26 +369,50 @@ export function ActivityTimeline({ items }: { items: TimelineItem[] }) {
   );
 }
 
+const eventIconColors: Record<string, { bg: string; text: string }> = {
+  calendar: { bg: "bg-[#FFF0EC]", text: "text-[#F4532A]" },
+  home: { bg: "bg-[#EEF1FF]", text: "text-[#4A5ADE]" },
+};
+
+const eventIconFallback = { bg: "bg-[#FAFAF8]", text: "text-[#777777]" };
+
 export function UpcomingEvents({ items }: { items: UpcomingEventItem[] }) {
   return (
     <Panel className="p-6">
       <SectionTitle title="Próximos encontros" eyebrow="Agenda" />
       <div className="space-y-3">
-        {items.map((item) => (
-          <Link key={`${item.title}-${item.time}`} href={item.href} className="block rounded-[20px] border border-[#F0EFEB] bg-white p-4 transition hover:border-[#F0EFEB] hover:bg-[#FAFAF8]">
-            <div className="flex gap-3">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-[#FAFAF8] text-[#777777]">
-                <Icon name={item.icon} size={18} />
+        {items.map((item) => {
+          const iconStyle = eventIconColors[item.icon] ?? eventIconFallback;
+          return (
+            <Link
+              key={`${item.title}-${item.time}`}
+              href={item.href}
+              className="block rounded-[20px] border border-[#F0EFEB] bg-white p-4 transition hover:border-[#F0EFEB] hover:bg-[#FAFAF8]"
+            >
+              <div className="flex gap-3">
+                <div
+                  className={cn(
+                    "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl",
+                    iconStyle.bg,
+                    iconStyle.text,
+                  )}
+                >
+                  <Icon name={item.icon} size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[14px] font-semibold text-[#191919]">{item.title}</div>
+                  <div className="mt-1 text-[12px] text-[#777777]">
+                    {item.time} · {item.location}
+                  </div>
+                  <div className="mt-1 text-[12px] text-[#AAAAAA]">{item.meta}</div>
+                </div>
+                <span className="h-fit rounded-full bg-[#FFF0EC] px-2.5 py-1 text-[11px] font-semibold text-[#D94420]">
+                  {item.badge}
+                </span>
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[14px] font-semibold text-[#191919]">{item.title}</div>
-                <div className="mt-1 text-[12px] text-[#777777]">{item.time} · {item.location}</div>
-                <div className="mt-1 text-[12px] text-[#AAAAAA]">{item.meta}</div>
-              </div>
-              <span className="h-fit rounded-full bg-[#FFF0EC] px-2.5 py-1 text-[11px] font-semibold text-[#D94420]">{item.badge}</span>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </div>
     </Panel>
   );
