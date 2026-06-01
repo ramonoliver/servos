@@ -597,7 +597,6 @@ export function DashboardV3Home({ data }: { data: DashboardV3Data }) {
           summary={data.heroSummary}
           churchName={data.churchName}
         />
-        <QuickActions items={data.quickActions} />
         {data.profileMode === "connect" && <PersonalizedEmptyState />}
         <PriorityCards items={data.priorities} />
 
