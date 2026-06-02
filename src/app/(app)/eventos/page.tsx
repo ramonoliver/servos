@@ -121,7 +121,7 @@ export default function EventosPage() {
         subtitle="Centralize cultos, programações especiais e leituras pós-evento em uma experiência única de agenda pastoral."
         actions={
           canDo("event.create") && (
-            <button onClick={() => setModal({ type: "form" })} className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_34px_-18px_rgba(244,83,42,0.9)] transition hover:bg-brand-dark">
+            <button onClick={() => setModal({ type: "form" })} className="btn btn-primary btn-sm">
               + Novo evento
             </button>
           )

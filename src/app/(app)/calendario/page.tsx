@@ -258,7 +258,7 @@ export default function CalendarioPage() {
             <button
               type="button"
               onClick={() => setShowEventForm(true)}
-              className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_34px_-18px_rgba(244,83,42,0.9)] transition hover:bg-brand-dark"
+              className="btn btn-primary btn-sm"
             >
               + Novo evento
             </button>
