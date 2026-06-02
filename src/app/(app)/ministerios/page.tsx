@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { getIconEmoji, getInitials } from "@/lib/utils/helpers";
-import { ConfirmDialog, Modal, MultiSelect, PageShell, PageHeader } from "@/components/ui";
+import { ConfirmDialog, Modal, MultiSelect, PageShell, PageHeader, Avatar } from "@/components/ui";
 import type { MultiSelectOption } from "@/components/ui";
 import Link from "next/link";
 import type { Department, User, DepartmentMember } from "@/types";
@@ -105,67 +105,92 @@ export default function MinisteriosPage() {
             return (
               <div
                 key={d.id}
-                className="group relative rounded-[14px] border border-border-soft bg-white shadow-sm transition-all hover:border-ink-ghost hover:bg-surface-alt hover:shadow-md"
+                className="group relative flex flex-col rounded-[18px] border border-border-soft bg-white/70 p-5 shadow-soft backdrop-blur transition-all hover:border-white hover:bg-white/85 hover:shadow-lift"
               >
-                <Link href={`/ministerios/${d.id}`} className="block p-4">
-                  {/* ── Icon + name row — igual ao PersonMini ── */}
+                <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xl"
-                      style={{ background: d.color + "22" }}
+                      className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl text-[22px] shadow-sm"
+                      style={{ background: d.color + "15", color: d.color, border: `1px solid ${d.color}30` }}
                     >
                       {getIconEmoji(d.icon)}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13px] font-semibold text-ink">{d.name}</div>
-                      <div className="truncate text-[11px] text-ink-faint">
+                    <div className="min-w-0">
+                      <Link href={`/ministerios/${d.id}`} className="block truncate font-display text-[16px] font-bold text-ink transition-colors hover:text-brand-deep">
+                        {d.name}
+                      </Link>
+                      <p className="mt-0.5 text-[12px] text-ink-muted">
                         {count} {count === 1 ? "membro" : "membros"}
-                        {leaderNames.length ? " · " + leaderNames.join(", ") : ""}
-                      </div>
+                      </p>
                     </div>
                   </div>
-
-                  {/* ── Funções como badges — igual ao PersonTagList ── */}
-                  {d.function_names?.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {d.function_names.slice(0, 4).map((fn) => (
-                        <span key={fn} className="badge badge-secondary">{fn}</span>
-                      ))}
-                      {d.function_names.length > 4 && (
-                        <span className="text-[10px] text-ink-faint self-center">+{d.function_names.length - 4}</span>
+                  
+                  {(canDo("department.edit", d.id) || canDo("department.delete")) && (
+                    <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      {canDo("department.edit", d.id) && (
+                        <button
+                          onClick={() => setModal({ type: "form", dept: d })}
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-alt shadow-sm text-xs text-ink transition hover:bg-white"
+                          title="Editar ministério"
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                        </button>
+                      )}
+                      {canDo("department.delete") && (
+                        <button
+                          onClick={() => setModal({ type: "delete", dept: d })}
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-alt shadow-sm text-danger transition hover:bg-danger-light"
+                          title="Excluir ministério"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                        </button>
                       )}
                     </div>
                   )}
+                </div>
 
-                  {/* ── Linha de info — igual ao grid inferior do PersonCard ── */}
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-ink-muted">
-                    <span>{d.description ? d.description : "Sem descrição"}</span>
+                <Link href={`/ministerios/${d.id}`} className="flex-1 mt-3 flex flex-col">
+                  {d.description && (
+                    <p className="line-clamp-2 text-[12.5px] leading-relaxed text-ink-muted mb-4">{d.description}</p>
+                  )}
+                  
+                  {d.function_names?.length > 0 && (
+                    <div className="mt-auto">
+                       <div className="flex flex-wrap gap-1.5">
+                        {d.function_names.slice(0, 3).map((fn) => (
+                          <span key={fn} className="badge badge-secondary text-[11px] px-2 py-0.5">{fn}</span>
+                        ))}
+                        {d.function_names.length > 3 && (
+                          <span className="text-[11px] font-semibold text-ink-faint self-center">+{d.function_names.length - 3}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-4 pt-4 border-t border-border-soft flex items-center justify-between">
+                    {leaderNames.length > 0 ? (() => {
+                      const firstLeader = (d.leader_ids || [])[0] ? members.find((m) => m.id === d.leader_ids[0]) : null;
+                      const extraLeaders = Math.max((d.leader_ids?.length || 0) - 1, 0);
+                      return firstLeader ? (
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Avatar name={firstLeader.name} color={firstLeader.avatar_color} photoUrl={firstLeader.photo_url} size={28} />
+                          <div className="min-w-0">
+                            <div className="truncate text-[12px] font-semibold text-ink">
+                              {firstLeader.name.split(" ")[0]}{extraLeaders > 0 ? ` +${extraLeaders}` : ""}
+                            </div>
+                            <div className="text-[10px] text-ink-faint">{d.leader_ids.length > 1 ? "Líderes" : "Líder"}</div>
+                          </div>
+                        </div>
+                      ) : <span className="text-[12px] text-ink-faint">Sem líder definido</span>;
+                    })() : (
+                      <span className="text-[12px] text-ink-faint">Sem líder definido</span>
+                    )}
+                    
+                    <span className="flex items-center gap-1 text-[11px] font-semibold text-brand-deep bg-brand-light/50 px-2 py-1 rounded-full transition-colors hover:bg-brand-light">
+                      Ver detalhes <span aria-hidden>&rarr;</span>
+                    </span>
                   </div>
                 </Link>
-
-                {/* ── Botões de ação — fora do Link, sobrepostos ── */}
-                {(canDo("department.edit", d.id) || canDo("department.delete")) && (
-                  <div className="absolute right-3 top-3 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    {canDo("department.edit", d.id) && (
-                      <button
-                        onClick={() => setModal({ type: "form", dept: d })}
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm text-xs text-ink transition hover:bg-surface-alt"
-                        title="Editar ministério"
-                      >
-                        ✏️
-                      </button>
-                    )}
-                    {canDo("department.delete") && (
-                      <button
-                        onClick={() => setModal({ type: "delete", dept: d })}
-                        className="flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm text-danger transition hover:bg-danger-light"
-                        title="Excluir ministério"
-                      >
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                      </button>
-                    )}
-                  </div>
-                )}
               </div>
             );
           })}

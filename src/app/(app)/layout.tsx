@@ -107,7 +107,7 @@ function ShellV2({ children }: { children: React.ReactNode }) {
   const isSplitPage = SPLIT_PAGES.some((p) => pathname.startsWith(p));
 
   return (
-    <div className="relative flex min-h-screen overflow-hidden">
+    <div className="relative flex h-[100dvh] overflow-hidden">
       {/* Aurora background layer */}
       <div className="fixed inset-0 -z-10 overflow-hidden bg-[radial-gradient(60%_50%_at_12%_8%,rgba(255,107,87,0.10),transparent_60%),radial-gradient(55%_45%_at_92%_4%,rgba(56,189,240,0.09),transparent_60%),radial-gradient(50%_50%_at_82%_92%,rgba(155,140,251,0.09),transparent_60%),radial-gradient(45%_45%_at_6%_94%,rgba(45,212,167,0.08),transparent_60%),linear-gradient(180deg,#FBFAFF_0%,#F7F6FC_100%)]">
         <span className="aurora-blob b1" />

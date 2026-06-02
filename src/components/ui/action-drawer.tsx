@@ -7,9 +7,10 @@ interface ActionDrawerProps {
   title: string;
   children: React.ReactNode;
   width?: number;
+  footer?: React.ReactNode;
 }
 
-export function ActionDrawer({ open, onClose, title, children, width = 380 }: ActionDrawerProps) {
+export function ActionDrawer({ open, onClose, title, children, width = 380, footer }: ActionDrawerProps) {
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -45,6 +46,11 @@ export function ActionDrawer({ open, onClose, title, children, width = 380 }: Ac
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5">{children}</div>
+        {footer && (
+          <div className="border-t border-border-soft px-5 py-4 bg-surface sticky bottom-0 flex justify-end gap-2 z-[1]">
+            {footer}
+          </div>
+        )}
       </div>
     </>
   );

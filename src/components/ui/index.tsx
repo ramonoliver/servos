@@ -258,3 +258,4 @@ export {
 export type { Tone } from "./page-header";
 
 export { DateField } from "./date-field";
+export { ActionDrawer } from "./action-drawer";

@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
 import { getInitials, getIconEmoji } from "@/lib/utils/helpers";
-import { Modal } from "@/components/ui";
+import { Modal, PageShell } from "@/components/ui";
 import Link from "next/link";
 import type { Department, User, DepartmentMember, Schedule, Event } from "@/types";
 
@@ -155,16 +155,32 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
   }
 
   if (!dept) {
-    return <div className="py-20 text-center text-ink-faint">Ministério não encontrado.</div>;
+    return (
+      <PageShell>
+        <Link href="/ministerios" className="mb-5 inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand-deep hover:underline">
+          &larr; Ministérios
+        </Link>
+        <div className="rounded-[18px] border border-border-soft bg-white/70 px-6 py-12 text-center backdrop-blur">
+          <p className="text-sm font-semibold text-ink">Ministério não encontrado</p>
+        </div>
+      </PageShell>
+    );
   }
 
   if (loading) {
-    return <div className="py-20 text-center text-ink-faint">Carregando ministério...</div>;
+    return (
+      <PageShell>
+        <div className="py-20 text-center text-ink-faint">Carregando ministério...</div>
+      </PageShell>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="card p-5 sm:p-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <PageShell>
+      <Link href="/ministerios" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand-deep hover:underline">
+        &larr; Ministérios
+      </Link>
+      <div className="card p-5 sm:p-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mt-2">
         <div className="flex min-w-0 items-start gap-4">
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-sm"
@@ -347,7 +363,7 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
           }}
         />
       )}
-    </div>
+    </PageShell>
   );
 }
 
