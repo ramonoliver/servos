@@ -48,6 +48,7 @@ function Icon({ name, size = 15 }: { name: string; size?: number }) {
     morevert:   <><circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" /></>,
     x:          <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
     grip:       <><line x1="9" y1="5" x2="9" y2="19" /><line x1="15" y1="5" x2="15" y2="19" /></>,
+    eye:        <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>,
   };
   return <svg {...s}>{p[name] ?? null}</svg>;
 }
@@ -187,7 +188,16 @@ function NodeCard({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-display text-[15px] font-bold text-ink leading-tight">{node.name}</span>
+                    {linkedCell ? (
+                      <Link
+                        href={`/celulas/${linkedCell.id}`}
+                        className="font-display text-[15px] font-bold text-ink leading-tight hover:text-brand transition-colors"
+                      >
+                        {node.name}
+                      </Link>
+                    ) : (
+                      <span className="font-display text-[15px] font-bold text-ink leading-tight">{node.name}</span>
+                    )}
                     <LevelBadge type={node.type} />
                     {node.status === "inativo" && (
                       <span className="rounded-full bg-surface-alt px-2 py-0.5 text-[10px] font-semibold text-ink-faint">Inativo</span>
@@ -195,12 +205,6 @@ function NodeCard({
                   </div>
                   {node.description && (
                     <p className="mt-0.5 text-[12px] text-ink-muted">{node.description}</p>
-                  )}
-
-                  {linkedCell && (
-                    <Link href={`/celulas/${linkedCell.id}`} className="mt-0.5 block text-[11px] font-semibold text-brand-deep hover:underline">
-                      → {linkedCell.name}
-                    </Link>
                   )}
                 </div>
 
@@ -224,6 +228,7 @@ function NodeCard({
                       open={!!menuPos}
                       onClose={() => setMenuPos(null)}
                       items={[
+                        ...(linkedCell ? [{ label: "Visualizar", icon: "eye", onClick: () => { window.location.assign(`/celulas/${linkedCell.id}`); } }] : []),
                         { label: "Editar",               icon: "edit",    onClick: () => onEdit(node) },
                         { label: "Adicionar nível abaixo", icon: "plus",  onClick: () => onAdd(node.id) },
                         { label: "Excluir",               icon: "trash",  danger: true, onClick: () => onDelete(node) },

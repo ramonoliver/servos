@@ -445,7 +445,7 @@ export function PriorityList({ items }: { items: PriorityListItem[] }) {
             <Link
               key={item.title}
               href={item.href}
-              className="group flex items-center gap-3 rounded-[18px] px-2.5 py-3 transition hover:bg-[#FAFAF8]"
+              className="group flex items-center gap-3 rounded-[18px] py-3 transition hover:bg-[#FAFAF8]"
             >
               <div className={cn("flex h-10 w-10 items-center justify-center rounded-2xl", iconClass)}>
                 <Icon name={item.icon} size={18} />
@@ -468,7 +468,7 @@ export function ActivityTimeline({ items }: { items: TimelineItem[] }) {
   return (
     <Panel className="p-6" dataSectionId="timeline">
       <SectionTitle title="Timeline viva" eyebrow="Comunidade" />
-      <div className="relative space-y-1 pl-3">
+      <div className="relative space-y-1">
         <div className="absolute bottom-6 left-[32px] top-3 w-px bg-[#F0EFEB]" />
         {items.slice(0, 4).map((item) => (
           <div key={`${item.title}-${item.time}`} className="relative flex gap-4 py-3">
