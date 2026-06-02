@@ -70,7 +70,11 @@ export function SoftCard({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
-      className={cn("bg-white border border-border-soft rounded-[14px] shadow-sm", className)}
+      className={cn(
+        "bg-white/40 backdrop-blur-md border border-white/60 rounded-[24px] shadow-sm",
+        href && "hover:bg-white/60 transition-colors",
+        className
+      )}
     >
       {children}
     </motion.div>

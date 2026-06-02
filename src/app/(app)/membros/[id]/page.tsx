@@ -334,8 +334,8 @@ export default function MembroDetailPage({ params }: { params: { id: string } })
 
   return (
     <div>
-      <Link href="/membros" className="inline-flex items-center gap-1.5 text-[13px] text-brand font-medium mb-5 hover:underline">
-        &larr; Membros
+      <Link href="/membros" className="mb-5 inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand hover:underline">
+        <span aria-hidden>&larr;</span> Membros
       </Link>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">

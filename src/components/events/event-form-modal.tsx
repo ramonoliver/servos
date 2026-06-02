@@ -8,6 +8,7 @@ import {
   parseEventRecurrence,
 } from "@/lib/events/recurrence";
 import type { Event } from "@/types";
+import { ActionDrawer } from "@/components/ui";
 
 type EventFormModalProps = {
   ev?: Event;
@@ -83,138 +84,128 @@ export function EventFormModal({ ev, toast, close, onSaved }: EventFormModalProp
   }
 
   return (
-    <div
-      className="!mt-0 fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-ink/40 p-4 pt-5 backdrop-blur-sm sm:pt-8"
-      onClick={(event) => event.target === event.currentTarget && close()}
-    >
-      <div className="w-full max-w-[540px] overflow-hidden rounded-[26px] bg-white shadow-[0_24px_80px_-28px_rgba(27,23,38,0.45)]">
-        <div className="sticky top-0 z-[1] flex items-center justify-between border-b border-border-soft bg-white px-6 py-4">
-          <span className="text-xl font-semibold tracking-[-0.02em] text-ink">{isEdit ? "Editar evento" : "Novo evento"}</span>
-          <button
-            onClick={close}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-alt text-ink-muted transition hover:bg-border hover:text-ink"
-            aria-label="Fechar modal"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </button>
-        </div>
-
-        <div className="max-h-[calc(100vh-164px)] space-y-4 overflow-y-auto px-6 py-5">
-          <div>
-            <label className="input-label">Categoria</label>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {EVENT_CATEGORIES.map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => setCategory(item.value)}
-                  className={`flex h-11 items-center justify-center rounded-2xl border px-3 text-xs font-semibold transition ${
-                    category === item.value
-                      ? "border-brand bg-brand-light text-brand"
-                      : "border-border-soft bg-white text-ink-muted hover:bg-surface-alt"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="input-label">Nome</label>
-            <input
-              className="input-field"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder={`Ex: ${getEventCategory(category).label} de domingo`}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="input-label">Tipo</label>
-              <select className="input-field" value={type} onChange={(event) => setType(event.target.value as "recurring" | "special")}>
-                <option value="recurring">Recorrente</option>
-                <option value="special">Especial</option>
-              </select>
-            </div>
-
-            {type === "recurring" ? (
-              <div>
-                <label className="input-label">Dia da semana</label>
-                <select className="input-field" value={weekday} onChange={(event) => setWeekday(event.target.value)}>
-                  {EVENT_WEEKDAYS.map((day) => (
-                    <option key={day.value} value={day.value}>
-                      {day.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div>
-                <label className="input-label">Data</label>
-                <input
-                  type="date"
-                  className="input-field"
-                  value={eventDate}
-                  onChange={(event) => setEventDate(event.target.value)}
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="input-label">Local</label>
-              <input
-                className="input-field"
-                value={location}
-                onChange={(event) => setLocation(event.target.value)}
-                placeholder="Templo principal"
-              />
-            </div>
-
-            <div>
-              <label className="input-label">Horário base</label>
-              <input
-                type="time"
-                className="input-field"
-                value={baseTime}
-                onChange={(event) => setBaseTime(event.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="input-label">Descrição</label>
-            <textarea
-              className="input-field min-h-[70px]"
-              value={desc}
-              onChange={(event) => setDesc(event.target.value)}
-              placeholder="Resumo curto do evento..."
-            />
-          </div>
-
-          <div>
-            <label className="input-label">Instruções</label>
-            <textarea
-              className="input-field min-h-[70px]"
-              value={instructions}
-              onChange={(event) => setInstructions(event.target.value)}
-              placeholder="Orientações para este evento..."
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-border-soft bg-white px-6 py-4">
+    <ActionDrawer
+      open={true}
+      title={isEdit ? "Editar evento" : "Novo evento"}
+      onClose={close}
+      width={540}
+      footer={
+        <>
           <button onClick={close} className="btn btn-secondary">
             Cancelar
           </button>
           <button onClick={save} disabled={saving} className="btn btn-primary">
             {saving ? "Salvando..." : isEdit ? "Salvar" : "Criar"}
           </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <label className="input-label">Categoria</label>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {EVENT_CATEGORIES.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setCategory(item.value)}
+                className={`flex h-11 items-center justify-center rounded-2xl border px-3 text-xs font-semibold transition ${
+                  category === item.value
+                    ? "border-brand bg-brand-light text-brand"
+                    : "border-border-soft bg-white text-ink-muted hover:bg-surface-alt"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="input-label">Nome</label>
+          <input
+            className="input-field"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder={`Ex: ${getEventCategory(category).label} de domingo`}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="input-label">Tipo</label>
+            <select className="input-field" value={type} onChange={(event) => setType(event.target.value as "recurring" | "special")}>
+              <option value="recurring">Recorrente</option>
+              <option value="special">Especial</option>
+            </select>
+          </div>
+
+          {type === "recurring" ? (
+            <div>
+              <label className="input-label">Dia da semana</label>
+              <select className="input-field" value={weekday} onChange={(event) => setWeekday(event.target.value)}>
+                {EVENT_WEEKDAYS.map((day) => (
+                  <option key={day.value} value={day.value}>
+                    {day.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label className="input-label">Data</label>
+              <input
+                type="date"
+                className="input-field"
+                value={eventDate}
+                onChange={(event) => setEventDate(event.target.value)}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="input-label">Local</label>
+            <input
+              className="input-field"
+              value={location}
+              onChange={(event) => setLocation(event.target.value)}
+              placeholder="Templo principal"
+            />
+          </div>
+
+          <div>
+            <label className="input-label">Horário base</label>
+            <input
+              type="time"
+              className="input-field"
+              value={baseTime}
+              onChange={(event) => setBaseTime(event.target.value)}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="input-label">Descrição</label>
+          <textarea
+            className="input-field min-h-[70px]"
+            value={desc}
+            onChange={(event) => setDesc(event.target.value)}
+            placeholder="Resumo curto do evento..."
+          />
+        </div>
+
+        <div>
+          <label className="input-label">Instruções</label>
+          <textarea
+            className="input-field min-h-[70px]"
+            value={instructions}
+            onChange={(event) => setInstructions(event.target.value)}
+            placeholder="Orientações para este evento..."
+          />
         </div>
       </div>
-    </div>
+    </ActionDrawer>
   );
 }

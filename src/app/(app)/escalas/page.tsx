@@ -158,7 +158,7 @@ function EscalasPageInner() {
   const listPanel = (
     <div className="flex flex-col h-full">
       {/* List header */}
-      <div className="px-4 py-3 border-b border-border-soft flex items-center justify-between flex-shrink-0">
+      <div className="px-4 py-3 border-b border-white/50 flex items-center justify-between flex-shrink-0">
         <div>
           <h1 className="font-display text-[15px] font-bold text-ink">Escalas</h1>
           <p className="text-[11px] text-ink-faint">{schedules.length} no total</p>
@@ -176,13 +176,13 @@ function EscalasPageInner() {
       </div>
 
       {/* Filter tabs */}
-      <div className="px-3 py-2 border-b border-border-soft flex gap-0.5 flex-shrink-0">
+      <div className="px-3 py-2 border-b border-white/50 flex gap-0.5 flex-shrink-0">
         {(["all", "active", "draft"] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
             className={`px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors ${
-              filter === f ? "bg-black/[.06] text-ink" : "text-ink-muted hover:text-ink"
+              filter === f ? "bg-white/60 text-ink shadow-sm" : "text-ink-muted hover:bg-white/40 hover:text-ink"
             }`}
           >
             {f === "all" ? "Todas" : f === "active" ? "Ativas" : "Rascunhos"}
@@ -215,11 +215,11 @@ function EscalasPageInner() {
               <button
                 key={s.id}
                 onClick={() => router.push(`/escalas?id=${s.id}`)}
-                className={`w-full text-left flex items-start gap-3 px-4 py-3 border-b border-border-soft transition-colors group ${
-                  isSelected ? "bg-black/[.06]" : "hover:bg-black/[.03]"
+                className={`w-full text-left flex items-start gap-3 px-4 py-3 border-b border-white/40 transition-colors group ${
+                  isSelected ? "bg-white/40" : "hover:bg-white/30"
                 }`}
               >
-                <div className="w-9 h-[38px] rounded-lg bg-surface-alt border border-border-soft flex flex-col items-center justify-center flex-shrink-0">
+                <div className="w-9 h-[38px] rounded-lg bg-white/50 border border-white/60 flex flex-col items-center justify-center flex-shrink-0 backdrop-blur-sm">
                   <span className="text-[7px] font-bold uppercase text-ink-faint">{getDayName(s.date)}</span>
                   <span className="font-display text-[14px] text-ink leading-none">{s.date.split("-")[2]}</span>
                 </div>

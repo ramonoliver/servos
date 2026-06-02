@@ -307,7 +307,7 @@ export default function MembrosPage() {
       />
 
       {/* Filters */}
-      <div className="mb-3 flex-shrink-0 rounded-[14px] border border-border-soft bg-white p-3 shadow-sm">
+      <div className="mb-3 flex-shrink-0 rounded-[24px] border border-white/60 bg-white/40 backdrop-blur-md p-3 shadow-sm">
         <div className="flex flex-wrap gap-2">
           <input
             className="input-field flex-1 min-w-[200px]"
@@ -352,7 +352,7 @@ export default function MembrosPage() {
       </div>
 
       {/* Member list */}
-      <div className="flex-1 overflow-y-auto bg-white border border-border-soft rounded-xl">
+      <div className="flex-1 overflow-y-auto rounded-[24px] border border-white/60 bg-white/40 backdrop-blur-md shadow-sm">
         {loading ? (
           <div className="px-5 py-12 text-center text-sm text-ink-faint">Carregando membros...</div>
         ) : filtered.length === 0 ? (
@@ -378,8 +378,8 @@ export default function MembrosPage() {
             return (
               <div
                 key={m.id}
-                className={`flex items-center gap-3 px-4 py-3 border-b border-border-soft last:border-b-0 group transition-colors ${
-                  m.active ? "hover:bg-black/[.02]" : "opacity-60"
+                className={`flex items-center gap-3 px-4 py-3 border-b border-white/40 last:border-b-0 group transition-colors ${
+                  m.active ? "hover:bg-white/60" : "opacity-60"
                 }`}
               >
                 <Link href={`/membros/${m.id}`} className="flex items-center gap-3 flex-1 min-w-0">

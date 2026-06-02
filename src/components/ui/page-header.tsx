@@ -79,7 +79,7 @@ export function PageHeader({
         {backHref && (
           <Link
             href={backHref}
-            className="mb-2 inline-flex items-center gap-1 text-xs font-semibold text-ink-muted transition-colors hover:text-ink"
+            className="mb-2 inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand hover:underline"
           >
             <span aria-hidden>&larr;</span> {backLabel}
           </Link>

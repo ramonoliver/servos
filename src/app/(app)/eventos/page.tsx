@@ -167,7 +167,7 @@ export default function EventosPage() {
 
       {[{ title: "Cultos recorrentes", list: recurring, tone: "green" as const }, { title: "Eventos especiais", list: special, tone: "coral" as const }].map(
         (section) => (
-          <section key={section.title} className="rounded-[28px] border border-border-soft bg-white p-6 shadow-[0_18px_50px_-38px_rgba(27,23,38,0.32)]">
+          <section key={section.title} className="rounded-[28px] border border-white/50 bg-white/40 backdrop-blur-xl p-6 shadow-[0_18px_50px_-38px_rgba(27,23,38,0.2)]">
             <div className="mb-5 flex items-end justify-between gap-3">
               <div>
                 <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint">Eventos</div>
@@ -302,7 +302,7 @@ function EventStat({
   loading?: boolean;
 }) {
   return (
-    <div className="rounded-[26px] border border-white/70 bg-white p-5 shadow-[0_18px_50px_-38px_rgba(27,23,38,0.26)]">
+    <div className="rounded-[26px] border border-white/50 bg-white/70 backdrop-blur-md p-5 shadow-sm transition hover:bg-white/90">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="text-[34px] font-bold leading-none tracking-[-0.055em] text-ink">{loading ? "..." : value}</div>
@@ -333,7 +333,7 @@ function EventRow({
   onDelete: () => void;
 }) {
   return (
-    <div className="group rounded-[22px] border border-border-soft bg-white px-4 py-4 transition hover:bg-surface-alt/60">
+    <div className="group rounded-[22px] border border-white/60 bg-white/60 backdrop-blur-sm px-4 py-4 transition hover:bg-white shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <Link href={`/eventos/${event.id}`} className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[18px] ${toneClasses(tone)}`}>
           <EventIcon name={event.type === "special" ? "spark" : "calendar"} size={21} />

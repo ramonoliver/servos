@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Modal } from "@/components/ui";
+import { ActionDrawer } from "@/components/ui";
 import { formatPhoneInput } from "@/lib/invitations";
 import { getInitials, getIconEmoji } from "@/lib/utils/helpers";
 import { fileToAvatarDataUrl } from "@/lib/utils/image";
@@ -130,9 +130,10 @@ export function MemberEditModal({
   }
 
   return (
-    <Modal
+    <ActionDrawer
+      open={true}
       title="Editar membro"
-      close={onClose}
+      onClose={onClose}
       width={760}
       footer={
         <>
@@ -378,6 +379,6 @@ export function MemberEditModal({
           </div>
         </div>
       </div>
-    </Modal>
+    </ActionDrawer>
   );
 }

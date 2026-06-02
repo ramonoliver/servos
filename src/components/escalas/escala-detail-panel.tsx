@@ -733,7 +733,7 @@ export function EscalaDetailPanel({ scheduleId, onRefreshList }: EscalaDetailPan
 
       {/* My response card */}
       {myScheduleMember && (
-        <div className="card border border-brand-light/60 bg-brand-glow">
+        <div className="rounded-2xl border border-white/60 bg-white/40 backdrop-blur-md shadow-sm">
           <div className="p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">

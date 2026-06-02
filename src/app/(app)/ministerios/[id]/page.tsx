@@ -7,8 +7,8 @@ import { getInitials, getIconEmoji } from "@/lib/utils/helpers";
 import { Modal, PageShell } from "@/components/ui";
 import Link from "next/link";
 import type { Department, User, DepartmentMember, Schedule, Event } from "@/types";
-
-const ICONS = ["music", "camera", "heart", "church", "cross", "flower", "flame", "star", "book", "baby", "pray"];
+import { DeptForm } from "@/components/shared/dept-form";
+import { AddMemberForm } from "@/components/shared/add-member-form";
 
 export default function MinisterioDetailPage({ params }: { params: { id: string } }) {
   const { user, departments, canDo, toast, refresh } = useApp();
@@ -157,8 +157,8 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
   if (!dept) {
     return (
       <PageShell>
-        <Link href="/ministerios" className="mb-5 inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand-deep hover:underline">
-          &larr; Ministérios
+        <Link href="/ministerios" className="mb-5 inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand hover:underline">
+          <span aria-hidden>&larr;</span> Ministérios
         </Link>
         <div className="rounded-[18px] border border-border-soft bg-white/70 px-6 py-12 text-center backdrop-blur">
           <p className="text-sm font-semibold text-ink">Ministério não encontrado</p>
@@ -177,8 +177,8 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
 
   return (
     <PageShell>
-      <Link href="/ministerios" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand-deep hover:underline">
-        &larr; Ministérios
+      <Link href="/ministerios" className="mb-5 inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand hover:underline">
+        <span aria-hidden>&larr;</span> Ministérios
       </Link>
       <div className="card p-5 sm:p-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mt-2">
         <div className="flex min-w-0 items-start gap-4">
@@ -341,7 +341,7 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
       </div>
 
       {showAddMember && (
-        <AddMemberModal
+        <AddMemberForm
           availableToAdd={availableToAdd}
           functionOptions={dept.function_names || []}
           onClose={() => setShowAddMember(false)}
@@ -350,12 +350,13 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
       )}
 
       {showEditDept && (
-        <DepartmentFormModal
+        <DeptForm
           dept={dept}
           members={allMembers}
-          userId={user.id}
+          user={user}
           toast={toast}
-          onClose={() => setShowEditDept(false)}
+          allDM={dms}
+          close={() => setShowEditDept(false)}
           onSaved={async () => {
             setShowEditDept(false);
             await refresh();
@@ -367,423 +368,4 @@ export default function MinisterioDetailPage({ params }: { params: { id: string 
   );
 }
 
-function AddMemberModal({
-  availableToAdd,
-  functionOptions,
-  onClose,
-  onSave,
-}: {
-  availableToAdd: User[];
-  functionOptions: string[];
-  onClose: () => void;
-  onSave: (members: { userId: string; functionName: string; functionNames: string[] }[]) => void;
-}) {
-  const [selectedUsers, setSelectedUsers] = useState<Record<string, string[]>>({});
 
-  function toggleUser(userId: string) {
-    setSelectedUsers((current) => {
-      const next = { ...current };
-      if (next[userId] !== undefined) {
-        delete next[userId];
-      } else {
-        next[userId] = [];
-      }
-      return next;
-    });
-  }
-
-  function toggleFunction(userId: string, functionName: string) {
-    setSelectedUsers((current) => ({
-      ...current,
-      [userId]: current[userId]?.includes(functionName)
-        ? current[userId].filter((item) => item !== functionName)
-        : [...(current[userId] || []), functionName],
-    }));
-  }
-
-  function updateCustomFunctions(userId: string, rawValue: string) {
-    setSelectedUsers((current) => ({
-      ...current,
-      [userId]: rawValue
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean),
-    }));
-  }
-
-  const selectedIds = Object.keys(selectedUsers);
-
-  return (
-    <Modal
-      title="Adicionar membros"
-      close={onClose}
-      width={680}
-      footer={
-        <>
-          <button onClick={onClose} className="btn btn-secondary">
-            Cancelar
-          </button>
-          <button
-            onClick={() =>
-              onSave(
-                selectedIds.map((userId) => ({
-                  userId,
-                  functionName: selectedUsers[userId]?.[0] || "",
-                  functionNames: selectedUsers[userId] || [],
-                }))
-              )
-            }
-            disabled={selectedIds.length === 0}
-            className="btn btn-primary"
-          >
-            Adicionar selecionados
-          </button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <div className="rounded-2xl border border-border-soft bg-surface-alt px-4 py-3 text-sm text-ink-muted">
-          Selecione vários membros de uma vez e ajuste a função individual de cada um, se quiser.
-        </div>
-
-        <div className="space-y-3 max-h-[52vh] overflow-y-auto pr-1">
-          {availableToAdd.length === 0 ? (
-            <div className="text-sm text-ink-faint text-center py-8">
-              Todos os membros ativos já estão neste ministério.
-            </div>
-          ) : (
-            availableToAdd.map((member) => {
-              const selected = selectedUsers[member.id] !== undefined;
-
-              return (
-                <div
-                  key={member.id}
-                  className={`rounded-2xl border p-4 transition-all ${
-                    selected
-                      ? "border-brand bg-brand-glow shadow-sm"
-                      : "border-border-soft bg-white"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <button
-                      type="button"
-                      onClick={() => toggleUser(member.id)}
-                      className={`mt-1 w-5 h-5 rounded-md border-2 flex items-center justify-center text-[11px] font-bold transition-all ${
-                        selected
-                          ? "bg-brand border-brand text-white"
-                          : "border-border bg-white text-transparent"
-                      }`}
-                    >
-                      ✓
-                    </button>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-semibold truncate">{member.name}</div>
-                      <div className="text-[12px] text-ink-faint truncate">{member.email}</div>
-
-                      {selected && (
-                        <div className="mt-3">
-                          <label className="input-label">Funções no ministério</label>
-                          {functionOptions.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                              {functionOptions.map((functionName) => {
-                                const active = selectedUsers[member.id]?.includes(functionName);
-                                return (
-                                  <button
-                                    key={functionName}
-                                    type="button"
-                                    onClick={() => toggleFunction(member.id, functionName)}
-                                    className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-all ${
-                                      active ? "bg-brand text-white" : "bg-surface-alt text-ink-muted"
-                                    }`}
-                                  >
-                                    {functionName}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ) : null}
-
-                          <input
-                            className="input-field mt-2"
-                            value={(selectedUsers[member.id] || []).join(", ")}
-                            onChange={(e) => updateCustomFunctions(member.id, e.target.value)}
-                            placeholder="Ex: Vocal, Câmera, Recepção"
-                          />
-                          <div className="text-[11px] text-ink-faint mt-1">
-                            Você pode selecionar várias funções e também editar manualmente separando por vírgula.
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function DepartmentFormModal({
-  dept,
-  members,
-  userId,
-  toast,
-  onClose,
-  onSaved,
-}: {
-  dept: Department;
-  members: User[];
-  userId: string;
-  toast: (msg: string) => void;
-  onClose: () => void;
-  onSaved: () => void | Promise<void>;
-}) {
-  const [name, setName] = useState(dept.name || "");
-  const [desc, setDesc] = useState(dept.description || "");
-  const [icon, setIcon] = useState(dept.icon || "church");
-  const [color, setColor] = useState(dept.color || "#7B9E87");
-  const [functionNames, setFunctionNames] = useState<string[]>(dept.function_names || []);
-  const [newFunctionName, setNewFunctionName] = useState("");
-  const [leaderIds, setLeaderIds] = useState<string[]>(dept.leader_ids || [userId]);
-  const [coLeaderIds, setCoLeaderIds] = useState<string[]>(dept.co_leader_ids || []);
-
-  function toggleList(list: string[], setList: (v: string[]) => void, id: string) {
-    setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
-  }
-
-  function addFunctionName() {
-    const normalized = newFunctionName.trim();
-    if (!normalized) return;
-    if (functionNames.some((item) => item.toLowerCase() === normalized.toLowerCase())) {
-      setNewFunctionName("");
-      return;
-    }
-    setFunctionNames((current) => [...current, normalized]);
-    setNewFunctionName("");
-  }
-
-  function removeFunctionName(functionName: string) {
-    setFunctionNames((current) => current.filter((item) => item !== functionName));
-  }
-
-  async function save() {
-    if (!name.trim()) {
-      toast("Informe o nome.");
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/departments/manage", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "update",
-          departmentId: dept.id,
-          data: {
-            name,
-            description: desc,
-            icon,
-            color,
-            function_names: functionNames,
-            leader_ids: leaderIds,
-            co_leader_ids: coLeaderIds,
-          },
-        }),
-      });
-
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        console.error("Erro ao salvar ministério:", payload);
-        toast(payload?.error || "Erro ao salvar ministério.");
-        return;
-      }
-
-      toast("Ministério atualizado!");
-      await onSaved();
-    } catch (error) {
-      console.error("Erro ao salvar ministério:", error);
-      toast("Erro ao salvar ministério.");
-    }
-  }
-
-  const eligibleLeaders = members.filter((m) => m.role === "admin" || m.role === "leader");
-
-  return (
-    <Modal
-      title="Editar ministério"
-      close={onClose}
-      width={520}
-      footer={
-        <>
-          <button onClick={onClose} className="btn btn-secondary">
-            Cancelar
-          </button>
-          <button onClick={save} className="btn btn-primary">
-            Salvar
-          </button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <div>
-          <label className="input-label">Nome</label>
-          <input className="input-field" value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-
-        <div>
-          <label className="input-label">Descrição</label>
-          <textarea className="input-field min-h-[60px]" value={desc} onChange={(e) => setDesc(e.target.value)} />
-        </div>
-
-        <div>
-          <label className="input-label">Ícone</label>
-          <div className="flex flex-wrap gap-2">
-            {ICONS.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setIcon(item)}
-                className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg border-2 transition-all ${
-                  icon === item ? "border-brand bg-brand-light" : "border-border-soft"
-                }`}
-              >
-                {getIconEmoji(item)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="input-label">Cor</label>
-          <input type="color" className="input-field h-10 p-1 cursor-pointer" value={color} onChange={(e) => setColor(e.target.value)} />
-        </div>
-
-        <div>
-          <label className="input-label">Funções do ministério</label>
-          <div className="rounded-[14px] border border-border-soft bg-surface-alt/50 p-3">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                className="input-field flex-1"
-                value={newFunctionName}
-                onChange={(e) => setNewFunctionName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addFunctionName();
-                  }
-                }}
-                placeholder="Ex: Câmera, Fotografia, Projeção..."
-              />
-              <button type="button" onClick={addFunctionName} className="btn btn-secondary sm:self-start">
-                Adicionar função
-              </button>
-            </div>
-
-            {functionNames.length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {functionNames.map((functionName) => (
-                  <button
-                    key={functionName}
-                    type="button"
-                    onClick={() => removeFunctionName(functionName)}
-                    className="badge badge-secondary"
-                    title="Remover função"
-                  >
-                    {functionName} ×
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-3 text-xs text-ink-faint">
-                Cadastre as funções principais deste ministério para reaproveitar depois nos membros e nas escalas.
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <label className="input-label">Líderes</label>
-          <div className="space-y-1.5">
-            {eligibleLeaders.map((member) => (
-              <label
-                key={member.id}
-                className={`flex items-center gap-3 px-3 py-2 rounded-[10px] cursor-pointer transition-all border-[1.5px] ${
-                  leaderIds.includes(member.id)
-                    ? "border-brand bg-brand-light"
-                    : "border-border-soft hover:border-ink-ghost"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={leaderIds.includes(member.id)}
-                  onChange={() => toggleList(leaderIds, setLeaderIds, member.id)}
-                  className="sr-only"
-                />
-                <div
-                  className={`w-4 h-4 rounded border-2 flex items-center justify-center text-[10px] font-bold ${
-                    leaderIds.includes(member.id) ? "bg-brand border-brand text-white" : "border-border"
-                  }`}
-                >
-                  {leaderIds.includes(member.id) ? "\u2713" : ""}
-                </div>
-                <div
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0"
-                  style={{ background: member.avatar_color }}
-                >
-                  {getInitials(member.name)}
-                </div>
-                <span className="text-sm font-medium">{member.name}</span>
-                <span className="text-[10px] text-ink-faint ml-auto">
-                  {member.role === "admin" ? "Admin" : "Líder"}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="input-label">Co-líderes (opcional)</label>
-          <div className="space-y-1.5">
-            {members
-              .filter((member) => !leaderIds.includes(member.id))
-              .map((member) => (
-                <label
-                  key={member.id}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-[10px] cursor-pointer transition-all border-[1.5px] ${
-                    coLeaderIds.includes(member.id)
-                      ? "border-info bg-info-light"
-                      : "border-border-soft hover:border-ink-ghost"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={coLeaderIds.includes(member.id)}
-                    onChange={() => toggleList(coLeaderIds, setCoLeaderIds, member.id)}
-                    className="sr-only"
-                  />
-                  <div
-                    className={`w-4 h-4 rounded border-2 flex items-center justify-center text-[10px] font-bold ${
-                      coLeaderIds.includes(member.id) ? "bg-info border-info text-white" : "border-border"
-                    }`}
-                  >
-                    {coLeaderIds.includes(member.id) ? "\u2713" : ""}
-                  </div>
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0"
-                    style={{ background: member.avatar_color }}
-                  >
-                    {getInitials(member.name)}
-                  </div>
-                  <span className="text-sm font-medium">{member.name}</span>
-                </label>
-              ))}
-          </div>
-        </div>
-      </div>
-    </Modal>
-  );
-}
