@@ -464,29 +464,42 @@ export default function CalendarioPage() {
         </div>
 
 
-        <aside className="rounded-[28px] border border-border-soft bg-surface-alt shadow-[0_18px_50px_-38px_rgba(27,23,38,0.32)] lg:sticky lg:top-5 lg:max-h-[calc(100vh-40px)] flex flex-col overflow-hidden">
-          <div className="p-5 border-b border-border-soft bg-white shrink-0">
-            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink-faint mb-2">
-              Dia selecionado
+        <aside className="rounded-[32px] border border-white/60 bg-white/40 backdrop-blur-xl shadow-[0_24px_60px_-24px_rgba(244,83,42,0.15)] lg:sticky lg:top-5 lg:max-h-[calc(100vh-40px)] flex flex-col overflow-hidden">
+          <div className="relative p-6 sm:p-8 shrink-0 overflow-hidden bg-white/50 border-b border-white/40">
+            <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-brand/10 blur-2xl" />
+            
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="flex h-6 items-center rounded-full bg-white/80 border border-white/50 px-2.5 text-[10px] font-bold uppercase tracking-widest text-brand backdrop-blur-sm">
+                  Dia selecionado
+                </span>
+              </div>
+              <h2 className="font-display text-[28px] sm:text-[32px] leading-tight tracking-tight text-ink mb-2">
+                {selectedDay ? `${selectedDay} de ${monthName.split(" de ")[0]}` : "Selecione um dia"}
+              </h2>
+              <p className="text-[13px] text-ink-muted/80 font-medium">
+                {selectedDay
+                  ? `${daySchedules.length} escalas · ${dayEvents.length} eventos · ${dayCells.length} células · ${dayBirthdays.length} aniversários`
+                  : "Clique em uma data do calendário para ver todos os detalhes do que acontece."}
+              </p>
             </div>
-            <h2 className="text-xl font-semibold leading-tight tracking-[-0.03em] text-ink">
-              {selectedDay ? `${selectedDay}/${month + 1}` : "Selecione um dia"}
-            </h2>
-            <p className="mt-1 text-sm text-ink-muted">
-              {selectedDay
-                ? `${daySchedules.length} escalas · ${dayEvents.length} eventos · ${dayCells.length} células · ${dayBirthdays.length} aniversários`
-                : "Clique em uma data para ver o que acontece."}
-            </p>
+
             {selectedDay && (
-              <div className="flex flex-wrap gap-2 mt-3">
+              <div className="relative flex flex-wrap gap-2 mt-5">
                 {daySchedules.some((schedule) => myScheduleIds.has(schedule.id)) && (
-                  <span className="badge" style={{ background: "#fff4dc", color: "#7b4c00" }}>Você está escalado</span>
+                  <span className="flex items-center gap-1.5 rounded-xl bg-[#fff4dc]/80 border border-[#f1c46a] px-3 py-1.5 text-[11px] font-bold text-[#7b4c00]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#f0aa00]" /> Minha escala
+                  </span>
                 )}
                 {dayCells.some((c) => myCellIds.has(c.id)) && (
-                  <span className="badge" style={{ background: "#f0ecff", color: "#5b4aa8" }}>Sua célula</span>
+                  <span className="flex items-center gap-1.5 rounded-xl bg-[#f0ecff]/80 border border-[#cfc2f6] px-3 py-1.5 text-[11px] font-bold text-[#5b4aa8]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#9b8cfb]" /> Minha célula
+                  </span>
                 )}
                 {daySchedules.some((schedule) => events.find((event) => event.id === schedule.event_id)?.type === "special") && (
-                  <span className="badge" style={{ background: "#ffe8e3", color: "#8f3b22" }}>Especial</span>
+                  <span className="flex items-center gap-1.5 rounded-xl bg-[#ffe8e3]/80 border border-[#f2b6a6] px-3 py-1.5 text-[11px] font-bold text-[#8f3b22]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#e46b42]" /> Especial
+                  </span>
                 )}
               </div>
             )}
