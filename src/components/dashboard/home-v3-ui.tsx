@@ -469,7 +469,7 @@ export function ActivityTimeline({ items }: { items: TimelineItem[] }) {
     <Panel className="p-6" dataSectionId="timeline">
       <SectionTitle title="Timeline viva" eyebrow="Comunidade" />
       <div className="relative space-y-1">
-        <div className="absolute bottom-6 left-[32px] top-3 w-px bg-[#F0EFEB]" />
+        <div className="absolute bottom-6 left-[20px] top-3 w-px bg-[#F0EFEB]" />
         {items.slice(0, 4).map((item) => (
           <div key={`${item.title}-${item.time}`} className="relative flex gap-4 py-3">
             <div className={cn("relative z-10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[15px]", toneIconStyle[item.tone])}>
