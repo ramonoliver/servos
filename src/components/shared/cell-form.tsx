@@ -115,7 +115,7 @@ export function CellForm({
       <div className="mb-6">
         <SegmentedControl
           value={tab}
-          onChange={setTab}
+          onChange={(val) => setTab(val as "info" | "membros")}
           options={[
             { value: "info", label: "Informações" },
             { value: "membros", label: "Membros" }

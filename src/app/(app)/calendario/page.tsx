@@ -437,10 +437,35 @@ export default function CalendarioPage() {
             );
           })}
         </div>
+        
+
+          <div className="mt-6 border-t border-border-soft pt-4 flex flex-wrap gap-x-5 gap-y-3 text-[11px] font-semibold text-ink-muted">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#f0aa00]" />
+              <span>Sua escala</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#4d9c62]" />
+              <span>Evento recorrente</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#e46b42]" />
+              <span>Evento especial</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#9b8cfb]" />
+              <span>Sua célula</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#e94b73]" />
+              <span>Aniversário</span>
+            </div>
+          </div>
         </div>
 
-        <aside className="rounded-[28px] border border-border-soft bg-white p-5 shadow-[0_18px_50px_-38px_rgba(27,23,38,0.32)] lg:sticky lg:top-5">
-          <div>
+
+        <aside className="rounded-[28px] border border-border-soft bg-surface-alt shadow-[0_18px_50px_-38px_rgba(27,23,38,0.32)] lg:sticky lg:top-5 lg:max-h-[calc(100vh-40px)] flex flex-col overflow-hidden">
+          <div className="p-5 border-b border-border-soft bg-white shrink-0">
             <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink-faint mb-2">
               Dia selecionado
             </div>
@@ -452,73 +477,33 @@ export default function CalendarioPage() {
                 ? `${daySchedules.length} escalas · ${dayEvents.length} eventos · ${dayCells.length} células · ${dayBirthdays.length} aniversários`
                 : "Clique em uma data para ver o que acontece."}
             </p>
+            {selectedDay && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {daySchedules.some((schedule) => myScheduleIds.has(schedule.id)) && (
+                  <span className="badge" style={{ background: "#fff4dc", color: "#7b4c00" }}>Você está escalado</span>
+                )}
+                {dayCells.some((c) => myCellIds.has(c.id)) && (
+                  <span className="badge" style={{ background: "#f0ecff", color: "#5b4aa8" }}>Sua célula</span>
+                )}
+                {daySchedules.some((schedule) => events.find((event) => event.id === schedule.event_id)?.type === "special") && (
+                  <span className="badge" style={{ background: "#ffe8e3", color: "#8f3b22" }}>Especial</span>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="mt-5 border-t border-border-soft pt-4 space-y-2 text-xs text-ink-muted">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-[#f0aa00]" />
-              <span>Dia em que você está escalado</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-[#4d9c62]" />
-              <span>Evento recorrente</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-[#e46b42]" />
-              <span>Evento especial</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-[#9b8cfb]" />
-              <span>Encontro de célula</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-[#e94b73]" />
-              <span>Aniversário</span>
-            </div>
-          </div>
-        </aside>
-      </div>
-
-      {selectedDay && (
-        <div className="mt-5">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 mb-3">
-            <div>
-              <h3 className="font-display text-lg break-words">Agenda de {selectedDay}/{month + 1}</h3>
-              <p className="text-sm text-ink-muted">
-                {daySchedules.length} {daySchedules.length === 1 ? "escala" : "escalas"}
-                {dayEvents.length > 0 && ` · ${dayEvents.length} ${dayEvents.length === 1 ? "evento" : "eventos"}`}
-                {dayCells.length > 0 && ` · ${dayCells.length} ${dayCells.length === 1 ? "célula" : "células"}`}
-                {dayBirthdays.length > 0 && ` · ${dayBirthdays.length} ${dayBirthdays.length === 1 ? "aniversário" : "aniversários"}`} neste dia.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {daySchedules.some((schedule) => myScheduleIds.has(schedule.id)) && (
-                <span className="badge" style={{ background: "#fff4dc", color: "#7b4c00" }}>
-                  Você está escalado
-                </span>
-              )}
-              {dayCells.some((c) => myCellIds.has(c.id)) && (
-                <span className="badge" style={{ background: "#f0ecff", color: "#5b4aa8" }}>
-                  Sua célula
-                </span>
-              )}
-              {daySchedules.some((schedule) => events.find((event) => event.id === schedule.event_id)?.type === "special") && (
-                <span className="badge" style={{ background: "#ffe8e3", color: "#8f3b22" }}>
-                  Especial
-                </span>
-              )}
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="card px-5 py-8 text-center text-sm text-ink-faint">Carregando...</div>
-          ) : daySchedules.length === 0 && dayEvents.length === 0 && dayCells.length === 0 && dayBirthdays.length === 0 ? (
-            <div className="card px-5 py-8 text-center text-sm text-ink-faint">
-              Nada agendado neste dia.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {dayBirthdays.length > 0 && (
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+            {!selectedDay ? (
+              <div className="text-center text-sm text-ink-faint py-10">
+                Selecione uma data no calendário para ver os detalhes.
+              </div>
+            ) : loading ? (
+              <div className="text-center text-sm text-ink-faint py-10">Carregando...</div>
+            ) : daySchedules.length === 0 && dayEvents.length === 0 && dayCells.length === 0 && dayBirthdays.length === 0 ? (
+              <div className="text-center text-sm text-ink-faint py-10">Nada agendado neste dia.</div>
+            ) : (
+              <>
+                {dayBirthdays.length > 0 && (
                 <div className="card">
                   {dayBirthdays.map((birthday) => (
                     <div
@@ -554,8 +539,7 @@ export default function CalendarioPage() {
                   ))}
                 </div>
               )}
-
-              {dayEvents.length > 0 && (
+                {dayEvents.length > 0 && (
                 <div className="card">
                   {dayEvents.map((ev) => {
                     const hasScheduleForEvent = daySchedules.some((schedule) => schedule.event_id === ev.id);
@@ -596,8 +580,7 @@ export default function CalendarioPage() {
                   })}
                 </div>
               )}
-
-              {daySchedules.length > 0 && (
+                {daySchedules.length > 0 && (
               <div className="card">
               {daySchedules.map((s) => {
                 const ev = events.find((e) => e.id === s.event_id);
@@ -647,8 +630,7 @@ export default function CalendarioPage() {
               })}
               </div>
               )}
-
-              {dayCells.length > 0 && (
+                {dayCells.length > 0 && (
                 <div className="card">
                   {dayCells.map((c) => {
                     const isMine = myCellIds.has(c.id);
@@ -679,10 +661,11 @@ export default function CalendarioPage() {
                   })}
                 </div>
               )}
-            </div>
-          )}
-        </div>
-      )}
+              </>
+            )}
+          </div>
+        </aside>
+      </div>
 
       {showEventForm && (
         <EventFormModal
