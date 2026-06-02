@@ -142,9 +142,28 @@ export interface Event {
   location: string;
   base_time: string;
   instructions: string;
-  recurrence: string; // "weekly" | "biweekly" | "monthly" | "once"
+  recurrence: string; // "weekly:0-6" for recurring events or "once:YYYY-MM-DD" for dated special events
   active: boolean;
   created_at: string;
+}
+
+export interface EventReport {
+  id: string;
+  church_id: string;
+  event_id: string;
+  event_date: string;
+  attendance_count: number;
+  volunteers_count: number;
+  new_converts_count: number;
+  reconciliations_count: number;
+  prayer_requests_count: number;
+  people_followed_count: number;
+  visitors_count: number;
+  children_count: number;
+  notes: string;
+  reported_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Schedule {

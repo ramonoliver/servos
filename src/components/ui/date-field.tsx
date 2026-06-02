@@ -46,7 +46,9 @@ export function DateField({
   min?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);  const lastPosRef = useRef<{ top: number; left: number }>({ top: 0, left: 0 });  const ref = useRef<HTMLDivElement | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const lastPosRef = useRef<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
+  const ref = useRef<HTMLDivElement | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
   const selected = parseISO(value);
   const today = new Date();
@@ -109,7 +111,7 @@ export function DateField({
             const spaceBelow = window.innerHeight - rect.bottom;
             const dropH = 340;
             const top = spaceBelow < dropH + 8 ? rect.top - dropH - 4 : rect.bottom + 4;
-            const pos = { top, left: rect.left };
+            const pos = { top, left: rect.left, width: rect.width };
             lastPosRef.current = pos;
             setDropdownPos(pos);
           }

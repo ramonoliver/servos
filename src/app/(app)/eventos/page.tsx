@@ -1,44 +1,65 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import type React from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
-import { getIconEmoji } from "@/lib/utils/helpers";
-import { PageShell, PageHeader, StatTile } from "@/components/ui";
-import type { Event } from "@/types";
+import { PageShell, PageHeader } from "@/components/ui";
+import { EventFormModal } from "@/components/events/event-form-modal";
+import { formatEventRecurrence, getEventCategory } from "@/lib/events/recurrence";
+import type { Event, EventReport } from "@/types";
 
-const ICONS = ["church", "cross", "flower", "flame", "star", "music", "heart", "book"] as const;
+function isMissingEventReportsError(error: unknown) {
+  const message =
+    typeof error === "object" && error !== null && "message" in error
+      ? String((error as { message?: unknown }).message)
+      : String(error || "");
+  return /event_reports|schema cache|does not exist/i.test(message);
+}
 
 export default function EventosPage() {
   const { user, toast, canDo } = useApp();
   const [modal, setModal] = useState<null | { type: "form"; ev?: Event } | { type: "delete"; ev: Event }>(null);
   const [events, setEvents] = useState<Event[]>([]);
+  const [reports, setReports] = useState<EventReport[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function loadData() {
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("events")
-      .select("*")
-      .eq("church_id", user.church_id)
-      .neq("active", false)
-      .order("created_at", { ascending: false });
+    const [{ data, error }, { data: reportsData, error: reportsError }] = await Promise.all([
+      supabase
+        .from("events")
+        .select("*")
+        .eq("church_id", user.church_id)
+        .neq("active", false)
+        .order("created_at", { ascending: false }),
+      supabase.from("event_reports").select("*").eq("church_id", user.church_id),
+    ]);
 
-    if (error) {
-      console.error("Erro ao carregar eventos:", error);
+    if (error || (reportsError && !isMissingEventReportsError(reportsError))) {
+      console.error("Erro ao carregar eventos:", { error, reportsError });
       toast("Erro ao carregar eventos.");
       setLoading(false);
       return;
     }
 
     setEvents((data || []) as Event[]);
+    setReports(reportsError ? [] : ((reportsData || []) as EventReport[]));
     setLoading(false);
   }
 
   useEffect(() => {
     loadData();
   }, [user.church_id]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("novo") === "1" && canDo("event.create")) {
+      setModal((current) => current || { type: "form" });
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, [canDo]);
 
   const recurring = useMemo(
     () => events.filter((e) => e.type === "recurring"),
@@ -50,6 +71,20 @@ export default function EventosPage() {
     [events]
   );
   const withTime = useMemo(() => events.filter((e) => Boolean(e.base_time)).length, [events]);
+  const reportByEvent = useMemo(() => new Map(reports.map((report) => [report.event_id, report])), [reports]);
+  const reportedEvents = reports.length;
+  const totalAttendance = useMemo(
+    () => reports.reduce((sum, report) => sum + report.attendance_count, 0),
+    [reports]
+  );
+  const totalVisitors = useMemo(
+    () => reports.reduce((sum, report) => sum + report.visitors_count, 0),
+    [reports]
+  );
+  const totalVolunteers = useMemo(
+    () => reports.reduce((sum, report) => sum + report.volunteers_count, 0),
+    [reports]
+  );
 
   async function deleteEvent(ev: Event) {
     try {
@@ -79,111 +114,98 @@ export default function EventosPage() {
   }
 
   return (
-    <PageShell>
+    <PageShell className="[font-family:'Inter','Plus_Jakarta_Sans',system-ui,sans-serif]">
       <PageHeader
         eyebrow="Agenda"
         title="Eventos"
-        subtitle="Organize a agenda da igreja com uma leitura mais clara entre bases recorrentes e programações especiais."
+        subtitle="Centralize cultos, programações especiais e leituras pós-evento em uma experiência única de agenda pastoral."
         actions={
           canDo("event.create") && (
-            <button onClick={() => setModal({ type: "form" })} className="btn btn-primary btn-sm">
-              + Novo
+            <button onClick={() => setModal({ type: "form" })} className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_34px_-18px_rgba(244,83,42,0.9)] transition hover:bg-brand-dark">
+              + Novo evento
             </button>
           )
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatTile tone="success" value={recurring.length} label="Recorrentes" hint="Bases semanais que sustentam as escalas." icon="🔁" />
-        <StatTile tone="brand" value={special.length} label="Especiais" hint="Eventos únicos ou fora do ritmo semanal." icon="✨" />
-        <StatTile tone="info" value={withTime} label="Com horário base" hint="Prontos para agilizar a criação de escala." icon="⏰" />
+      <section className="relative overflow-hidden rounded-[34px] border border-white bg-[linear-gradient(135deg,#FFFFFF_0%,#FFF0EC_48%,#FAFAF8_100%)] p-6 shadow-[0_28px_80px_-54px_rgba(244,83,42,0.34)] md:p-8">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full bg-brand/10 blur-3xl" />
+        <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
+          <div>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-[12px] font-semibold text-ink-muted">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+              Operação da igreja
+            </div>
+            <h2 className="max-w-[720px] text-[30px] font-bold leading-tight tracking-[-0.045em] text-ink md:text-[38px]">
+              Eventos como ponto de encontro entre agenda, escala e cuidado.
+            </h2>
+            <p className="mt-3 max-w-[650px] text-[14px] leading-6 text-ink-muted">
+              Cadastre os eventos base, acompanhe o que já recebeu leitura pós-evento e use a agenda para transformar cada encontro em ação pastoral.
+            </p>
+          </div>
+          <div className="rounded-[26px] border border-white/80 bg-white/78 p-5 shadow-[0_18px_48px_-36px_rgba(27,23,38,0.35)] backdrop-blur">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Pós-eventos registrados</div>
+            <div className="mt-2 flex items-end gap-2">
+              <span className="text-[42px] font-bold leading-none tracking-[-0.055em] text-ink">{loading ? "..." : reportedEvents}</span>
+              <span className="pb-1 text-sm font-medium text-ink-muted">de {events.length} eventos</span>
+            </div>
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              <EventMetricPill label="Pessoas" value={totalAttendance} />
+              <EventMetricPill label="Visitantes" value={totalVisitors} tone="green" />
+              <EventMetricPill label="Servindo" value={totalVolunteers} tone="purple" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <EventStat value={recurring.length} label="Recorrentes" description="Bases semanais para escalas." icon="repeat" tone="green" loading={loading} />
+        <EventStat value={special.length} label="Especiais" description="Programações únicas." icon="spark" tone="coral" loading={loading} />
+        <EventStat value={withTime} label="Com horário base" description="Mais rápidos de escalar." icon="clock" tone="purple" loading={loading} />
+        <EventStat value={reportedEvents} label="Com pós-evento" description="Leitura pastoral registrada." icon="chart" tone="amber" loading={loading} />
       </div>
 
-      {[{ title: "Cultos Recorrentes", list: recurring }, { title: "Eventos Especiais", list: special }].map(
+      {[{ title: "Cultos recorrentes", list: recurring, tone: "green" as const }, { title: "Eventos especiais", list: special, tone: "coral" as const }].map(
         (section) => (
-          <div key={section.title} className="mb-8">
-            <div className="flex items-end justify-between gap-3 mb-3">
+          <section key={section.title} className="rounded-[28px] border border-border-soft bg-white p-6 shadow-[0_18px_50px_-38px_rgba(27,23,38,0.32)]">
+            <div className="mb-5 flex items-end justify-between gap-3">
               <div>
-                <h3 className="font-display text-lg">{section.title}</h3>
-                <p className="text-xs text-ink-muted mt-1">
-                  {section.title === "Cultos Recorrentes"
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-faint">Eventos</div>
+                <h3 className="text-[22px] font-semibold tracking-[-0.025em] text-ink">{section.title}</h3>
+                <p className="mt-1 text-sm text-ink-muted">
+                  {section.title === "Cultos recorrentes"
                     ? "Eventos base para a rotina semanal dos ministérios."
                     : "Programações pontuais que merecem destaque próprio no calendário."}
                 </p>
               </div>
-              <span className="badge badge-secondary">{section.list.length}</span>
+              <span className="rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-ink-muted">{section.list.length}</span>
             </div>
 
-            <div className="card overflow-hidden">
+            <div className="grid gap-3">
               {loading ? (
-                <div className="px-5 py-8 text-center text-sm text-ink-faint">Carregando eventos...</div>
+                <div className="rounded-[22px] bg-surface-alt px-5 py-8 text-center text-sm text-ink-faint">Carregando eventos...</div>
               ) : section.list.length === 0 ? (
-                <div className="px-5 py-8 text-center text-sm text-ink-faint">Nenhum evento.</div>
+                <div className="rounded-[22px] bg-surface-alt px-5 py-8 text-center text-sm text-ink-faint">Nenhum evento.</div>
               ) : (
                 section.list.map((e) => (
-                  <div
+                  <EventRow
                     key={e.id}
-                    className="flex flex-col gap-3 px-5 py-4 border-t border-border-soft first:border-t-0 hover:bg-brand-glow transition-colors group"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-border-soft bg-surface-alt text-2xl">
-                        {getIconEmoji(e.icon)}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                          <div className="text-sm font-semibold break-words">{e.name}</div>
-                          <span className={`badge ${e.type === "recurring" ? "badge-green" : "badge-brand"}`}>
-                            {e.type === "recurring" ? "Recorrente" : "Especial"}
-                          </span>
-                          {e.base_time && <span className="badge badge-secondary">{e.base_time}</span>}
-                        </div>
-
-                        {e.description && (
-                          <div className="text-[12px] text-ink-muted break-words leading-relaxed">
-                            {e.description}
-                          </div>
-                        )}
-
-                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-faint leading-relaxed">
-                          {e.location && <span>Local: {e.location}</span>}
-                          {e.instructions && <span>Instruções disponíveis</span>}
-                        </div>
-                      </div>
-
-                      {canDo("event.edit") && (
-                        <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => setModal({ type: "form", ev: e })}
-                            className="btn btn-ghost btn-sm"
-                          >
-                            &#9998;
-                          </button>
-                          <button
-                            onClick={() => setModal({ type: "delete", ev: e })}
-                            className="btn btn-ghost btn-sm text-danger"
-                          >
-                            &#10005;
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {e.instructions && (
-                      <div className="rounded-[14px] border border-border-soft bg-surface-alt/60 px-3 py-2 text-[11px] text-ink-muted leading-relaxed">
-                        {e.instructions}
-                      </div>
-                    )}
-                  </div>
+                    event={e}
+                    report={reportByEvent.get(e.id)}
+                    tone={section.tone}
+                    canEdit={canDo("event.edit")}
+                    onEdit={() => setModal({ type: "form", ev: e })}
+                    onDelete={() => setModal({ type: "delete", ev: e })}
+                  />
                 ))
               )}
             </div>
-          </div>
+          </section>
         )
       )}
 
       {modal?.type === "form" && (
-        <EventForm
+        <EventFormModal
           ev={(modal as any).ev}
           toast={toast}
           close={() => setModal(null)}
@@ -218,174 +240,134 @@ export default function EventosPage() {
   );
 }
 
-function EventForm({
-  ev,
-  toast,
-  close,
-  onSaved,
-}: {
-  ev?: Event;
-  toast: (msg: string) => void;
-  close: () => void;
-  onSaved: () => Promise<void>;
-}) {
-  const isEdit = !!ev;
-  const [name, setName] = useState(ev?.name || "");
-  const [desc, setDesc] = useState(ev?.description || "");
-  const [type, setType] = useState<"recurring" | "special">((ev?.type as "recurring" | "special") || "recurring");
-  const [icon, setIcon] = useState(ev?.icon || "church");
-  const [location, setLocation] = useState(ev?.location || "");
-  const [baseTime, setBaseTime] = useState(ev?.base_time || "");
-  const [instructions, setInstructions] = useState(ev?.instructions || "");
-  const [saving, setSaving] = useState(false);
+type EventTone = "coral" | "green" | "purple" | "amber";
+type EventIconName = "calendar" | "chart" | "clock" | "repeat" | "spark" | "users";
 
-  async function save() {
-    if (!name.trim()) {
-      toast("Informe o nome.");
-      return;
-    }
+function EventIcon({ name, size = 18, className }: { name: EventIconName; size?: number; className?: string }) {
+  const props = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.75,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    vectorEffect: "non-scaling-stroke" as const,
+    shapeRendering: "geometricPrecision" as const,
+    className,
+  };
+  const icons: Record<EventIconName, React.ReactNode> = {
+    calendar: <><rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" /></>,
+    chart: <><path d="M4 19V5" /><path d="M4 19h17" /><path d="m8 15 4-5 3 3 5-7" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    repeat: <><path d="m17 2 4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></>,
+    spark: <><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" /><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z" /></>,
+    users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.8" /></>,
+  };
+  return <svg {...props}>{icons[name]}</svg>;
+}
 
-    setSaving(true);
+function toneClasses(tone: EventTone) {
+  return {
+    coral: "bg-[#FFF0EC] text-[#D94420]",
+    green: "bg-[#EEF9F1] text-[#1F8044]",
+    purple: "bg-[#F5F0FF] text-[#6D5DF0]",
+    amber: "bg-[#FFF8ED] text-[#C07B1A]",
+  }[tone];
+}
 
-    const data = {
-      name: name.trim(),
-      description: desc,
-      type,
-      icon,
-      location,
-      base_time: baseTime,
-      instructions,
-      recurrence: type === "recurring" ? "weekly" : "once",
-    };
-
-    try {
-      const response = await fetch("/api/events/manage", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: isEdit ? "update" : "create",
-          eventId: ev?.id,
-          data,
-        }),
-      });
-
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        console.error("Erro ao salvar evento:", payload);
-        toast(payload?.error || "Erro ao salvar evento.");
-        setSaving(false);
-        return;
-      }
-
-      toast(isEdit ? "Atualizado!" : "Evento criado!");
-      setSaving(false);
-      await onSaved();
-    } catch (error) {
-      console.error("Erro ao salvar evento:", error);
-      toast("Erro ao salvar evento.");
-      setSaving(false);
-    }
-  }
-
+function EventMetricPill({ label, value, tone = "coral" }: { label: string; value: number; tone?: EventTone }) {
   return (
-    <div
-      className="fixed inset-0 bg-ink/40 backdrop-blur-sm z-50 flex items-center justify-center"
-      onClick={(e) => e.target === e.currentTarget && close()}
-    >
-      <div className="bg-white rounded-xl w-full max-w-[500px] shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border-soft">
-          <span className="font-display text-xl">{isEdit ? "Editar Evento" : "Novo Evento"}</span>
-          <button
-            onClick={close}
-            className="w-8 h-8 rounded-full bg-surface-alt flex items-center justify-center hover:bg-border text-ink-muted transition-colors"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </button>
+    <div className={`rounded-2xl px-3 py-2 ${toneClasses(tone)}`}>
+      <div className="text-lg font-bold leading-none">{value}</div>
+      <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] opacity-75">{label}</div>
+    </div>
+  );
+}
+
+function EventStat({
+  value,
+  label,
+  description,
+  icon,
+  tone,
+  loading,
+}: {
+  value: number;
+  label: string;
+  description: string;
+  icon: EventIconName;
+  tone: EventTone;
+  loading?: boolean;
+}) {
+  return (
+    <div className="rounded-[26px] border border-white/70 bg-white p-5 shadow-[0_18px_50px_-38px_rgba(27,23,38,0.26)]">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="text-[34px] font-bold leading-none tracking-[-0.055em] text-ink">{loading ? "..." : value}</div>
+          <div className="mt-2 text-[13px] font-semibold leading-snug text-ink">{label}</div>
+          <div className="mt-1 text-[12px] leading-snug text-ink-muted">{description}</div>
         </div>
+        <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[18px] ${toneClasses(tone)}`}>
+          <EventIcon name={icon} size={21} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
-        <div className="px-6 py-5 space-y-4">
-          <div>
-            <label className="input-label">Nome</label>
-            <input
-              className="input-field"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Culto de Domingo"
-            />
+function EventRow({
+  event,
+  report,
+  tone,
+  canEdit,
+  onEdit,
+  onDelete,
+}: {
+  event: Event;
+  report?: EventReport;
+  tone: EventTone;
+  canEdit: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="group rounded-[22px] border border-border-soft bg-white px-4 py-4 transition hover:bg-surface-alt/60">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <Link href={`/eventos/${event.id}`} className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[18px] ${toneClasses(tone)}`}>
+          <EventIcon name={event.type === "special" ? "spark" : "calendar"} size={21} />
+        </Link>
+        <div className="min-w-0 flex-1">
+          <div className="mb-1.5 flex flex-wrap items-center gap-2">
+            <Link href={`/eventos/${event.id}`} className="break-words text-sm font-semibold text-ink transition hover:text-brand">
+              {event.name}
+            </Link>
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${toneClasses(tone)}`}>
+              {event.type === "recurring" ? "Recorrente" : "Especial"}
+            </span>
+            {event.base_time && <span className="rounded-full bg-surface-alt px-2.5 py-1 text-[10px] font-bold text-ink-muted">{event.base_time}</span>}
+            {report && <span className="rounded-full bg-[#EEF9F1] px-2.5 py-1 text-[10px] font-bold text-[#1F8044]">Pós-evento</span>}
           </div>
-
-          <div>
-            <label className="input-label">Descrição</label>
-            <textarea className="input-field min-h-[60px]" value={desc} onChange={(e) => setDesc(e.target.value)} />
-          </div>
-
-          <div>
-            <label className="input-label">Tipo</label>
-            <select className="input-field" value={type} onChange={(e) => setType(e.target.value as "recurring" | "special")}>
-              <option value="recurring">Recorrente</option>
-              <option value="special">Especial</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="input-label">Icone</label>
-            <div className="flex flex-wrap gap-2">
-              {ICONS.map((i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setIcon(i)}
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg border-2 ${
-                    icon === i ? "border-brand bg-brand-light" : "border-border-soft"
-                  }`}
-                >
-                  {getIconEmoji(i)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="input-label">Local</label>
-              <input
-                className="input-field"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Templo principal"
-              />
-            </div>
-
-            <div>
-              <label className="input-label">Horario base</label>
-              <input
-                type="time"
-                className="input-field"
-                value={baseTime}
-                onChange={(e) => setBaseTime(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="input-label">Instrucoes</label>
-            <textarea
-              className="input-field min-h-[60px]"
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              placeholder="Orientacoes para este evento..."
-            />
+          {event.description && <p className="max-w-[760px] text-[13px] leading-5 text-ink-muted">{event.description}</p>}
+          <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-ink-faint">
+            {event.location && <span className="rounded-full bg-surface-alt px-2.5 py-1">Local: {event.location}</span>}
+            <span className="rounded-full bg-surface-alt px-2.5 py-1">{getEventCategory(event.icon).label}</span>
+            <span className="rounded-full bg-surface-alt px-2.5 py-1">{formatEventRecurrence(event)}</span>
+            {event.instructions && <span className="rounded-full bg-surface-alt px-2.5 py-1">Instruções disponíveis</span>}
+            {report && <span className="rounded-full bg-surface-alt px-2.5 py-1">{report.attendance_count} pessoas · {report.visitors_count} visitantes</span>}
           </div>
         </div>
-
-        <div className="px-6 py-4 border-t border-border-soft flex gap-2 justify-end">
-          <button onClick={close} className="btn btn-secondary">
-            Cancelar
-          </button>
-          <button onClick={save} disabled={saving} className="btn btn-primary">
-            {saving ? "Salvando..." : isEdit ? "Salvar" : "Criar"}
-          </button>
-        </div>
+        {canEdit && (
+          <div className="flex flex-shrink-0 gap-1 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+            <button type="button" onClick={onEdit} className="flex h-9 w-9 items-center justify-center rounded-full border border-border-soft bg-white text-ink-muted transition hover:bg-surface-alt hover:text-ink" aria-label={`Editar ${event.name}`}>
+              <EventIcon name="chart" size={15} />
+            </button>
+            <button type="button" onClick={onDelete} className="flex h-9 w-9 items-center justify-center rounded-full border border-border-soft bg-white text-danger transition hover:bg-danger-light" aria-label={`Remover ${event.name}`}>
+              <span aria-hidden className="text-base leading-none">&times;</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

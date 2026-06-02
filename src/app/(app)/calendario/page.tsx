@@ -3,20 +3,70 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/hooks/use-app";
 import { supabase } from "@/lib/supabase/client";
-import { getIconEmoji } from "@/lib/utils/helpers";
 import { PageShell, PageHeader } from "@/components/ui";
 import { fetchCells } from "@/lib/cells/client";
+import { EventFormModal } from "@/components/events/event-form-modal";
+import { parseEventCalendarRecurrence } from "@/lib/events/recurrence";
 import type { Cell, CellMemberRow } from "@/lib/cells/types";
 import Link from "next/link";
 import type { Schedule, Event, ScheduleMember } from "@/types";
 
 const WEEKDAY_PT = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const MOCK_PRAYER_EVENT_ID = "mock_culto_oracao_quarta";
+const MOCK_BIRTHDAYS = [
+  {
+    id: "mock_birthday_ana_souza",
+    name: "Ana Souza",
+    role: "Líder de célula",
+    day: 18,
+    month: 5,
+    phone: "(85) 99999-1203",
+    color: "#F4532A",
+  },
+];
+
+function createMockPrayerEvent(churchId: string): Event {
+  return {
+    id: MOCK_PRAYER_EVENT_ID,
+    church_id: churchId,
+    name: "Culto de Oração",
+    description: "Encontro semanal de oração, intercessão e cuidado comunitário.",
+    type: "recurring",
+    icon: "church",
+    location: "Templo principal",
+    base_time: "19:30",
+    instructions: "Recepção 30 minutos antes. Separar equipe para acolhimento e intercessão.",
+    recurrence: "weekly:3",
+    active: true,
+    created_at: "2026-06-01T00:00:00.000Z",
+  };
+}
+
+function AgendaEventIcon({ special = false }: { special?: boolean }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      {special ? (
+        <>
+          <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" />
+          <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z" />
+        </>
+      ) : (
+        <>
+          <rect x="3" y="4" width="18" height="18" rx="3" />
+          <path d="M16 2v4M8 2v4M3 10h18" />
+        </>
+      )}
+    </svg>
+  );
+}
 
 export default function CalendarioPage() {
-  const { user, departments } = useApp();
+  const { user, departments, canDo, toast } = useApp();
+  const now = new Date();
 
   const [monthOffset, setMonthOffset] = useState(0);
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedDay, setSelectedDay] = useState<number | null>(now.getDate());
+  const [showEventForm, setShowEventForm] = useState(false);
 
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -25,7 +75,6 @@ export default function CalendarioPage() {
   const [cellMembers, setCellMembers] = useState<CellMemberRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const now = new Date();
   const viewDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
@@ -57,7 +106,7 @@ export default function CalendarioPage() {
         .select("*")
         .eq("church_id", user.church_id)
         .neq("status", "cancelled"),
-      supabase.from("events").select("*").eq("church_id", user.church_id),
+      supabase.from("events").select("*").eq("church_id", user.church_id).neq("active", false),
     ]);
 
     if (schedulesError || eventsError) {
@@ -86,7 +135,8 @@ export default function CalendarioPage() {
     const scopedScheduleIds = new Set(scopedSchedules.map((schedule) => schedule.id));
 
     setSchedules(scopedSchedules);
-    setEvents((eventsData || []) as Event[]);
+    const loadedEvents = (eventsData || []) as Event[];
+    setEvents(loadedEvents.some((event) => event.id === MOCK_PRAYER_EVENT_ID) ? loadedEvents : [createMockPrayerEvent(user.church_id), ...loadedEvents]);
     setAllSM(((smData || []) as ScheduleMember[]).filter((scheduleMember) => scopedScheduleIds.has(scheduleMember.schedule_id)));
     setLoading(false);
   }
@@ -133,6 +183,17 @@ export default function CalendarioPage() {
     [selectedDay, cellList, year, month]
   );
 
+  const dayEvents = useMemo(
+    () => (selectedDay ? getEventsForDay(selectedDay) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedDay, events, year, month]
+  );
+
+  const dayBirthdays = useMemo(
+    () => MOCK_BIRTHDAYS.filter((birthday) => birthday.month === month && birthday.day === selectedDay),
+    [selectedDay, month]
+  );
+
   const monthStats = useMemo(() => {
     let recurringDays = 0;
     let specialDays = 0;
@@ -140,17 +201,19 @@ export default function CalendarioPage() {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dailySchedules = getSchedulesForDay(day);
-      if (dailySchedules.length === 0) continue;
+      const dailyEvents = getEventsForDay(day);
+      const dailyBirthdays = MOCK_BIRTHDAYS.filter((birthday) => birthday.month === month && birthday.day === day);
+      if (dailySchedules.length === 0 && dailyEvents.length === 0 && dailyBirthdays.length === 0) continue;
 
       const hasRecurring = dailySchedules.some((schedule) => {
         const event = events.find((item) => item.id === schedule.event_id);
         return event?.type === "recurring";
-      });
+      }) || dailyEvents.some((event) => event.type === "recurring");
 
       const hasSpecial = dailySchedules.some((schedule) => {
         const event = events.find((item) => item.id === schedule.event_id);
         return event?.type === "special";
-      });
+      }) || dailyEvents.some((event) => event.type === "special");
 
       const hasMine = dailySchedules.some((schedule) => myScheduleIds.has(schedule.id));
 
@@ -172,23 +235,69 @@ export default function CalendarioPage() {
     return cellList.filter((c) => c.week_day === wd);
   }
 
+  function getEventsForDay(day: number) {
+    const date = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const weekday = new Date(year, month, day).getDay();
+
+    return events.filter((event) => {
+      const parsed = parseEventCalendarRecurrence(event);
+      if (!parsed) return false;
+      if (parsed.type === "weekly") return parsed.weekday === weekday;
+      return parsed.date === date;
+    });
+  }
+
   return (
-    <PageShell>
+    <PageShell className="[font-family:'Inter','Plus_Jakarta_Sans',system-ui,sans-serif]">
       <PageHeader
         eyebrow="Agenda"
-        title="Calendário"
-        subtitle="Acompanhe dias com eventos recorrentes, especiais e as escalas em que você está incluído."
+        title="Agenda"
+        subtitle="Veja cultos, eventos, células e escalas em uma leitura única. Clique em um evento para registrar o pós-evento da ocorrência."
+        actions={
+          canDo("event.create") && (
+            <button
+              type="button"
+              onClick={() => setShowEventForm(true)}
+              className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_34px_-18px_rgba(244,83,42,0.9)] transition hover:bg-brand-dark"
+            >
+              + Novo evento
+            </button>
+          )
+        }
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
-        <div className="card p-4 sm:p-5">
+      <section className="relative overflow-hidden rounded-[34px] border border-white bg-[linear-gradient(135deg,#FFFFFF_0%,#FFF0EC_48%,#FAFAF8_100%)] p-6 shadow-[0_28px_80px_-54px_rgba(244,83,42,0.34)] md:p-8">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full bg-brand/10 blur-3xl" />
+        <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-[12px] font-semibold text-ink-muted">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+              Operação pastoral
+            </div>
+            <h2 className="max-w-[720px] text-[30px] font-bold leading-tight tracking-[-0.045em] text-ink md:text-[38px]">
+              A agenda como centro do cuidado da semana.
+            </h2>
+            <p className="mt-3 max-w-[640px] text-[14px] leading-6 text-ink-muted">
+              Selecione um dia, abra o evento e registre os indicadores pós-evento da ocorrência correta.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 rounded-[24px] border border-white/80 bg-white/75 p-3 backdrop-blur">
+            <MiniMetric label="Minhas" value={monthStats.myDays} tone="amber" />
+            <MiniMetric label="Recorrentes" value={monthStats.recurringDays} tone="green" />
+            <MiniMetric label="Especiais" value={monthStats.specialDays} tone="coral" />
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+        <div className="rounded-[28px] border border-border-soft bg-white p-4 shadow-[0_18px_50px_-38px_rgba(27,23,38,0.32)] sm:p-5">
           <div className="flex items-center justify-between gap-2 sm:gap-3 mb-4">
-            <button onClick={() => setMonthOffset((m) => m - 1)} className="btn btn-ghost btn-sm" aria-label="Mês anterior">
-              &larr;
+            <button onClick={() => setMonthOffset((m) => m - 1)} className="flex h-10 w-10 items-center justify-center rounded-full border border-border-soft bg-white text-ink-muted transition hover:bg-surface-alt hover:text-ink" aria-label="Mês anterior">
+              <span aria-hidden>&larr;</span>
             </button>
-            <span className="font-display text-base sm:text-lg capitalize text-center break-words">{monthName}</span>
-            <button onClick={() => setMonthOffset((m) => m + 1)} className="btn btn-ghost btn-sm" aria-label="Próximo mês">
-              &rarr;
+            <span className="text-lg font-semibold capitalize tracking-[-0.02em] text-ink sm:text-xl">{monthName}</span>
+            <button onClick={() => setMonthOffset((m) => m + 1)} className="flex h-10 w-10 items-center justify-center rounded-full border border-border-soft bg-white text-ink-muted transition hover:bg-surface-alt hover:text-ink" aria-label="Próximo mês">
+              <span aria-hidden>&rarr;</span>
             </button>
           </div>
           <div className="mb-4 flex justify-end">
@@ -212,19 +321,22 @@ export default function CalendarioPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-1.5">
           {cells.map((day, i) => {
             if (!day) return <div key={i} />;
 
             const dayScheds = getSchedulesForDay(day);
+            const dayEventList = getEventsForDay(day);
+            const birthdayList = MOCK_BIRTHDAYS.filter((birthday) => birthday.month === month && birthday.day === day);
             const eventTypes = dayScheds.map((schedule) =>
               events.find((event) => event.id === schedule.event_id)?.type
             );
-            const hasRecurring = eventTypes.includes("recurring");
-            const hasSpecial = eventTypes.includes("special");
+            const hasRecurring = eventTypes.includes("recurring") || dayEventList.some((event) => event.type === "recurring");
+            const hasSpecial = eventTypes.includes("special") || dayEventList.some((event) => event.type === "special");
             const hasMine = dayScheds.some((schedule) => myScheduleIds.has(schedule.id));
             const dayCellList = getCellsForDay(day);
             const hasCell = dayCellList.length > 0;
+            const hasBirthday = birthdayList.length > 0;
             const isToday =
               day === now.getDate() &&
               month === now.getMonth() &&
@@ -235,7 +347,7 @@ export default function CalendarioPage() {
               <button
                 key={i}
                 onClick={() => setSelectedDay(day === selectedDay ? null : day)}
-                className={`relative aspect-square min-h-[62px] rounded-2xl border text-sm transition-all overflow-hidden ${
+                className={`relative aspect-square min-h-[76px] rounded-[18px] border text-sm transition-all overflow-hidden ${
                   isSelected
                     ? "bg-brand text-white border-brand shadow-lg shadow-brand/20 scale-[1.02]"
                     : isToday
@@ -246,6 +358,8 @@ export default function CalendarioPage() {
                     ? "bg-[#ffe8e3] border-[#f2b6a6] text-[#8f3b22] hover:bg-[#ffdcd2]"
                     : hasRecurring
                     ? "bg-[#edf6ef] border-[#b8d8bf] text-[#285e34] hover:bg-[#e4f1e7]"
+                    : hasBirthday
+                    ? "bg-[#fff1f5] border-[#f7bfd0] text-[#9f244a] hover:bg-[#ffe6ee]"
                     : hasCell
                     ? "bg-[#f0ecff] border-[#cfc2f6] text-[#5b4aa8] hover:bg-[#e9e2ff]"
                     : "bg-white border-border-soft hover:bg-surface-alt"
@@ -262,6 +376,8 @@ export default function CalendarioPage() {
                         ? "bg-[#e46b42]"
                         : hasRecurring
                         ? "bg-[#4d9c62]"
+                        : hasBirthday
+                        ? "bg-[#e94b73]"
                         : hasCell
                         ? "bg-[#9b8cfb]"
                         : "bg-transparent"
@@ -296,13 +412,21 @@ export default function CalendarioPage() {
                         {dayCellList[0].name}{dayCellList.length > 1 ? ` +${dayCellList.length - 1}` : ""}
                       </span>
                     )}
+                    {hasBirthday && (
+                      <span
+                        title={birthdayList.map((item) => item.name).join(", ")}
+                        className={`max-w-[58px] truncate text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-white/80 text-[#9f244a]"}`}
+                      >
+                        Aniv.
+                      </span>
+                    )}
                   </div>
 
-                  {dayScheds.length + dayCellList.length > 0 ? (
+                  {dayScheds.length + dayEventList.length + dayCellList.length + birthdayList.length > 0 ? (
                     <div className="flex items-center gap-1">
-                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white" : hasMine ? "bg-[#f0aa00]" : hasSpecial ? "bg-[#e46b42]" : hasCell ? "bg-[#9b8cfb]" : "bg-brand"}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-white" : hasMine ? "bg-[#f0aa00]" : hasSpecial ? "bg-[#e46b42]" : hasBirthday ? "bg-[#e94b73]" : hasCell ? "bg-[#9b8cfb]" : "bg-brand"}`} />
                       <span className={`text-[10px] ${isSelected ? "text-white/90" : "text-ink-faint"}`}>
-                        {dayScheds.length + dayCellList.length}
+                        {dayScheds.length + dayEventList.length + dayCellList.length + birthdayList.length}
                       </span>
                     </div>
                   ) : (
@@ -315,35 +439,22 @@ export default function CalendarioPage() {
         </div>
         </div>
 
-        <div className="card p-5 space-y-4">
+        <aside className="rounded-[28px] border border-border-soft bg-white p-5 shadow-[0_18px_50px_-38px_rgba(27,23,38,0.32)] lg:sticky lg:top-5">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-ink-faint mb-2">
-              Leitura Rápida
+              Dia selecionado
             </div>
-            <h2 className="font-display text-xl leading-tight">Panorama do mês</h2>
+            <h2 className="text-xl font-semibold leading-tight tracking-[-0.03em] text-ink">
+              {selectedDay ? `${selectedDay}/${month + 1}` : "Selecione um dia"}
+            </h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              {selectedDay
+                ? `${daySchedules.length} escalas · ${dayEvents.length} eventos · ${dayCells.length} células · ${dayBirthdays.length} aniversários`
+                : "Clique em uma data para ver o que acontece."}
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
-            <div className="rounded-2xl border border-[#f1c46a] bg-[#fff4dc] px-4 py-3">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-[#7b4c00]">Minhas escalas</div>
-              <div className="text-2xl font-display text-[#7b4c00] mt-1">{monthStats.myDays}</div>
-              <div className="text-xs text-[#8f6b1d] mt-1">Dias do mês em que você está escalado.</div>
-            </div>
-
-            <div className="rounded-2xl border border-[#b8d8bf] bg-[#edf6ef] px-4 py-3">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-[#285e34]">Recorrentes</div>
-              <div className="text-2xl font-display text-[#285e34] mt-1">{monthStats.recurringDays}</div>
-              <div className="text-xs text-[#467451] mt-1">Dias com cultos e eventos recorrentes.</div>
-            </div>
-
-            <div className="rounded-2xl border border-[#f2b6a6] bg-[#ffe8e3] px-4 py-3">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-[#8f3b22]">Especiais</div>
-              <div className="text-2xl font-display text-[#8f3b22] mt-1">{monthStats.specialDays}</div>
-              <div className="text-xs text-[#a35840] mt-1">Dias com eventos especiais ou fora da rotina.</div>
-            </div>
-          </div>
-
-          <div className="border-t border-border-soft pt-4 space-y-2 text-xs text-ink-muted">
+          <div className="mt-5 border-t border-border-soft pt-4 space-y-2 text-xs text-ink-muted">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-[#f0aa00]" />
               <span>Dia em que você está escalado</span>
@@ -360,8 +471,12 @@ export default function CalendarioPage() {
               <span className="w-3 h-3 rounded-full bg-[#9b8cfb]" />
               <span>Encontro de célula</span>
             </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-[#e94b73]" />
+              <span>Aniversário</span>
+            </div>
           </div>
-        </div>
+        </aside>
       </div>
 
       {selectedDay && (
@@ -371,7 +486,9 @@ export default function CalendarioPage() {
               <h3 className="font-display text-lg break-words">Agenda de {selectedDay}/{month + 1}</h3>
               <p className="text-sm text-ink-muted">
                 {daySchedules.length} {daySchedules.length === 1 ? "escala" : "escalas"}
-                {dayCells.length > 0 && ` · ${dayCells.length} ${dayCells.length === 1 ? "célula" : "células"}`} neste dia.
+                {dayEvents.length > 0 && ` · ${dayEvents.length} ${dayEvents.length === 1 ? "evento" : "eventos"}`}
+                {dayCells.length > 0 && ` · ${dayCells.length} ${dayCells.length === 1 ? "célula" : "células"}`}
+                {dayBirthdays.length > 0 && ` · ${dayBirthdays.length} ${dayBirthdays.length === 1 ? "aniversário" : "aniversários"}`} neste dia.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -395,12 +512,91 @@ export default function CalendarioPage() {
 
           {loading ? (
             <div className="card px-5 py-8 text-center text-sm text-ink-faint">Carregando...</div>
-          ) : daySchedules.length === 0 && dayCells.length === 0 ? (
+          ) : daySchedules.length === 0 && dayEvents.length === 0 && dayCells.length === 0 && dayBirthdays.length === 0 ? (
             <div className="card px-5 py-8 text-center text-sm text-ink-faint">
               Nada agendado neste dia.
             </div>
           ) : (
             <div className="space-y-4">
+              {dayBirthdays.length > 0 && (
+                <div className="card">
+                  {dayBirthdays.map((birthday) => (
+                    <div
+                      key={birthday.id}
+                      className="flex items-start gap-3 border-t border-border-soft px-5 py-4 first:border-t-0"
+                    >
+                      <div
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-white"
+                        style={{ background: birthday.color }}
+                      >
+                        {birthday.name
+                          .split(" ")
+                          .map((part) => part[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <div className="text-sm font-semibold text-ink">{birthday.name}</div>
+                          <span className="rounded-full bg-[#fff1f5] px-2 py-0.5 text-[10px] font-bold text-[#9f244a]">
+                            Aniversário
+                          </span>
+                        </div>
+                        <div className="text-[11px] leading-relaxed text-ink-faint">
+                          {birthday.role} · {birthday.phone}
+                        </div>
+                      </div>
+                      <button className="rounded-full border border-border-soft bg-white px-3 py-1.5 text-xs font-semibold text-ink-muted transition hover:bg-surface-alt hover:text-ink">
+                        Enviar mensagem
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {dayEvents.length > 0 && (
+                <div className="card">
+                  {dayEvents.map((ev) => {
+                    const hasScheduleForEvent = daySchedules.some((schedule) => schedule.event_id === ev.id);
+                    return (
+                      <Link
+                        key={ev.id}
+                        href={`/eventos/${ev.id}?date=${selectedDateStr}`}
+                        className="flex items-start sm:items-center gap-3 px-5 py-4 border-t border-border-soft first:border-t-0 transition-colors hover:bg-brand-glow"
+                      >
+                        <div
+                          className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
+                            ev.type === "special" ? "bg-[#ffe8e3] text-[#8f3b22]" : "bg-[#edf6ef] text-[#285e34]"
+                          }`}
+                        >
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <div className="text-sm font-medium break-words">{ev.name}</div>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              ev.type === "special"
+                                ? "bg-[#ffe8e3] text-[#8f3b22]"
+                                : "bg-[#edf6ef] text-[#285e34]"
+                            }`}>
+                              {ev.type === "special" ? "Evento especial" : "Evento recorrente"}
+                            </span>
+                            {hasScheduleForEvent && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#fff4dc] text-[#7b4c00]">Com escala</span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-ink-faint break-words leading-relaxed">
+                            {[ev.base_time, ev.location].filter(Boolean).join(" · ") || "Sem horário definido"}
+                          </div>
+                        </div>
+                        <div className="text-brand text-sm font-semibold shrink-0">&rarr;</div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+
               {daySchedules.length > 0 && (
               <div className="card">
               {daySchedules.map((s) => {
@@ -423,7 +619,7 @@ export default function CalendarioPage() {
                         ev?.type === "special" ? "bg-[#ffe8e3]" : "bg-[#edf6ef]"
                       }`}
                     >
-                      {ev ? getIconEmoji(ev.icon) : ""}
+                      <AgendaEventIcon special={ev?.type === "special"} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -487,6 +683,31 @@ export default function CalendarioPage() {
           )}
         </div>
       )}
+
+      {showEventForm && (
+        <EventFormModal
+          toast={toast}
+          close={() => setShowEventForm(false)}
+          onSaved={async () => {
+            setShowEventForm(false);
+            await loadData();
+          }}
+        />
+      )}
     </PageShell>
+  );
+}
+
+function MiniMetric({ label, value, tone }: { label: string; value: number; tone: "amber" | "green" | "coral" }) {
+  const cls = {
+    amber: "bg-[#FFF8ED] text-[#C07B1A]",
+    green: "bg-[#EEF9F1] text-[#1F8044]",
+    coral: "bg-[#FFF0EC] text-[#D94420]",
+  }[tone];
+  return (
+    <div className={`rounded-2xl px-3 py-2 text-center ${cls}`}>
+      <div className="text-xl font-bold leading-none tracking-[-0.04em]">{value}</div>
+      <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] opacity-70">{label}</div>
+    </div>
   );
 }

@@ -29,7 +29,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Dados invalidos para gerenciar evento." }, { status: 400 });
     }
 
-    const { actor, session, errorResponse } = await requireApiActor(req);
+    const { actor, session, errorResponse } = await requireApiActor(req, { select: "id, role, cell_role, church_id, active" });
     if (errorResponse) return errorResponse;
 
     const churchId = session!.church_id;
@@ -42,7 +42,8 @@ export async function POST(req: Request) {
     const requiredAction =
       mode === "create" ? "event.create" : mode === "update" ? "event.edit" : "event.delete";
 
-    if (!can(actor.role, requiredAction)) {
+    const isPastor = (actor as { cell_role?: string | null }).cell_role === "pastor";
+    if (!can(actor.role, requiredAction) && !isPastor) {
       return NextResponse.json({ error: "Sem permissao para gerenciar eventos." }, { status: 403 });
     }
 
