@@ -13,6 +13,7 @@ type IconName =
   | "calendar"
   | "check"
   | "chevron"
+  | "clock"
   | "heart"
   | "home"
   | "message"
@@ -75,6 +76,8 @@ export type Insight = {
   value: string;
   label: string;
   description: string;
+  trend?: number[];
+  icon?: IconName;
 };
 
 export type CellSummary = {
@@ -179,6 +182,7 @@ function Icon({ name, size = 18, className }: { name: IconName; size?: number; c
     calendar: <><rect x="3" y="4" width="18" height="18" rx="3" /><path d="M16 2v4M8 2v4M3 10h18" /></>,
     check: <><circle cx="12" cy="12" r="9" /><path d="m8.8 12.2 2.2 2.2 4.2-4.4" /></>,
     chevron: <path d="m9 18 6-6-6-6" />,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></>,
     heart: <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21.2l8.8-8.8a5.5 5.5 0 0 0 0-7.8Z" />,
     home: <><path d="M3 10 12 3l9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V10Z" /><path d="M9 22V12h6v10" /></>,
     message: <><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5Z" /></>,
@@ -368,71 +372,45 @@ export function DashboardHero({
 }
 
 export function PriorityCards({ items }: { items: PriorityCard[] }) {
-  const getActionState = (item: PriorityCard) => {
-    const isZero = typeof item.value === "number" && item.value === 0;
-    if (!isZero) {
-      return { label: item.action, resolved: false };
-    }
-
-    if (item.label === "Confirmações pendentes") {
-      return { label: "Sem pendências", resolved: true };
-    }
-    if (item.label === "Pessoas em cuidado") {
-      return { label: "Tudo em dia", resolved: true };
-    }
-    if (item.label === "Células acontecendo") {
-      return { label: "Sem células hoje", resolved: true };
-    }
-    if (item.label === "Visitantes sem acompanhamento") {
-      return { label: "Visitantes acolhidos", resolved: true };
-    }
-
-    return { label: "Tudo em dia", resolved: true };
-  };
-
   return (
-    <section id="priority-cards" data-section="priority-cards" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {items.map((item, index) => {
-        const actionState = getActionState(item);
-        return (
-          <motion.div
-            key={item.label}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.24, delay: index * 0.04 }}
+    <section id="priority-cards" data-section="priority-cards" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {items.map((item, index) => (
+        <motion.div
+          key={item.label}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.24, delay: index * 0.04 }}
+        >
+          <Link
+            href={item.href}
+            className={cn(
+              "group flex items-center gap-4 rounded-[22px] border border-white/70 p-4 shadow-[0_8px_28px_-16px_rgba(25,25,25,0.18)] transition hover:shadow-[0_12px_36px_-16px_rgba(25,25,25,0.22)]",
+              toneSurface[item.tone],
+            )}
           >
-            <Link
-              href={item.href}
+            <div
               className={cn(
-                "group flex min-h-[168px] flex-col rounded-[26px] border border-white/70 p-5 shadow-[0_18px_50px_-36px_rgba(25,25,25,0.4)] transition hover:border-white hover:shadow-[0_24px_60px_-36px_rgba(25,25,25,0.42)]",
-                toneSurface[item.tone]
+                "flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
+                toneIcon[item.tone],
               )}
             >
-              <div className="flex items-start justify-between gap-5">
-                <div className={cn("flex h-12 w-12 items-center justify-center rounded-[18px] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]", toneIcon[item.tone])}>
-                  <Icon name={item.icon} size={22} />
-                </div>
-                <Icon name="arrow" size={16} className="mt-2 text-[#AAAAAA] transition group-hover:text-[#191919]" />
+              <Icon name={item.icon} size={20} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[26px] font-bold leading-none tracking-[-0.05em] text-[#191919]">
+                {item.value}
               </div>
-              <div className="mt-6 text-[36px] font-bold leading-none tracking-[-0.055em] text-[#191919]">{item.value}</div>
-              <div className="mt-2 text-[15px] font-semibold leading-snug tracking-[-0.015em] text-[#191919]">{item.label}</div>
-              <div className="mt-auto pt-5">
-                <span
-                  className={cn(
-                    "inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-[12px] font-semibold transition",
-                    actionState.resolved
-                      ? "bg-white/78 text-[#191919] ring-1 ring-white/70"
-                      : toneActionButton[item.tone],
-                  )}
-                >
-                  {actionState.label}
-                  <Icon name="arrow" size={14} />
-                </span>
-              </div>
-            </Link>
-          </motion.div>
-        );
-      })}
+              <div className="mt-0.5 truncate text-[13px] font-semibold text-[#191919]">{item.label}</div>
+              <div className="mt-0.5 truncate text-[11px] text-[#888888]">{item.description}</div>
+            </div>
+            <Icon
+              name="arrow"
+              size={14}
+              className="shrink-0 text-[#CCCCCC] transition group-hover:text-[#191919]"
+            />
+          </Link>
+        </motion.div>
+      ))}
     </section>
   );
 }
@@ -565,75 +543,202 @@ const careBadgeColors: Record<string, string> = {
   "Participação baixa": "bg-[#FFF8ED] text-[#C07B1A]",
   "Visitante":         "bg-[#EEF1FF] text-[#4A5ADE]",
   "Reconectado":       "bg-[#EEFAF2] text-[#1F8044]",
+  "3 faltas seguidas": "bg-[#EEF1FF] text-[#4A5ADE]",
 };
 const careBadgeFallback = "bg-[#F0EFEB] text-[#777777]";
 
 export function CarePeopleSection({ people }: { people: CarePerson[] }) {
+  const [active, setActive] = useState(0);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    function onScroll() {
+      const firstCard = el!.firstElementChild as HTMLElement | null;
+      const cardW = firstCard ? firstCard.offsetWidth + 16 : el!.offsetWidth;
+      const idx = Math.min(Math.round(el!.scrollLeft / cardW), people.length - 1);
+      setActive(idx);
+    }
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [people.length]);
+
+  function goTo(idx: number) {
+    const el = trackRef.current;
+    if (!el) return;
+    const firstCard = el.firstElementChild as HTMLElement | null;
+    const cardW = firstCard ? firstCard.offsetWidth + 16 : el.offsetWidth;
+    el.scrollTo({ left: idx * cardW, behavior: "smooth" });
+    setActive(idx);
+  }
+
+  const careActions: Record<string, { label: string; icon: IconName }> = {
+    "Atenção pastoral": { label: "Acompanhar", icon: "users" },
+    "Participação baixa": { label: "Contato", icon: "message" },
+    "Visitante": { label: "Acompanhar", icon: "users" },
+    "Reconectado": { label: "Orar", icon: "heart" },
+    "3 faltas seguidas": { label: "Orar", icon: "heart" },
+  };
+  const defaultAction: { label: string; icon: IconName } = { label: "Orar", icon: "heart" };
+  const getLastLabel = (badge: string) =>
+    badge === "Participação baixa" ? "Último contato" : "Último encontro";
+
   return (
-    <Panel className="flex h-full flex-col p-6" dataSectionId="care-people">
-      <SectionTitle title="Pessoas precisando de cuidado" eyebrow="Cuidado pastoral" />
-      <div className="grid flex-1 gap-4 lg:grid-cols-2">
-        {people.map((person) => (
-          <div key={person.id} className="flex min-h-[214px] flex-col rounded-[24px] border border-[#F0EFEB] bg-[linear-gradient(180deg,#FFFFFF_0%,#FFFCFA_100%)] p-5 shadow-[0_14px_38px_-34px_rgba(25,25,25,0.35)]">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <Avatar name={person.name} color={person.avatarColor} photoUrl={person.photoUrl} size={46} />
+    <Panel className="flex h-full flex-col bg-white p-6" dataSectionId="care-people">
+      <div className="mb-5 flex items-center justify-between gap-4">
+        <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-[#191919] md:text-[22px]">
+          Pessoas precisando de cuidado
+        </h2>
+        <Link href="/pessoas" className="shrink-0 text-[13px] font-semibold text-[#F4532A] transition hover:opacity-75">
+          Ver todas
+        </Link>
+      </div>
+
+      <div
+        ref={trackRef}
+        className="flex flex-1 gap-4 overflow-x-auto pb-1"
+        style={{ scrollSnapType: "x mandatory", scrollbarWidth: "none" } as React.CSSProperties}
+      >
+        {people.map((person) => {
+          const action = careActions[person.badge] ?? defaultAction;
+          return (
+            <div
+              key={person.id}
+              className="flex w-[190px] sm:w-[200px] shrink-0 flex-col rounded-[22px] border border-[#F0EFEB] bg-white p-4 shadow-[0_6px_20px_-12px_rgba(25,25,25,0.14)]"
+              style={{ scrollSnapAlign: "start" } as React.CSSProperties}
+            >
+              <div className="flex items-center gap-3">
+                <Avatar name={person.name} color={person.avatarColor} photoUrl={person.photoUrl} size={48} />
                 <div className="min-w-0">
-                  <div className="truncate text-[15px] font-semibold text-[#191919]">{person.name}</div>
-                  <div className="mt-0.5 truncate text-[12px] text-[#AAAAAA]">{person.lastPresence}</div>
+                  <div className="truncate text-[13px] font-semibold text-[#191919]">{person.name}</div>
+                  <span className={cn("mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold", careBadgeColors[person.badge] ?? careBadgeFallback)}>
+                    {person.badge}
+                  </span>
                 </div>
               </div>
-              <span className={cn("flex-shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold", careBadgeColors[person.badge] ?? careBadgeFallback)}>{person.badge}</span>
-            </div>
-
-            <div className="mt-4 flex-1 rounded-[18px] border border-[#F0EFEB] bg-white/72 px-4 py-3">
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#AAAAAA]">Motivo do cuidado</div>
-              <p className="text-[13px] leading-5 text-[#777777]">{person.reason}</p>
-            </div>
-
-            <div className="mt-4 grid grid-cols-[1fr_auto_auto] gap-2">
-              <button className="min-h-10 rounded-full bg-[#F4532A] px-4 text-[12px] font-semibold text-white shadow-[0_12px_24px_-16px_rgba(244,83,42,0.75)] transition hover:bg-[#D94420]">
-                Acompanhar
-              </button>
-              <button className="min-h-10 rounded-full border border-[#F0EFEB] px-3 text-[12px] font-semibold text-[#191919] transition hover:bg-[#FAFAF8]">
-                Contato
-              </button>
-              <button className="min-h-10 rounded-full border border-[#F0EFEB] px-3 text-[12px] font-semibold text-[#191919] transition hover:bg-[#FAFAF8]">
-                Orar
+              <div className="mt-4 flex-1">
+                <div className="text-[11px] text-[#BBBBBB]">{getLastLabel(person.badge)}</div>
+                <div className="mt-0.5 text-[12px] font-medium text-[#555555]">{person.lastPresence}</div>
+              </div>
+              <button className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-[#EBEBEB] px-4 py-2.5 text-[12px] font-semibold text-[#333333] transition hover:bg-[#FAFAF8]">
+                <Icon name={action.icon} size={13} />
+                {action.label}
               </button>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      {people.length > 1 && (
+        <div className="mt-4 flex justify-center gap-1.5">
+          {people.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => goTo(i)}
+              className={cn("h-2 rounded-full transition-all duration-200", i === active ? "w-5 bg-[#F4532A]" : "w-2 bg-[#E5E3DE]")}
+              aria-label={`Pessoa ${i + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </Panel>
   );
 }
 
-export function InsightCards({ items, className }: { items: Insight[]; className?: string }) {
-  const insightStyles = [
-    "text-[#D94420]",
-    "text-[#1F8044]",
-    "text-[#6D5DF0]",
-    "text-[#C07B1A]",
-  ];
+const INSIGHT_COLORS = ["#1F8044", "#6D5DF0", "#C07B1A", "#3B6CF4"] as const;
+const insightValueColors = ["text-[#1F8044]", "text-[#6D5DF0]", "text-[#C07B1A]", "text-[#3B6CF4]"];
+const insightIconBg = [
+  "bg-[#EEFAF2] text-[#1F8044]",
+  "bg-[#EEF1FF] text-[#6D5DF0]",
+  "bg-[#FFF8ED] text-[#C07B1A]",
+  "bg-[#EEF4FF] text-[#3B6CF4]",
+];
+
+const insightCardBg = [
+  "bg-[#F4FBF7]",
+  "bg-[#F2F1FD]",
+  "bg-[#FDF8F2]",
+  "bg-[#EFF4FD]",
+];
+
+function Sparkline({ data, color, idx }: { data: number[]; color: string; idx: number }) {
+  if (data.length < 2) return null;
+  const W = 200;
+  const H = 52;
+  const pad = 3;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => [
+    pad + (i / (data.length - 1)) * (W - pad * 2),
+    pad + (1 - (v - min) / range) * (H - pad * 2),
+  ]);
+  const line = pts.map((p) => p.join(",")).join(" ");
+  const area = `${pts[0][0]},${H} ${line} ${pts[pts.length - 1][0]},${H}`;
+  const gid = `ins-grad-${idx}`;
   return (
-    <Panel
-      className={cn(
-        "flex h-full flex-col border-white bg-[linear-gradient(135deg,#FFFFFF_0%,#FFF0EC_48%,#FAFAF8_100%)] p-6 shadow-[0_28px_80px_-50px_rgba(244,83,42,0.30)]",
-        className,
-      )}
-      dataSectionId="insights"
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="w-full"
+      preserveAspectRatio="none"
+      aria-hidden="true"
     >
-      <SectionTitle title="Insights da semana" eyebrow="Leitura pastoral" />
-      <div className="grid flex-1 auto-rows-fr gap-3 sm:grid-cols-2">
-        {items.map((item, index) => (
-          <div key={item.label} className="flex h-full flex-col justify-between rounded-[24px] border border-white/80 bg-white/72 p-5 shadow-[0_14px_36px_-30px_rgba(25,25,25,0.28)] backdrop-blur">
-            <div className={cn("text-[34px] font-bold leading-none tracking-[-0.06em]", insightStyles[index % insightStyles.length])}>
-              {item.value}
+      <polyline
+        points={line}
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function InsightCards({ items, className }: { items: Insight[]; className?: string }) {
+  return (
+    <Panel className={cn("flex h-full flex-col bg-white p-6", className)} dataSectionId="insights">
+      <div className="mb-5 flex items-center justify-between gap-4">
+        <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-[#191919] md:text-[22px]">
+          Insights da semana
+        </h2>
+        <Link
+          href="/relatorios"
+          className="flex shrink-0 items-center gap-1 text-[13px] font-semibold text-[#F4532A] transition hover:opacity-75"
+        >
+          Ver relatório completo
+          <Icon name="arrow" size={13} />
+        </Link>
+      </div>
+      <div className="grid flex-1 auto-rows-fr grid-cols-2 gap-3 sm:grid-cols-4">
+        {items.map((item, index) => {
+          const idx = index % 4;
+          return (
+            <div
+              key={item.label}
+              className={cn("flex h-full flex-col overflow-hidden rounded-[20px] border border-white", insightCardBg[idx])}
+            >
+              <div className="flex flex-1 flex-col items-center p-4 pb-2 text-center">
+                {item.icon && (
+                  <div className={cn("mb-3 flex h-11 w-11 items-center justify-center rounded-[14px]", insightIconBg[idx])}>
+                    <Icon name={item.icon} size={20} />
+                  </div>
+                )}
+                <div className={cn("text-[30px] font-bold leading-none tracking-[-0.05em]", insightValueColors[idx])}>
+                  {item.value}
+                </div>
+                <div className="mt-1.5 text-[13px] font-semibold text-[#191919]">{item.label}</div>
+                <div className="mt-0.5 text-[11px] text-[#AAAAAA]">{item.description}</div>
+              </div>
+              {item.trend && item.trend.length > 1 && (
+                <div className="px-3 pb-3">
+                  <Sparkline data={item.trend} color={INSIGHT_COLORS[idx]} idx={index} />
+                </div>
+              )}
             </div>
-            <div className="mt-3 text-[14px] font-semibold text-[#191919]">{item.label}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </Panel>
   );
@@ -747,7 +852,7 @@ export function DashboardV3Home({ data }: { data: DashboardV3Data }) {
           <UpcomingEvents items={data.upcoming} />
         </section>
 
-        <section className="grid min-w-0 items-stretch gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
+        <section className="grid min-w-0 items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           {showPastoralManagement ? <CarePeopleSection people={data.carePeople} /> : showCellLife ? <CellCard cell={data.cell} /> : <PrayerRequestCard items={data.prayers} />}
           <div className={cn("space-y-6", showPastoralManagement && !showCellLife && "flex h-full flex-col")}> 
             {showCellLife && showPastoralManagement && <CellCard cell={data.cell} />}

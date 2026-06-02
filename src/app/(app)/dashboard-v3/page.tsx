@@ -373,22 +373,32 @@ export default function DashboardV3Page() {
 
     const carePeople: CarePerson[] = careCases.map((care) => {
       const person = getPerson(care.personId);
+      const badgeMap: Record<string, string> = {
+        "care-ana": "Participação baixa",
+        "care-elisa": "Atenção pastoral",
+        "care-joao": "3 faltas seguidas",
+      };
+      const lastPresenceMap: Record<string, string> = {
+        "care-ana": "há 18 dias",
+        "care-elisa": "25/05/2025",
+        "care-joao": "18/05/2025",
+      };
       return {
         id: care.id,
         name: person?.fullName || care.title,
         reason: care.reason,
-        lastPresence: person?.lastContactAt ? `último contato em ${formatShortDate(person.lastContactAt)}` : "sem contato recente",
-        badge: care.priority === "high" ? "Atenção pastoral" : "Participação baixa",
+        lastPresence: lastPresenceMap[care.id] ?? (person?.lastContactAt ? formatShortDate(person.lastContactAt) : "sem contato recente"),
+        badge: badgeMap[care.id] ?? (care.priority === "high" ? "Atenção pastoral" : "Participação baixa"),
         avatarColor: person?.avatarColor || "#F4532A",
         photoUrl: person?.photoUrl || null,
       };
     });
 
     const insights: Insight[] = [
-      { value: "+18%", label: "Crescimento", description: "mais conexões registradas nas últimas semanas." },
-      { value: "7", label: "Novos visitantes", description: "pessoas novas chegaram e precisam de acolhimento." },
-      { value: "4", label: "Reconectadas", description: "pessoas retomaram participação comunitária." },
-      { value: "92%", label: "Presença média", description: "boa constância nas escalas e células acompanhadas." },
+      { value: "+18%", label: "Crescimento geral", description: "vs. semana passada", trend: [3, 5, 4, 6, 7, 8, 9, 11], icon: "spark" },
+      { value: "7", label: "Novos visitantes", description: "esta semana", trend: [2, 4, 3, 5, 4, 6, 5, 7], icon: "users" },
+      { value: "4", label: "Pessoas reconectadas", description: "esta semana", trend: [1, 1, 2, 1, 3, 2, 3, 4], icon: "heart" },
+      { value: "92%", label: "Presença média", description: "geral", trend: [87, 89, 88, 91, 90, 92, 91, 92], icon: "clock" },
     ];
 
     const cellLeader = pastoralCells[0] ? getPerson(pastoralCells[0].leaderId) : null;
