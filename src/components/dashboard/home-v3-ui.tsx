@@ -1388,8 +1388,9 @@ function MemberPrayerPanel({ items }: { items: PrayerRequestCardData[] }) {
               >
                 {item.person
                   .split(" ")
+                  .filter(Boolean)
                   .slice(0, 2)
-                  .map((n) => n[0])
+                  .map((n) => n.charAt(0))
                   .join("")
                   .toUpperCase()}
               </div>
