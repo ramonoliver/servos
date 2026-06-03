@@ -462,6 +462,10 @@ export default function DashboardV3Page() {
       })
       .filter(Boolean) as Array<{ name: string; role: string }>;
 
+    const userIsLeader = myCell
+      ? [...(myCell.leader_ids || []), ...(myCell.co_leader_ids || [])].includes(user.id)
+      : false;
+
     const cell: CellSummary | undefined = myCell
       ? {
           name: myCell.name,
@@ -471,6 +475,7 @@ export default function DashboardV3Page() {
           prayerCount: activePrayerRequests.length,
           href: `/celulas/${myCell.id}`,
           leaders: cellLeaders.length > 0 ? cellLeaders : undefined,
+          userIsLeader,
         }
       : undefined;
 

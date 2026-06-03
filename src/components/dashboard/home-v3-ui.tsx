@@ -88,6 +88,7 @@ export type CellSummary = {
   prayerCount: number;
   href: string;
   leaders?: Array<{ name: string; role: string }>;
+  userIsLeader?: boolean;
 };
 
 export type PrayerRequestCardData = {
