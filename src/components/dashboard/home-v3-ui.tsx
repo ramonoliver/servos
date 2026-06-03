@@ -1342,6 +1342,79 @@ function MemberCellPanel({ cell }: { cell?: CellSummary }) {
   );
 }
 
+const prayerAvatarColors = ["#C07B1A", "#4A5ADE", "#1F8044", "#D94420"];
+
+function MemberPrayerPanel({ items }: { items: PrayerRequestCardData[] }) {
+  return (
+    <Panel className="flex flex-col p-6" dataSectionId="member-prayers">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#AAAAAA]">
+            Cuidado
+          </div>
+          <h2 className="text-[22px] font-semibold tracking-[-0.025em] text-[#191919] md:text-[24px]">
+            Pedidos de oração
+          </h2>
+        </div>
+        <Link
+          href="/pedidos-oracao"
+          className="shrink-0 text-[13px] font-semibold text-[#F4532A] transition hover:opacity-75"
+        >
+          Ver todos
+        </Link>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="flex-1 rounded-[20px] border border-dashed border-[#E6E0D7] bg-[#FAFAF8] px-5 py-8 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-white text-[#C07B1A]">
+            <Icon name="heart" size={20} />
+          </div>
+          <div className="mt-3 text-[14px] font-bold text-[#191919]">Nenhum pedido ainda</div>
+          <p className="mx-auto mt-1 max-w-[240px] text-[12px] leading-5 text-[#777777]">
+            Compartilhe um pedido e a célula ora por você.
+          </p>
+        </div>
+      ) : (
+        <div className="flex-1 divide-y divide-[#F0EFEB]">
+          {items.slice(0, 3).map((item, index) => (
+            <Link
+              key={item.title}
+              href={item.href}
+              className="flex items-start gap-3 py-3.5 transition hover:opacity-80"
+            >
+              <div
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white"
+                style={{ background: prayerAvatarColors[index % prayerAvatarColors.length] }}
+              >
+                {item.person
+                  .split(" ")
+                  .slice(0, 2)
+                  .map((n) => n[0])
+                  .join("")
+                  .toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-bold text-[#191919]">{item.person}</div>
+                <p className="mt-0.5 line-clamp-2 text-[12px] leading-5 text-[#777777]">
+                  {item.description}
+                </p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      <Link
+        href="/pedidos-oracao"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-[16px] border border-dashed border-[#E6E0D7] bg-[#FAFAF8] py-3 text-[13px] font-bold text-[#777777] transition hover:bg-white"
+      >
+        <Icon name="plus" size={14} />
+        Fazer pedido de oração
+      </Link>
+    </Panel>
+  );
+}
+
 function MemberHomeSections({ data }: { data: DashboardV3Data }) {
   return (
     <>
