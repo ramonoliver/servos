@@ -87,6 +87,7 @@ export type CellSummary = {
   leader: string;
   prayerCount: number;
   href: string;
+  leaders?: Array<{ name: string; role: string }>;
 };
 
 export type PrayerRequestCardData = {
@@ -921,73 +922,98 @@ export function PrayerRequestCard({ items }: { items: PrayerRequestCardData[] })
 function MemberCellPanel({ cell }: { cell?: CellSummary }) {
   return (
     <Panel
-      className="overflow-hidden border-[rgba(109,93,240,0.12)] bg-[#F5F0FF] shadow-[0_14px_40px_-28px_rgba(109,93,240,0.2)]"
+      className="overflow-hidden border-[rgba(109,93,240,0.12)] shadow-[0_14px_40px_-28px_rgba(109,93,240,0.2)]"
       dataSectionId="member-cell"
     >
+      <div className="h-[5px] bg-[linear-gradient(90deg,#6D5DF0,#8C78FF)]" />
       <div className="p-6">
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9A95BB]">
-              Minha célula
-            </div>
-            <h2 className="text-[22px] font-semibold tracking-[-0.025em] text-[#191919] md:text-[24px]">
-              Comunhão
-            </h2>
-          </div>
-          {cell && (
-            <Link
-              href={cell.href}
-              className="shrink-0 rounded-full bg-[#6D5DF0] px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_8px_20px_-12px_rgba(109,93,240,0.7)] transition hover:bg-[#5849D6]"
-            >
-              Abrir célula
-            </Link>
-          )}
-        </div>
-
         {cell ? (
           <>
-            <div className="text-[22px] font-bold tracking-[-0.035em] text-[#191919]">{cell.name}</div>
-            <div className="mt-1 text-[13px] font-semibold text-[#6D5DF0]">{cell.nextMeeting}</div>
-            <div className="mt-4 rounded-[18px] bg-white p-4">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9A95BB]">
+                  Minha célula
+                </div>
+                <h2 className="text-[24px] font-extrabold leading-tight tracking-[-0.04em] text-[#191919]">
+                  {cell.name}
+                </h2>
+                <div className="mt-1 text-[13px] font-semibold text-[#6D5DF0]">{cell.nextMeeting}</div>
+              </div>
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[16px] bg-[#F5F0FF] text-[#6D5DF0]">
+                <Icon name="home" size={22} />
+              </div>
+            </div>
+
+            <div className="mb-4 rounded-[16px] bg-[#FAFAF8] p-4">
               <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#AAAAAA]">
                 Recado da célula
               </div>
               <div className="mt-1 text-[13px] leading-5 text-[#191919]">{cell.notice}</div>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <div className="rounded-[16px] bg-white/60 p-4">
-                <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#9A95BB]">
-                  Pedidos ativos
-                </div>
-                <div className="mt-1 text-[26px] font-bold leading-none tracking-[-0.04em] text-[#6D5DF0]">
-                  {cell.prayerCount}
-                </div>
-                <div className="mt-1 text-[11px] text-[#9A95BB]">em oração</div>
+
+            <div className="mb-5">
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[#AAAAAA]">
+                Liderança
               </div>
-              <div className="rounded-[16px] bg-white/60 p-4">
-                <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#9A95BB]">
-                  Liderança
-                </div>
-                <div className="mt-2 text-[13px] font-semibold leading-tight text-[#191919]">
-                  {cell.leader}
-                </div>
+              <div className="flex flex-col gap-2">
+                {(cell.leaders && cell.leaders.length > 0
+                  ? cell.leaders
+                  : [{ name: cell.leader, role: "Líder" }]
+                ).map((leader, index) => (
+                  <div
+                    key={leader.name}
+                    className={cn(
+                      "flex items-center gap-3 rounded-[14px] px-3 py-2.5",
+                      index === 0 ? "bg-[#F5F0FF]" : "bg-[#FAFAF8]",
+                    )}
+                  >
+                    <div
+                      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                      style={{ background: index === 0 ? "#6D5DF0" : "#C07B1A" }}
+                    >
+                      {leader.name
+                        .split(" ")
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((n) => n.charAt(0))
+                        .join("")
+                        .toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-bold text-[#191919]">{leader.name}</div>
+                      <div className="text-[11px] text-[#9A95BB]">{leader.role}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
+
+            <Link
+              href={cell.href}
+              className="block w-full rounded-full bg-[#6D5DF0] px-4 py-2.5 text-center text-[13px] font-bold text-white shadow-[0_8px_20px_-10px_rgba(109,93,240,0.65)] transition hover:bg-[#5849D6]"
+            >
+              Abrir célula
+            </Link>
           </>
         ) : (
-          <div className="rounded-[20px] border border-dashed border-[rgba(109,93,240,0.25)] bg-[#FAFAF8] p-5">
-            <div className="text-[16px] font-bold text-[#191919]">
-              Você ainda não está em uma célula.
+          <div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9A95BB]">
+              Minha célula
             </div>
-            <p className="mt-2 text-[13px] leading-6 text-[#777777]">
-              Escolha uma célula próxima e comece a participar da vida em comunidade.
-            </p>
-            <Link
-              href="/celulas"
-              className="mt-4 inline-flex rounded-full bg-[#F4532A] px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_10px_24px_-14px_rgba(244,83,42,0.7)] transition hover:bg-[#D94420]"
-            >
-              Ver células
-            </Link>
+            <div className="mt-5 rounded-[20px] border border-dashed border-[rgba(109,93,240,0.25)] bg-[#FAFAF8] p-5">
+              <div className="text-[16px] font-bold text-[#191919]">
+                Você ainda não está em uma célula.
+              </div>
+              <p className="mt-2 text-[13px] leading-6 text-[#777777]">
+                Escolha uma célula próxima e comece a participar da vida em comunidade.
+              </p>
+              <Link
+                href="/celulas"
+                className="mt-4 inline-flex rounded-full bg-[#F4532A] px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_10px_24px_-14px_rgba(244,83,42,0.7)] transition hover:bg-[#D94420]"
+              >
+                Ver células
+              </Link>
+            </div>
           </div>
         )}
       </div>
@@ -1234,11 +1260,20 @@ function MemberSchedulePanel({ items }: { items: UpcomingEventItem[] }) {
 }
 
 function MemberHomeSections({ data }: { data: DashboardV3Data }) {
+  const scheduleItems = data.upcoming.filter((item) => item.icon === "calendar");
+  const hasSchedules = scheduleItems.length > 0;
+
   return (
     <>
       <MemberAgenda items={data.upcoming} />
-      <section className="grid min-w-0 items-stretch gap-6 xl:grid-cols-2">
+      <section
+        className={cn(
+          "grid min-w-0 items-stretch gap-6",
+          hasSchedules ? "xl:grid-cols-3" : "xl:grid-cols-2",
+        )}
+      >
         <MemberCellPanel cell={data.cell} />
+        {hasSchedules && <MemberSchedulePanel items={scheduleItems} />}
         <MemberPrayerPanel items={data.prayers} />
       </section>
       <MemberMinistryGrid />
