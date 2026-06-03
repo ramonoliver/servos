@@ -1265,6 +1265,83 @@ function MemberDevotionalInvite() {
   );
 }
 
+function MemberCellPanel({ cell }: { cell?: CellSummary }) {
+  return (
+    <Panel
+      className="overflow-hidden border-[rgba(109,93,240,0.12)] bg-[#F5F0FF] shadow-[0_14px_40px_-28px_rgba(109,93,240,0.2)]"
+      dataSectionId="member-cell"
+    >
+      <div className="p-6">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9A95BB]">
+              Minha célula
+            </div>
+            <h2 className="text-[22px] font-semibold tracking-[-0.025em] text-[#191919] md:text-[24px]">
+              Comunhão
+            </h2>
+          </div>
+          {cell && (
+            <Link
+              href={cell.href}
+              className="shrink-0 rounded-full bg-[#6D5DF0] px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_8px_20px_-12px_rgba(109,93,240,0.7)] transition hover:bg-[#5849D6]"
+            >
+              Abrir célula
+            </Link>
+          )}
+        </div>
+
+        {cell ? (
+          <>
+            <div className="text-[22px] font-bold tracking-[-0.035em] text-[#191919]">{cell.name}</div>
+            <div className="mt-1 text-[13px] font-semibold text-[#6D5DF0]">{cell.nextMeeting}</div>
+            <div className="mt-4 rounded-[18px] bg-white p-4">
+              <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#AAAAAA]">
+                Recado da célula
+              </div>
+              <div className="mt-1 text-[13px] leading-5 text-[#191919]">{cell.notice}</div>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="rounded-[16px] bg-white/60 p-4">
+                <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#9A95BB]">
+                  Pedidos ativos
+                </div>
+                <div className="mt-1 text-[26px] font-bold leading-none tracking-[-0.04em] text-[#6D5DF0]">
+                  {cell.prayerCount}
+                </div>
+                <div className="mt-1 text-[11px] text-[#9A95BB]">em oração</div>
+              </div>
+              <div className="rounded-[16px] bg-white/60 p-4">
+                <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#9A95BB]">
+                  Liderança
+                </div>
+                <div className="mt-2 text-[13px] font-semibold leading-tight text-[#191919]">
+                  {cell.leader}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="rounded-[20px] border border-dashed border-[rgba(109,93,240,0.25)] bg-[#FAFAF8] p-5">
+            <div className="text-[16px] font-bold text-[#191919]">
+              Você ainda não está em uma célula.
+            </div>
+            <p className="mt-2 text-[13px] leading-6 text-[#777777]">
+              Escolha uma célula próxima e comece a participar da vida em comunidade.
+            </p>
+            <Link
+              href="/celulas"
+              className="mt-4 inline-flex rounded-full bg-[#F4532A] px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_10px_24px_-14px_rgba(244,83,42,0.7)] transition hover:bg-[#D94420]"
+            >
+              Ver células
+            </Link>
+          </div>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
 function MemberHomeSections({ data }: { data: DashboardV3Data }) {
   return (
     <>
