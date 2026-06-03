@@ -90,6 +90,10 @@ export interface User {
   avatar_color: string;
   photo_url: string | null;   // Profile photo URL or base64
   birth_date: string | null;   // ISO date YYYY-MM-DD
+  gender?: "feminino" | "masculino" | "nao_informado";
+  is_child?: boolean;
+  primary_guardian_id?: string | null;
+  guardian_ids?: string[];
   address_cep: string;
   address_street: string;
   address_number: string;

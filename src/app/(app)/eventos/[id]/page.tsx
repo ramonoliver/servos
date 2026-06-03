@@ -6,6 +6,7 @@ import type React from "react";
 import { useApp } from "@/hooks/use-app";
 import { PageShell, PageHeader } from "@/components/ui";
 import { EventFormModal } from "@/components/events/event-form-modal";
+import { KidsEventCheckInSection } from "@/components/kids/kids-ui";
 import { supabase } from "@/lib/supabase/client";
 import { getEventCategory } from "@/lib/events/recurrence";
 import type { Event, EventReport } from "@/types";
@@ -312,6 +313,8 @@ export default function EventoDetailPage({ params }: { params: { id: string } })
         <KpiCard icon="spark" value={form.visitors_count} label="Visitantes" description="precisam de conexão" tone="visitor" />
         <KpiCard icon="heart" value={form.children_count} label="Crianças" description="participaram do evento" tone="care" />
       </div>
+
+      <KidsEventCheckInSection eventId={event.id} eventDate={eventDate} eventName={event.name} />
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_410px]">
         <section className="space-y-5">

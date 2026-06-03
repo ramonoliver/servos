@@ -3,8 +3,9 @@
 import { useMemo, useState, useRef } from "react";
 import { ActionDrawer } from "@/components/ui/action-drawer";
 import { PageIntro, PersonCard, SoftCard } from "@/components/pastoral/pastoral-ui";
+import { calculateAge } from "@/lib/kids/domain";
 import { pastoralCells, pastoralMinistries, pastoralPeople, pastoralTags } from "@/lib/pastoral/mock-data";
-import type { PastoralPerson, PersonKind } from "@/lib/pastoral/types";
+import type { PastoralPerson, PersonGender, PersonKind } from "@/lib/pastoral/types";
 
 const kindOptions: { value: PersonKind | "all"; label: string }[] = [
   { value: "all", label: "Todas" },
@@ -59,9 +60,14 @@ const emptyForm = {
   phone: "",
   email: "",
   birthDate: "",
+  gender: "nao_informado" as PersonGender,
   kind: "visitor" as PersonKind,
   cellId: "",
   ministryId: "",
+  guardianName: "",
+  guardianPhone: "",
+  secondGuardianName: "",
+  secondGuardianPhone: "",
   cep: "",
   street: "",
   number: "",
@@ -83,6 +89,8 @@ export default function PessoasPage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [cepLoading, setCepLoading] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const newPersonAge = calculateAge(newPerson.birthDate);
+  const isChildPerson = newPersonAge !== null && newPersonAge <= 12;
 
   const people = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -147,6 +155,7 @@ export default function PessoasPage() {
   function createPerson() {
     const name = newPerson.fullName.trim();
     if (!name) return;
+    if (isChildPerson && !newPerson.guardianName.trim()) return;
 
     const addressParts = [
       newPerson.street,
@@ -166,7 +175,7 @@ export default function PessoasPage() {
       phone: newPerson.phone,
       email: newPerson.email,
       birthDate: newPerson.birthDate,
-      gender: "nao_informado",
+      gender: newPerson.gender,
       maritalStatus: "nao_informado",
       address: addressParts.join(", "),
       instagram: "",
@@ -323,7 +332,24 @@ export default function PessoasPage() {
                       setNewPerson((p) => ({ ...p, birthDate: parseDateMask(masked) }));
                     }}
                   />
+                  {newPersonAge !== null && (
+                    <div className="mt-1 text-[11px] font-semibold text-ink-faint">
+                      Idade calculada: {newPersonAge} anos
+                    </div>
+                  )}
                 </div>
+              </div>
+              <div>
+                <label className="input-label">Sexo</label>
+                <select
+                  className="input-field"
+                  value={newPerson.gender}
+                  onChange={(e) => setNewPerson((p) => ({ ...p, gender: e.target.value as PersonGender }))}
+                >
+                  <option value="nao_informado">Nao informado</option>
+                  <option value="feminino">Feminino</option>
+                  <option value="masculino">Masculino</option>
+                </select>
               </div>
               <div>
                 <label className="input-label">E-mail</label>
@@ -337,6 +363,57 @@ export default function PessoasPage() {
               </div>
             </div>
           </div>
+
+          {isChildPerson && (
+            <div className="rounded-[22px] border border-brand/15 bg-[#FFF8ED] p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-ink-faint mb-3">Responsáveis obrigatórios</p>
+              <div className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="input-label">Responsável principal *</label>
+                    <input
+                      className="input-field"
+                      placeholder="Nome do responsável"
+                      value={newPerson.guardianName}
+                      onChange={(e) => setNewPerson((p) => ({ ...p, guardianName: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="input-label">Telefone *</label>
+                    <input
+                      className="input-field"
+                      placeholder="(00) 00000-0000"
+                      value={newPerson.guardianPhone}
+                      onChange={(e) => setNewPerson((p) => ({ ...p, guardianPhone: formatPhone(e.target.value) }))}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="input-label">Segundo responsável</label>
+                    <input
+                      className="input-field"
+                      placeholder="Opcional"
+                      value={newPerson.secondGuardianName}
+                      onChange={(e) => setNewPerson((p) => ({ ...p, secondGuardianName: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="input-label">Telefone</label>
+                    <input
+                      className="input-field"
+                      placeholder="Opcional"
+                      value={newPerson.secondGuardianPhone}
+                      onChange={(e) => setNewPerson((p) => ({ ...p, secondGuardianPhone: formatPhone(e.target.value) }))}
+                    />
+                  </div>
+                </div>
+                <div className="rounded-[16px] bg-white/70 px-4 py-3 text-[12px] font-semibold leading-5 text-[#9A6414]">
+                  Pessoas com 12 anos ou menos precisam de pelo menos um responsável vinculado antes de salvar.
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Perfil */}
           <div>
@@ -456,7 +533,7 @@ export default function PessoasPage() {
           <button
             className="btn btn-primary w-full"
             onClick={createPerson}
-            disabled={!newPerson.fullName.trim()}
+            disabled={!newPerson.fullName.trim() || (isChildPerson && !newPerson.guardianName.trim())}
           >
             Criar pessoa
           </button>

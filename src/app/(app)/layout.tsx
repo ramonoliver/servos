@@ -80,6 +80,7 @@ function ShellV2({ children }: { children: React.ReactNode }) {
     { href: "/dashboard", label: "Início", icon: "home", show: true },
     { href: "/calendario", label: "Agenda", icon: "calendar-days", show: true },
     { href: "/pessoas", label: "Pessoas", icon: "users", show: !isMember },
+    { href: "/kids", label: "Kids", icon: "shield", show: !isMember },
     { href: "/celulas", label: "Células", icon: "house", show: !isMember },
     { href: isMember ? "/minhas-escalas" : "/ministerios", label: "Ministérios", icon: "heart", show: true },
     { href: "/comunicacao", label: "Comunicação", icon: "message-circle", show: canDo("message.send") || !isAdmin },
