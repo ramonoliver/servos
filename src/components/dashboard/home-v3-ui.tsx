@@ -102,6 +102,14 @@ export type QuickActionItem = {
   icon: IconName;
 };
 
+export type NoticeItem = {
+  title: string;
+  body: string;
+  time: string;
+  href: string;
+  scope: "Ministério" | "Célula" | "Aviso";
+};
+
 export type DashboardV3Data = {
   profileMode: ProfileMode;
   greeting: string;
@@ -120,6 +128,7 @@ export type DashboardV3Data = {
   cell?: CellSummary;
   prayers: PrayerRequestCardData[];
   quickActions: QuickActionItem[];
+  notices: NoticeItem[];
 };
 
 const toneSurface: Record<Tone, string> = {
@@ -235,9 +244,11 @@ function Panel({
 export function DashboardHero({
   title,
   unreadNotifications,
+  quickActions,
 }: {
   title: string;
   unreadNotifications: number;
+  quickActions: QuickActionItem[];
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
@@ -342,13 +353,7 @@ export function DashboardHero({
 
             {quickActionsOpen && (
               <div className="absolute right-0 top-[calc(100%+8px)] z-30 w-44 overflow-hidden rounded-[14px] border border-[#F0EFEB] bg-white shadow-[0_12px_32px_-16px_rgba(25,25,25,0.25)]">
-                {(
-                  [
-                    { label: "Nova escala", href: "/escalas/nova", icon: "plus" as const },
-                    { label: "Nova célula", href: "/celulas", icon: "home" as const },
-                    { label: "Nova pessoa", href: "/pessoas", icon: "users" as const },
-                  ] as const
-                ).map((item, i, arr) => (
+                {quickActions.map((item, i, arr) => (
                   <Link
                     key={item.label}
                     href={item.href}
@@ -534,6 +539,103 @@ export function UpcomingEvents({ items }: { items: UpcomingEventItem[] }) {
           );
         })}
       </div>
+    </Panel>
+  );
+}
+
+export function MemberAgenda({ items }: { items: UpcomingEventItem[] }) {
+  return (
+    <Panel className="p-6" dataSectionId="member-agenda">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#AAAAAA]">
+            Agenda pessoal
+          </div>
+          <h2 className="text-[22px] font-semibold tracking-[-0.025em] text-[#191919] md:text-[24px]">
+            Seus compromissos
+          </h2>
+        </div>
+        <Link
+          href="/escalas"
+          className="shrink-0 text-[13px] font-semibold text-[#F4532A] transition hover:opacity-75"
+        >
+          Ver todos
+        </Link>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="rounded-[24px] border border-dashed border-[#E6E0D7] bg-[#FAFAF8] px-5 py-10 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-white text-[#F4532A]">
+            <Icon name="calendar" size={20} />
+          </div>
+          <div className="mt-4 text-[15px] font-bold text-[#191919]">Nenhum compromisso publicado</div>
+          <p className="mx-auto mt-1 max-w-[300px] text-[13px] leading-5 text-[#777777]">
+            Quando houver escala, encontro de célula ou evento para você, aparece aqui.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {items.slice(0, 4).map((item) => {
+            const isEscala = item.icon === "calendar";
+            return (
+              <div
+                key={`${item.title}-${item.time}`}
+                className={cn(
+                  "flex items-center gap-4 rounded-[18px] p-4",
+                  isEscala
+                    ? "border border-[rgba(244,83,42,0.18)] bg-[#FFF0EC]"
+                    : "border border-[rgba(74,90,222,0.14)] bg-[#EEF1FF]",
+                )}
+              >
+                <div
+                  className={cn(
+                    "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px] bg-white",
+                    isEscala ? "text-[#F4532A]" : "text-[#4A5ADE]",
+                  )}
+                >
+                  <Icon name={item.icon} size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[14px] font-bold text-[#191919]">{item.title}</div>
+                  <div className="mt-1 text-[12px] text-[#777777]">
+                    {item.time} · {item.location}
+                  </div>
+                  {isEscala && item.badge === "Confirmar" && (
+                    <span className="mt-2 inline-block rounded-full border border-[rgba(244,83,42,0.2)] bg-[#FFF0EC] px-2.5 py-0.5 text-[10px] font-bold text-[#D94420]">
+                      Aguardando confirmação
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-shrink-0 gap-2">
+                  {isEscala ? (
+                    <>
+                      <Link
+                        href={item.href}
+                        className="rounded-full bg-[#F4532A] px-3.5 py-2 text-[11px] font-bold text-white shadow-[0_6px_16px_-8px_rgba(244,83,42,0.55)] transition hover:bg-[#D94420]"
+                      >
+                        ✓ Vou
+                      </Link>
+                      <Link
+                        href={item.href}
+                        className="rounded-full border border-[#F0EFEB] bg-white px-3 py-2 text-[11px] font-semibold text-[#777777] transition hover:bg-[#FAFAF8]"
+                      >
+                        ✕
+                      </Link>
+                    </>
+                  ) : (
+                    <Link
+                      href={item.href}
+                      className="rounded-full border border-[rgba(74,90,222,0.25)] bg-white px-3.5 py-2 text-[11px] font-bold text-[#4A5ADE] transition hover:bg-[#EEF1FF]"
+                    >
+                      Ver célula
+                    </Link>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </Panel>
   );
 }
@@ -747,31 +849,198 @@ export function InsightCards({ items, className }: { items: Insight[]; className
 export function CellCard({ cell }: { cell?: CellSummary }) {
   if (!cell) return null;
   return (
-    <Panel className="bg-[#F5F0FF] p-6" dataSectionId="cell">
-      <SectionTitle title="Minha célula" eyebrow="Comunhão" />
-      <div className="rounded-[24px] bg-white/70 p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-[18px] font-semibold tracking-[-0.025em] text-[#191919]">{cell.name}</div>
-            <p className="mt-2 text-[13px] leading-6 text-[#777777]">{cell.nextMeeting}</p>
+    <Panel className="overflow-hidden bg-[#F5F0FF]" dataSectionId="cell">
+      <div className="p-6">
+        <SectionTitle title="Minha célula" eyebrow="Comunhão" />
+        <div className="rounded-[26px] bg-white/80 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-[22px] font-bold tracking-[-0.035em] text-[#191919]">{cell.name}</div>
+              <p className="mt-2 text-[13px] leading-6 text-[#777777]">{cell.nextMeeting}</p>
+            </div>
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-[#F5F0FF] text-[#7B61FF]">
+              <Icon name="home" size={24} />
+            </div>
           </div>
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#7B61FF]">
-            <Icon name="home" size={22} />
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[18px] bg-[#FAFAF8] p-4 sm:col-span-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#AAAAAA]">Aviso da célula</div>
+              <div className="mt-1 text-[13px] leading-5 text-[#191919]">{cell.notice}</div>
+            </div>
+            <div className="rounded-[18px] bg-[#FAFAF8] p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#AAAAAA]">Pedidos</div>
+              <div className="mt-1 text-[26px] font-bold leading-none tracking-[-0.04em] text-[#7B61FF]">{cell.prayerCount}</div>
+              <div className="mt-1 text-[12px] text-[#777777]">em oração</div>
+            </div>
           </div>
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-[18px] bg-white p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#AAAAAA]">Aviso</div>
-            <div className="mt-1 text-[13px] leading-5 text-[#191919]">{cell.notice}</div>
-          </div>
-          <div className="rounded-[18px] bg-white p-4">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[22px] bg-white/45 px-4 py-3">
+          <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#AAAAAA]">Liderança</div>
-            <div className="mt-1 text-[13px] leading-5 text-[#191919]">{cell.leader}</div>
-            <div className="mt-1 text-[12px] text-[#777777]">{cell.prayerCount} pedidos de oração</div>
+            <div className="mt-0.5 text-[13px] font-semibold text-[#191919]">{cell.leader}</div>
           </div>
+          <Link href={cell.href} className="rounded-full bg-[#6D5DF0] px-4 py-2.5 text-[13px] font-semibold text-white shadow-[0_14px_28px_-18px_rgba(109,93,240,0.85)]">Abrir célula</Link>
         </div>
       </div>
     </Panel>
+  );
+}
+
+export function MemberNotices({ notices }: { notices: NoticeItem[] }) {
+  return (
+    <motion.section
+      data-section="member-notices"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: "easeOut", delay: 0.04 }}
+      className="rounded-[28px] border border-[#F0EFEB] bg-white p-5 shadow-[0_18px_50px_-36px_rgba(25,25,25,0.28)] md:p-6"
+    >
+      <div className="mb-5 flex items-start justify-between gap-4 border-b border-[#F0EFEB] pb-5">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#AAAAAA]">Avisos</div>
+          <h2 className="mt-1 text-[24px] font-bold text-[#191919]">Notificações</h2>
+          <p className="mt-1 text-[13px] leading-5 text-[#777777]">Recados ligados ao seu ministério e à sua célula.</p>
+        </div>
+        <Link
+          href="/notificacoes"
+          className="shrink-0 rounded-full border border-[#F0EFEB] bg-[#FAFAF8] px-3.5 py-2 text-[12px] font-bold text-[#191919] transition hover:bg-white"
+        >
+          Ver todas
+        </Link>
+      </div>
+
+      {notices.length === 0 ? (
+        <div className="rounded-[24px] border border-dashed border-[#E6E0D7] bg-[#FAFAF8] px-5 py-10 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[18px] bg-white text-[#F4532A]">
+            <Icon name="bell" size={20} />
+          </div>
+          <div className="mt-4 text-[15px] font-bold text-[#191919]">Nenhum aviso novo</div>
+          <p className="mx-auto mt-1 max-w-[280px] text-[13px] leading-5 text-[#777777]">Quando seu ministério ou célula enviar algo, aparece aqui.</p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-[24px] border border-[#F0EFEB] bg-[#FAFAF8]">
+          <div className="divide-y divide-[#F0EFEB]">
+            {notices.slice(0, 5).map((notice) => {
+              return (
+                <Link
+                  key={`${notice.title}-${notice.time}`}
+                  href={notice.href}
+                  className="group grid min-w-0 grid-cols-[18px_minmax(0,1fr)_18px] gap-3 px-4 py-4 transition hover:bg-white"
+                >
+                  <div className="pt-1.5">
+                    <span className="block h-2.5 w-2.5 rounded-full bg-[#F4532A]" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold text-[#AAAAAA]">{notice.time}</div>
+                    <div className="mt-1.5 text-[14px] font-bold leading-snug text-[#191919]">{notice.title}</div>
+                    <p className="mt-1 text-[12px] leading-5 text-[#777777]">{notice.body}</p>
+                  </div>
+                  <Icon name="chevron" size={16} className="mt-6 shrink-0 text-[#BBBBBB] transition group-hover:translate-x-0.5 group-hover:text-[#F4532A]" />
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </motion.section>
+  );
+}
+
+export function MemberCommunion({ cell }: { cell?: CellSummary }) {
+  return (
+    <motion.section
+      data-section="member-communion"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: "easeOut", delay: 0.02 }}
+      className="rounded-[28px] border border-[#F0EFEB] bg-white p-5 shadow-[0_18px_50px_-36px_rgba(25,25,25,0.28)] md:p-6"
+    >
+      <div className="flex flex-col gap-3 border-b border-[#F0EFEB] pb-5 md:flex-row md:items-end md:justify-between">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#AAAAAA]">Comunhão</div>
+          <h2 className="mt-1 text-[24px] font-bold text-[#191919]">
+            {cell ? "Minha célula" : "Caminhe em uma célula"}
+          </h2>
+          <p className="mt-1 max-w-[520px] text-[13px] leading-5 text-[#777777]">
+            {cell ? "Encontro, liderança e recados da sua célula." : "Você ainda não está vinculado a uma célula."}
+          </p>
+        </div>
+        {cell && (
+          <Link
+            href={cell.href}
+            className="inline-flex w-fit items-center gap-2 rounded-full bg-[#6D5DF0] px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_14px_28px_-18px_rgba(109,93,240,0.75)] transition hover:bg-[#5849D6]"
+          >
+            Abrir célula
+            <Icon name="arrow" size={14} />
+          </Link>
+        )}
+      </div>
+
+      {cell ? (
+        <div className="mt-5 overflow-hidden rounded-[24px] border border-[#E6E0D7] bg-[#FAFAF8]">
+          <div className="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_250px]">
+            <div className="min-w-0 p-5 md:p-6">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#F5F0FF] text-[#6D5DF0]">
+                <Icon name="home" size={22} />
+              </div>
+              <h3 className="text-[26px] font-black leading-tight text-[#191919] md:text-[30px]">{cell.name}</h3>
+              <p className="mt-2 max-w-[620px] text-[14px] leading-6 text-[#777777]">{cell.nextMeeting}</p>
+
+              <div className="mt-5 rounded-[20px] border border-[#F0EFEB] bg-white px-4 py-3.5">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-[#FFF0EC] text-[#F4532A]">
+                    <Icon name="bell" size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#AAAAAA]">Recado da célula</div>
+                    <div className="mt-1 text-[13px] leading-5 text-[#191919]">{cell.notice}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <aside className="border-t border-[#F0EFEB] bg-white p-5 lg:border-l lg:border-t-0">
+              <div className="space-y-5">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#AAAAAA]">Liderança</div>
+                  <div className="mt-1 text-[15px] font-bold leading-snug text-[#191919]">{cell.leader}</div>
+                </div>
+                <div className="border-t border-[#F0EFEB] pt-5">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#AAAAAA]">Pedidos de oração</div>
+                  <div className="mt-2 flex items-end gap-2">
+                    <span className="text-[38px] font-black leading-none text-[#6D5DF0]">{cell.prayerCount}</span>
+                    <span className="pb-1 text-[12px] font-semibold text-[#777777]">ativos</span>
+                  </div>
+                </div>
+                <Link
+                  href={cell.href}
+                  className="inline-flex w-full items-center justify-center rounded-full border border-[#E6E0D7] bg-[#FAFAF8] px-4 py-2.5 text-[13px] font-bold text-[#191919] transition hover:bg-white"
+                >
+                  Ver detalhes
+                </Link>
+              </div>
+            </aside>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-5 rounded-[24px] border border-dashed border-[#E6E0D7] bg-[#FAFAF8] p-5">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <div className="text-[18px] font-black text-[#191919]">Encontre uma comunidade para a semana.</div>
+              <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-[#777777]">
+                Células ajudam você a conhecer pessoas, receber cuidado e participar da vida da igreja fora dos cultos.
+              </p>
+            </div>
+            <Link
+              href="/celulas"
+              className="inline-flex w-fit rounded-full bg-[#F4532A] px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_14px_28px_-18px_rgba(244,83,42,0.75)] transition hover:bg-[#D94420]"
+            >
+              Ver células
+            </Link>
+          </div>
+        </div>
+      )}
+    </motion.section>
   );
 }
 
@@ -797,6 +1066,216 @@ export function PrayerRequestCard({ items }: { items: PrayerRequestCardData[] })
         ))}
       </div>
     </Panel>
+  );
+}
+
+function MemberCellOverview({ cell }: { cell?: CellSummary }) {
+  return (
+    <Panel className="flex h-full flex-col p-6 md:p-7" dataSectionId="member-cell-overview">
+      <div className="mb-8">
+        <h2 className="text-[24px] font-bold tracking-[-0.035em] text-[#191919]">Minha célula</h2>
+        <p className="mt-2 text-[15px] leading-6 text-[#7B7890]">
+          {cell ? "Onde você cresce junto com outras pessoas." : "Encontre uma comunidade para caminhar durante a semana."}
+        </p>
+      </div>
+
+      {cell ? (
+        <>
+          <div className="flex flex-1 flex-col rounded-[24px] bg-[linear-gradient(135deg,#F7F1FF_0%,#FFFFFF_62%,#F5F0FF_100%)] p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-[30px] font-bold tracking-[-0.05em] text-[#6D5DF0]">{cell.name}</h3>
+                <p className="mt-2 max-w-[380px] text-[14px] leading-6 text-[#6F6A84]">{cell.notice}</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-white/75 px-4 py-2 text-[13px] font-bold text-[#5F52C8]">{Math.max(cell.prayerCount + 9, 12)} membros</span>
+            </div>
+            <div className="mt-7 rounded-[20px] border border-white bg-white/70 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] bg-[#F5F0FF] text-[#6D5DF0]">
+                  <Icon name="calendar" size={17} />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#AAA4C0]">Próximo encontro</div>
+                  <div className="mt-1 text-[14px] font-bold leading-6 text-[#3F3A55]">{cell.nextMeeting}</div>
+                  <div className="mt-1 text-[12px] font-semibold text-[#8C86A3]">Data / Horário / Local</div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {[
+                { label: "Pedidos ativos", value: cell.prayerCount, icon: "heart" as IconName },
+                { label: "Membros", value: Math.max(cell.prayerCount + 9, 12), icon: "users" as IconName },
+                { label: "Avisos", value: 2, icon: "bell" as IconName },
+              ].map((item) => (
+                <div key={item.label} className="rounded-[18px] border border-white bg-white/60 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <div className="text-[24px] font-bold leading-none tracking-[-0.04em] text-[#6D5DF0]">{item.value}</div>
+                      <div className="mt-1 text-[11px] font-bold text-[#6F6A84]">{item.label}</div>
+                    </div>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-[#F5F0FF] text-[#6D5DF0]">
+                      <Icon name={item.icon} size={15} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 rounded-[20px] border border-white bg-white/70 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <Avatar name={cell.leader} size={42} color="#C07B1A" photoUrl={null} />
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#AAA4C0]">Liderança</div>
+                    <div className="mt-1 truncate text-[14px] font-bold text-[#191919]">{cell.leader}</div>
+                  </div>
+                </div>
+                <Link href={cell.href} className="shrink-0 rounded-full bg-[#6D5DF0] px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_14px_28px_-18px_rgba(109,93,240,0.75)] transition hover:bg-[#5849D6]">
+                  Ver célula
+                </Link>
+              </div>
+            </div>
+          </div>
+          <div className="mt-5 grid grid-cols-4 gap-3 text-center">
+            {[
+              { label: "Mensagens", icon: "message" as IconName },
+              { label: "Participantes", icon: "users" as IconName },
+              { label: "Avisos", icon: "bell" as IconName },
+              { label: "Ver célula", icon: "heart" as IconName },
+            ].map((item) => (
+              <Link key={item.label} href={cell.href} className="group min-w-0">
+                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-[17px] bg-[#F5F0FF] text-[#6D5DF0] transition group-hover:bg-[#EEE7FF]">
+                  <Icon name={item.icon} size={18} />
+                </div>
+                <div className="mt-2 truncate text-[12px] font-bold text-[#3F3A55]">{item.label}</div>
+              </Link>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="rounded-[24px] border border-dashed border-[#E6E0D7] bg-[#FAFAF8] p-6">
+          <div className="text-[20px] font-bold text-[#191919]">Você ainda não está em uma célula.</div>
+          <p className="mt-2 text-[14px] leading-6 text-[#7B7890]">Escolha uma célula próxima e comece a participar da vida em comunidade.</p>
+          <Link href="/celulas" className="mt-5 inline-flex rounded-full bg-brand px-4 py-2.5 text-[13px] font-bold text-white transition hover:bg-brand-dark">Encontrar célula</Link>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function MemberPrayerList({ items }: { items: PrayerRequestCardData[] }) {
+  const prayers = [
+    ...items.map((item, index) => ({ ...item, time: ["há 2h", "há 5h", "há 1d"][index] || "há 2d" })),
+    { title: "Pela saúde da minha mãe", description: "Ela está fazendo exames e seguimos em oração.", person: "Ana Souza", href: "/pedidos-oracao", time: "há 2h" },
+    { title: "Sabedoria nas decisões", description: "Por direção nas decisões profissionais.", person: "João Mendes", href: "/pedidos-oracao", time: "há 5h" },
+    { title: "Unidade na família", description: "Pelo meu casamento e por unidade na nossa família.", person: "Mariana Lima", href: "/pedidos-oracao", time: "há 1d" },
+    { title: "Novo trabalho", description: "Por um novo trabalho e direção de Deus.", person: "Carlos Eduardo", href: "/pedidos-oracao", time: "há 2d" },
+  ].slice(0, 4);
+
+  return (
+    <Panel className="flex h-full flex-col p-6 md:p-7" dataSectionId="member-prayers">
+      <div className="mb-6 flex items-start justify-between gap-4 border-b border-[#ECEAF4] pb-6">
+        <div>
+          <h2 className="text-[24px] font-bold tracking-[-0.035em] text-[#191919]">Pedidos de oração</h2>
+          <p className="mt-2 text-[15px] leading-6 text-[#7B7890]">Vamos orar uns pelos outros.</p>
+        </div>
+        <Link href="/pedidos-oracao" className="rounded-full border border-[#ECEAF4] bg-white px-5 py-3 text-[13px] font-bold text-[#191919] transition hover:bg-[#FAFAF8]">Ver todos</Link>
+      </div>
+      <div className="flex-1 space-y-5">
+        {prayers.map((item, index) => (
+          <Link key={`${item.person}-${index}`} href={item.href} className="grid grid-cols-[48px_minmax(0,1fr)_auto] gap-4">
+            <Avatar name={item.person} size={48} color={["#C07B1A", "#6D5DF0", "#1F8044", "#D94420"][index % 4]} photoUrl={null} />
+            <div className="min-w-0">
+              <div className="truncate text-[15px] font-bold text-[#191919]">{item.person}</div>
+              <p className="mt-1 line-clamp-2 text-[14px] leading-6 text-[#7B7890]">{item.description || item.title}</p>
+            </div>
+            <div className="pt-1 text-[12px] font-semibold text-[#9A96AA]">{item.time}</div>
+          </Link>
+        ))}
+      </div>
+      <Link href="/pedidos-oracao" className="mt-7 flex w-full items-center justify-center gap-2 rounded-full border border-[#ECEAF4] bg-white px-5 py-3.5 text-[15px] font-bold text-[#191919] transition hover:bg-[#FAFAF8]">
+        <Icon name="plus" size={17} />
+        Fazer pedido de oração
+      </Link>
+    </Panel>
+  );
+}
+
+function MemberServeSection() {
+  const ministries = [
+    { title: "Ministério de Louvor", description: "Use seu talento para glorificar a Deus.", spots: "3 vagas", icon: "spark" as IconName, tone: "bg-[#EEF9F1] text-[#2A9A57] border-[#DDEFE3]" },
+    { title: "Acolhimento", description: "Receba as pessoas com amor e alegria.", spots: "5 vagas", icon: "heart" as IconName, tone: "bg-[#FFF8ED] text-[#D99025] border-[#F2E0C2]" },
+    { title: "Ministério Kids", description: "Trabalhe com crianças e faça a diferença.", spots: "2 vagas", icon: "users" as IconName, tone: "bg-[#F5F0FF] text-[#6D5DF0] border-[#E5DDFE]" },
+    { title: "Mídia", description: "Sirva com criatividade na comunicação.", spots: "4 vagas", icon: "message" as IconName, tone: "bg-[#EEF4FF] text-[#3B6CF4] border-[#DCE7FF]" },
+  ];
+
+  return (
+    <Panel className="p-6 md:p-7" dataSectionId="member-serve">
+      <div className="mb-7 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h2 className="text-[24px] font-bold tracking-[-0.035em] text-[#191919]">Em que você quer servir?</h2>
+          <p className="mt-2 text-[15px] leading-6 text-[#7B7890]">Descubra oportunidades para usar seus dons.</p>
+        </div>
+        <Link href="/ministerios" className="inline-flex w-fit items-center gap-2 rounded-full border border-[#ECEAF4] bg-white px-5 py-3 text-[13px] font-bold text-[#191919] transition hover:bg-[#FAFAF8]">
+          Ver ministérios
+          <Icon name="arrow" size={14} />
+        </Link>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {ministries.map((item) => (
+          <Link key={item.title} href="/ministerios" className={cn("min-h-[190px] rounded-[22px] border p-6 transition hover:shadow-[0_18px_42px_-28px_rgba(25,25,25,0.28)]", item.tone)}>
+            <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-white/70">
+              <Icon name={item.icon} size={22} />
+            </div>
+            <h3 className="mt-8 text-[19px] font-bold leading-tight tracking-[-0.025em] text-[#191919]">{item.title}</h3>
+            <p className="mt-2 text-[14px] leading-6 text-[#7B7890]">{item.description}</p>
+            <span className="mt-6 inline-flex rounded-full bg-white/70 px-3 py-1.5 text-[12px] font-bold">{item.spots}</span>
+          </Link>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function MemberDevotionalInvite() {
+  return (
+    <Panel className="overflow-hidden border-white bg-[linear-gradient(135deg,#FFF4EC_0%,#FFFFFF_52%,#F5F0FF_100%)]" dataSectionId="member-devotional">
+      <div className="relative p-7 md:p-8">
+        <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-[#FF6B57]/10 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-0 right-12 hidden h-28 w-52 md:block">
+          <div className="absolute bottom-0 left-4 h-20 w-20 rounded-t-[34px] bg-[#8C72FF]/85" />
+          <div className="absolute bottom-0 left-20 h-24 w-20 rounded-t-[34px] bg-[#FFB84D]/90" />
+          <div className="absolute left-[78px] top-5 h-10 w-14 rounded-full border-2 border-[#6D5DF0]/25" />
+        </div>
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-[600px]">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/65 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#D94420]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#F4532A]" />
+              Comunhão
+            </div>
+            <h3 className="text-[30px] font-bold leading-tight tracking-[-0.05em] text-[#191919] md:text-[36px]">Convide alguém hoje</h3>
+            <p className="mt-3 max-w-[520px] text-[15px] leading-7 text-[#6F6A84]">Um convite simples pode aproximar alguém da igreja nesta semana. Compartilhe o próximo culto, célula ou encontro com quem você tem acompanhado.</p>
+          </div>
+          <Link href="/comunicacao" className="inline-flex w-fit items-center gap-2 rounded-full bg-brand px-5 py-3 text-[14px] font-bold text-white shadow-[0_18px_38px_-22px_rgba(244,83,42,0.95)] transition hover:bg-brand-dark">
+            Compartilhar convite
+            <Icon name="arrow" size={15} />
+          </Link>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function MemberHomeSections({ data }: { data: DashboardV3Data }) {
+  return (
+    <>
+      <MemberAgenda items={data.upcoming} />
+      <section className="grid min-w-0 items-stretch gap-6 xl:grid-cols-2">
+        <MemberCellOverview cell={data.cell} />
+        <MemberPrayerList items={data.prayers} />
+      </section>
+      <MemberServeSection />
+      <MemberDevotionalInvite />
+    </>
   );
 }
 
@@ -835,6 +1314,7 @@ export function PersonalizedEmptyState() {
 export function DashboardV3Home({ data }: { data: DashboardV3Data }) {
   const showPastoralManagement = data.profileMode === "admin" || data.profileMode === "hybrid";
   const showCellLife = data.profileMode === "hybrid" || data.profileMode === "cellMember";
+  const showMemberHome = data.profileMode === "departmentMember" || data.profileMode === "cellMember";
 
   return (
     <div className="min-h-screen">
@@ -842,24 +1322,32 @@ export function DashboardV3Home({ data }: { data: DashboardV3Data }) {
         <DashboardHero
           title={data.heroTitle}
           unreadNotifications={data.unreadNotifications}
+          quickActions={data.quickActions}
         />
         {data.profileMode === "connect" && <PersonalizedEmptyState />}
-        <PriorityCards items={data.priorities} />
 
-        <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(280px,340px)]">
-          {showPastoralManagement ? <PriorityList items={data.priorityItems} /> : <ActivityTimeline items={data.timeline} />}
-          {showPastoralManagement ? <ActivityTimeline items={data.timeline} /> : <PrayerRequestCard items={data.prayers} />}
-          <UpcomingEvents items={data.upcoming} />
-        </section>
+        {showMemberHome ? (
+          <MemberHomeSections data={data} />
+        ) : (
+          <>
+            <PriorityCards items={data.priorities} />
 
-        <section className="grid min-w-0 items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          {showPastoralManagement ? <CarePeopleSection people={data.carePeople} /> : showCellLife ? <CellCard cell={data.cell} /> : <PrayerRequestCard items={data.prayers} />}
-          <div className={cn("space-y-6", showPastoralManagement && !showCellLife && "flex h-full flex-col")}> 
-            {showCellLife && showPastoralManagement && <CellCard cell={data.cell} />}
-            <InsightCards items={data.insights} className={showPastoralManagement && !showCellLife ? "h-full" : undefined} />
-            {!showPastoralManagement && showCellLife && <PrayerRequestCard items={data.prayers} />}
-          </div>
-        </section>
+            <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(280px,340px)]">
+              {showPastoralManagement ? <PriorityList items={data.priorityItems} /> : <ActivityTimeline items={data.timeline} />}
+              {showPastoralManagement ? <ActivityTimeline items={data.timeline} /> : <PrayerRequestCard items={data.prayers} />}
+              <UpcomingEvents items={data.upcoming} />
+            </section>
+
+            <section className="grid min-w-0 items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              {showPastoralManagement ? <CarePeopleSection people={data.carePeople} /> : showCellLife ? <CellCard cell={data.cell} /> : <PrayerRequestCard items={data.prayers} />}
+              <div className={cn("space-y-6", showPastoralManagement && !showCellLife && "flex h-full flex-col")}>
+                {showCellLife && showPastoralManagement && <CellCard cell={data.cell} />}
+                <InsightCards items={data.insights} className={showPastoralManagement && !showCellLife ? "h-full" : undefined} />
+                {!showPastoralManagement && showCellLife && <PrayerRequestCard items={data.prayers} />}
+              </div>
+            </section>
+          </>
+        )}
       </div>
     </div>
   );
