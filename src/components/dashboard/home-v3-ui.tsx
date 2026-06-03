@@ -939,6 +939,12 @@ function MemberCellPanel({ cell }: { cell?: CellSummary }) {
                   {cell.name}
                 </h2>
                 <div className="mt-1 text-[13px] font-semibold text-[#6D5DF0]">{cell.nextMeeting}</div>
+                {cell.userIsLeader && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#6D5DF0] px-3 py-1 text-[11px] font-bold text-white">
+                    <Icon name="spark" size={11} />
+                    Você lidera esta célula
+                  </div>
+                )}
               </div>
               <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[16px] bg-[#F5F0FF] text-[#6D5DF0]">
                 <Icon name="home" size={22} />
@@ -1257,6 +1263,32 @@ function MemberSchedulePanel({ items }: { items: UpcomingEventItem[] }) {
         })}
       </div>
     </Panel>
+  );
+}
+
+function HybridHomeSections({ data }: { data: DashboardV3Data }) {
+  return (
+    <>
+      <PriorityCards items={data.priorities} />
+
+      <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(280px,340px)]">
+        <PriorityList items={data.priorityItems} />
+        <ActivityTimeline items={data.timeline} />
+        <UpcomingEvents items={data.upcoming} />
+      </section>
+
+      <section className="grid min-w-0 items-stretch gap-5 xl:grid-cols-2">
+        <CarePeopleSection people={data.carePeople} />
+        <InsightCards items={data.insights} />
+      </section>
+
+      <MemberAgenda items={data.upcoming} />
+
+      <section className="grid min-w-0 items-stretch gap-6 xl:grid-cols-2">
+        <MemberCellPanel cell={data.cell} />
+        <MemberPrayerPanel items={data.prayers} />
+      </section>
+    </>
   );
 }
 
