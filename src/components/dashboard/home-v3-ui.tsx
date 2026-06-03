@@ -574,60 +574,67 @@ export function MemberAgenda({ items }: { items: UpcomingEventItem[] }) {
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           {items.slice(0, 4).map((item) => {
             const isEscala = item.icon === "calendar";
+            const isPending = isEscala && item.badge === "Confirmar";
+            const isConfirmed = isEscala && !isPending;
+            const surface = isPending
+              ? "bg-[#FFF0EC] border-[rgba(244,83,42,0.18)]"
+              : isConfirmed
+              ? "bg-[#EEF9F1] border-[#C8EDD5]"
+              : "bg-[#EEF1FF] border-[rgba(74,90,222,0.14)]";
+            const iconColor = isPending
+              ? "text-[#F4532A]"
+              : isConfirmed
+              ? "text-[#1F8044]"
+              : "text-[#4A5ADE]";
             return (
               <div
                 key={`${item.title}-${item.time}`}
                 className={cn(
-                  "flex items-center gap-4 rounded-[18px] p-4",
-                  isEscala
-                    ? "border border-[rgba(244,83,42,0.18)] bg-[#FFF0EC]"
-                    : "border border-[rgba(74,90,222,0.14)] bg-[#EEF1FF]",
+                  "flex min-h-[150px] flex-col justify-between rounded-[20px] border p-4 transition hover:shadow-[0_10px_28px_-16px_rgba(25,25,25,0.18)]",
+                  surface,
                 )}
               >
-                <div
-                  className={cn(
-                    "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px] bg-white",
-                    isEscala ? "text-[#F4532A]" : "text-[#4A5ADE]",
-                  )}
-                >
-                  <Icon name={item.icon} size={18} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[14px] font-bold text-[#191919]">{item.title}</div>
-                  <div className="mt-1 text-[12px] text-[#777777]">
-                    {item.time} · {item.location}
+                <div>
+                  <div
+                    className={cn(
+                      "mb-3 flex h-[38px] w-[38px] items-center justify-center rounded-[12px] bg-white",
+                      iconColor,
+                    )}
+                  >
+                    <Icon name={item.icon} size={17} />
                   </div>
-                  {isEscala && item.badge === "Confirmar" && (
-                    <span className="mt-2 inline-block rounded-full border border-[rgba(244,83,42,0.2)] bg-[#FFF0EC] px-2.5 py-0.5 text-[10px] font-bold text-[#D94420]">
-                      Aguardando confirmação
-                    </span>
-                  )}
+                  <div className="text-[14px] font-bold leading-tight text-[#191919]">{item.title}</div>
+                  <div className="mt-1.5 text-[11px] leading-5 text-[#777777]">{item.time}</div>
                 </div>
-                <div className="flex flex-shrink-0 gap-2">
-                  {isEscala ? (
-                    <>
+                <div className="mt-3">
+                  {isPending ? (
+                    <div className="flex gap-2">
                       <Link
                         href={item.href}
-                        className="rounded-full bg-[#F4532A] px-3.5 py-2 text-[11px] font-bold text-white shadow-[0_6px_16px_-8px_rgba(244,83,42,0.55)] transition hover:bg-[#D94420]"
+                        className="rounded-full bg-[#F4532A] px-3 py-1.5 text-[10px] font-bold text-white shadow-[0_4px_10px_-4px_rgba(244,83,42,0.55)] transition hover:bg-[#D94420]"
                       >
                         ✓ Vou
                       </Link>
                       <Link
                         href={item.href}
-                        className="rounded-full border border-[#F0EFEB] bg-white px-3 py-2 text-[11px] font-semibold text-[#777777] transition hover:bg-[#FAFAF8]"
+                        className="rounded-full border border-[#F0EFEB] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#777777] transition hover:bg-[#FAFAF8]"
                       >
                         ✕
                       </Link>
-                    </>
+                    </div>
+                  ) : isConfirmed ? (
+                    <span className="inline-block rounded-full border border-[#C8EDD5] bg-white/80 px-3 py-1 text-[10px] font-bold text-[#1F8044]">
+                      ✓ Confirmado
+                    </span>
                   ) : (
                     <Link
                       href={item.href}
-                      className="rounded-full border border-[rgba(74,90,222,0.25)] bg-white px-3.5 py-2 text-[11px] font-bold text-[#4A5ADE] transition hover:bg-[#EEF1FF]"
+                      className="inline-block rounded-full border border-[rgba(74,90,222,0.25)] bg-white/80 px-3 py-1 text-[10px] font-bold text-[#4A5ADE] transition hover:bg-[#EEF1FF]"
                     >
-                      Ver célula
+                      Ver célula →
                     </Link>
                   )}
                 </div>
