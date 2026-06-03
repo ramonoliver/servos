@@ -1161,6 +1161,78 @@ function MemberMinistryGrid() {
   );
 }
 
+function MemberSchedulePanel({ items }: { items: UpcomingEventItem[] }) {
+  return (
+    <Panel className="p-6" dataSectionId="member-schedules">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#AAAAAA]">
+            Ministério
+          </div>
+          <h2 className="text-[22px] font-semibold tracking-[-0.025em] text-[#191919] md:text-[24px]">
+            Minhas escalas
+          </h2>
+        </div>
+        <Link
+          href="/escalas"
+          className="shrink-0 text-[13px] font-semibold text-[#F4532A] transition hover:opacity-75"
+        >
+          Ver todas
+        </Link>
+      </div>
+      <div className="flex flex-col gap-3">
+        {items.slice(0, 4).map((item) => {
+          const isPending = item.badge === "Confirmar";
+          return (
+            <div
+              key={`${item.title}-${item.time}`}
+              className={cn(
+                "flex items-center gap-3 rounded-[16px] p-3",
+                isPending
+                  ? "border border-[rgba(244,83,42,0.18)] bg-[#FFF0EC]"
+                  : "border border-[#F0EFEB] bg-white",
+              )}
+            >
+              <div
+                className={cn(
+                  "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[12px] bg-white",
+                  isPending ? "text-[#F4532A]" : "text-[#1F8044]",
+                )}
+              >
+                <Icon name="calendar" size={16} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-bold text-[#191919]">{item.title}</div>
+                <div className="mt-0.5 text-[11px] text-[#777777]">{item.time}</div>
+              </div>
+              {isPending ? (
+                <div className="flex flex-shrink-0 gap-1.5">
+                  <Link
+                    href={item.href}
+                    className="rounded-full bg-[#F4532A] px-3 py-1.5 text-[10px] font-bold text-white shadow-[0_4px_10px_-4px_rgba(244,83,42,0.5)] transition hover:bg-[#D94420]"
+                  >
+                    ✓ Vou
+                  </Link>
+                  <Link
+                    href={item.href}
+                    className="rounded-full border border-[#F0EFEB] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#777777] transition hover:bg-[#FAFAF8]"
+                  >
+                    ✕
+                  </Link>
+                </div>
+              ) : (
+                <span className="flex-shrink-0 rounded-full bg-[#EEF9F1] px-2.5 py-1 text-[10px] font-bold text-[#1F8044]">
+                  ✓ Confirmado
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
 function MemberHomeSections({ data }: { data: DashboardV3Data }) {
   return (
     <>
