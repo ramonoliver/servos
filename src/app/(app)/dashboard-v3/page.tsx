@@ -24,6 +24,7 @@ import {
   type TimelineItem,
   type UpcomingEventItem,
 } from "@/components/dashboard/home-v3-ui";
+import type { Cell, CellMemberRow } from "@/lib/cells/types";
 import type { Department, Event, Notification, Schedule, ScheduleMember, User } from "@/types";
 
 function formatShortDate(date: string) {
@@ -36,6 +37,20 @@ function formatRelative(date: string) {
   const hours = Math.max(1, Math.round(diff / 36e5));
   if (hours < 24) return `há ${hours}h`;
   return `há ${Math.round(hours / 24)}d`;
+}
+
+function formatEventAgendaTime(event: Event) {
+  const time = event.base_time || "Horário a confirmar";
+  if (event.recurrence?.startsWith("once:")) {
+    const date = event.recurrence.split(":")[1] || "";
+    return `${date ? formatShortDate(date) : "Evento"} · ${time}`;
+  }
+  if (event.recurrence?.startsWith("weekly:")) {
+    const day = Number(event.recurrence.split(":")[1]);
+    const labels = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+    return `${labels[day] || "Semanal"} · ${time}`;
+  }
+  return `Evento · ${time}`;
 }
 
 function timelineTone(tone: string): TimelineItem["tone"] {
@@ -67,6 +82,8 @@ export default function DashboardV3Page() {
   const [scheduleMembers, setScheduleMembers] = useState<ScheduleMember[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [cells, setCells] = useState<Cell[]>([]);
+  const [cellMembers, setCellMembers] = useState<CellMemberRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const visibleDepartmentIds = useMemo(() => departments.map((department) => department.id), [departments]);
@@ -82,6 +99,7 @@ export default function DashboardV3Page() {
         { data: eventsData },
         { data: notificationsData },
         { data: departmentMembersData },
+        cellsResponse,
       ] = await Promise.all([
         supabase.from("users").select("*").eq("church_id", user.church_id).eq("active", true),
         supabase.from("schedules").select("*").eq("church_id", user.church_id).neq("status", "cancelled"),
@@ -90,6 +108,7 @@ export default function DashboardV3Page() {
         departments.length
           ? supabase.from("department_members").select("*").in("department_id", visibleDepartmentIds)
           : Promise.resolve({ data: [], error: null }),
+        fetch("/api/cells/list", { method: "POST", credentials: "include" }).catch(() => null),
       ]);
 
       const allSchedules = (schedulesData || []) as Schedule[];
@@ -120,6 +139,9 @@ export default function DashboardV3Page() {
       setScheduleMembers(((smData || []) as ScheduleMember[]).filter((sm) => scopedScheduleIds.has(sm.schedule_id)));
       setEvents((eventsData || []) as Event[]);
       setNotifications((notificationsData || []) as Notification[]);
+      const cellsPayload = cellsResponse ? await cellsResponse.json().catch(() => null) : null;
+      setCells((cellsPayload?.cells || []) as Cell[]);
+      setCellMembers((cellsPayload?.cellMembers || []) as CellMemberRow[]);
       setLoading(false);
     }
 
@@ -135,14 +157,18 @@ export default function DashboardV3Page() {
     const greeting = getGreeting();
     const firstName = user.name.split(" ")[0] || user.name;
     const isAdminLike = user.role === "admin" || user.role === "leader" || user.cell_role === "pastor" || user.cell_role === "coordenacao";
+    const isCommonMember = !isAdminLike;
+    const myCellIds = new Set(cellMembers.filter((member) => member.user_id === user.id).map((member) => member.cell_id));
+    const myCell = cells.find((cellItem) => myCellIds.has(cellItem.id));
     const hasMinistry = departments.length > 0;
+    const hasCell = Boolean(myCell);
     const profileMode: DashboardV3Data["profileMode"] = isAdminLike
       ? user.role === "leader"
         ? "hybrid"
         : "admin"
       : hasMinistry
       ? "departmentMember"
-      : pastoralCells.length
+      : hasCell
       ? "cellMember"
       : "connect";
 
@@ -181,7 +207,9 @@ export default function DashboardV3Page() {
         ? `Hoje você possui ${pendingConfirmations} confirmações pendentes e ${openCareCount} pessoas precisando de cuidado.`
         : nextMemberSchedule
         ? `Sua próxima escala acontece em ${formatShortDate(nextMemberSchedule.date)} às ${nextMemberSchedule.time}.`
-        : `Sua próxima célula acontece ${pastoralCells[0]?.weekDay.toLowerCase() || "esta semana"} às ${pastoralCells[0]?.time || "20:00"}.`;
+        : hasCell
+        ? `Sua próxima célula acontece ${myCell?.week_day.toLowerCase() || "esta semana"} às ${myCell?.time || "20:00"}.`
+        : "Veja sua agenda, seus avisos e caminhos para se conectar em uma célula.";
     const heroFocus =
       profileMode === "connect"
         ? "Complete seu cadastro, encontre uma célula e conheça ministérios para servir."
@@ -325,51 +353,68 @@ export default function DashboardV3Page() {
       })),
     ].slice(0, 5);
 
-    const upcomingFromSchedules: UpcomingEventItem[] = upcomingSchedules.slice(0, 3).map((schedule) => {
+    const memberScheduleIds = new Set(scheduleMembers.filter((sm) => sm.user_id === user.id).map((sm) => sm.schedule_id));
+    const scheduleAgendaSource = isCommonMember
+      ? [
+          ...myUpcoming,
+          ...upcomingSchedules.filter((schedule) => !memberScheduleIds.has(schedule.id)),
+        ]
+      : upcomingSchedules;
+
+    const upcomingFromSchedules: UpcomingEventItem[] = scheduleAgendaSource.slice(0, 3).map((schedule) => {
       const event = events.find((item) => item.id === schedule.event_id);
       const department = departments.find((item) => item.id === schedule.department_id);
+      const myStatus = scheduleMembers.find((sm) => sm.schedule_id === schedule.id && sm.user_id === user.id)?.status;
       return {
         title: event?.name || "Escala",
         meta: department?.name || "Ministério",
         time: `${formatShortDate(schedule.date)} · ${schedule.time}`,
         location: event?.location || "Igreja",
-        badge: scheduleMembers.some((sm) => sm.schedule_id === schedule.id && sm.status === "pending") ? "Confirmar" : "Em breve",
+        badge: myStatus === "pending" ? "Confirmar" : myStatus === "confirmed" ? "Confirmado" : "Ministério",
         href: `/escalas?id=${schedule.id}`,
         icon: "calendar",
       };
     });
-    const upcomingFromCells: UpcomingEventItem[] = pastoralCells.slice(0, Math.max(0, 3 - upcomingFromSchedules.length)).map((cell) => ({
-      title: cell.name,
-      meta: cell.audience,
-      time: `${cell.weekDay} · ${cell.time}`,
-      location: cell.address,
-      badge: "Célula",
-      href: `/celulas/${cell.id}`,
-      icon: "home" as const,
-    }));
+    const upcomingFromCells: UpcomingEventItem[] = isCommonMember
+      ? myCell
+        ? [{
+            title: myCell.name,
+            meta: myCell.audience || "Minha célula",
+            time: `${myCell.week_day} · ${myCell.time}`,
+            location: myCell.address || "Local a confirmar",
+            badge: "Célula",
+            href: `/celulas/${myCell.id}`,
+            icon: "home" as const,
+          }]
+        : []
+      : pastoralCells.slice(0, Math.max(0, 3 - upcomingFromSchedules.length)).map((cell) => ({
+          title: cell.name,
+          meta: cell.audience,
+          time: `${cell.weekDay} · ${cell.time}`,
+          location: cell.address,
+          badge: "Célula",
+          href: `/celulas/${cell.id}`,
+          icon: "home" as const,
+        }));
+
+    const upcomingFromEvents: UpcomingEventItem[] = events
+      .filter((event) => event.active !== false)
+      .slice(0, Math.max(0, 4 - upcomingFromSchedules.length - upcomingFromCells.length))
+      .map((event) => ({
+        title: event.name,
+        meta: event.type === "recurring" ? "Culto recorrente" : "Evento especial",
+        time: formatEventAgendaTime(event),
+        location: event.location || "Igreja",
+        badge: event.type === "recurring" ? "Culto" : "Evento",
+        href: `/eventos/${event.id}`,
+        icon: event.type === "recurring" ? "spark" as const : "calendar" as const,
+      }));
 
     const upcoming: UpcomingEventItem[] = [
       ...upcomingFromSchedules,
       ...upcomingFromCells,
-      {
-        title: "Culto de Celebração",
-        meta: "Celebração principal",
-        time: "Domingo · 18:00",
-        location: "Auditório principal",
-        badge: "Culto",
-        href: "/eventos",
-        icon: "spark" as const,
-      },
-      {
-        title: "Ensaio Geral",
-        meta: "Louvor",
-        time: "Sábado · 16:00",
-        location: "Sala de ensaios",
-        badge: "Ensaio",
-        href: "/escalas",
-        icon: "calendar" as const,
-      },
-    ];
+      ...upcomingFromEvents,
+    ].slice(0, 6);
 
     const carePeople: CarePerson[] = careCases.map((care) => {
       const person = getPerson(care.personId);
@@ -401,15 +446,31 @@ export default function DashboardV3Page() {
       { value: "92%", label: "Presença média", description: "geral", trend: [87, 89, 88, 91, 90, 92, 91, 92], icon: "clock" },
     ];
 
-    const cellLeader = pastoralCells[0] ? getPerson(pastoralCells[0].leaderId) : null;
-    const cell: CellSummary | undefined = pastoralCells[0]
+    const cellLeaderId = myCell?.leader_ids?.[0] || myCell?.leader_id || "";
+    const cellLeader = cellLeaderId ? members.find((member) => member.id === cellLeaderId) : null;
+
+    const cellLeaderIds = myCell
+      ? [
+          ...(myCell.leader_ids || []).map((id) => ({ id, role: "Líder" })),
+          ...(myCell.co_leader_ids || []).map((id) => ({ id, role: "Co-líder" })),
+        ].slice(0, 3)
+      : [];
+    const cellLeaders = cellLeaderIds
+      .map(({ id, role }) => {
+        const member = members.find((m) => m.id === id);
+        return member ? { name: member.name, role } : null;
+      })
+      .filter(Boolean) as Array<{ name: string; role: string }>;
+
+    const cell: CellSummary | undefined = myCell
       ? {
-          name: pastoralCells[0].name,
-          nextMeeting: `${pastoralCells[0].weekDay} às ${pastoralCells[0].time} · ${pastoralCells[0].address}`,
+          name: myCell.name,
+          nextMeeting: `${myCell.week_day} às ${myCell.time} · ${myCell.address || "Local a confirmar"}`,
           notice: "Separar pedidos de oração e confirmar presença antes do encontro.",
-          leader: cellLeader?.fullName || "Liderança da célula",
+          leader: cellLeader?.name || "Liderança da célula",
           prayerCount: activePrayerRequests.length,
-          href: `/celulas/${pastoralCells[0].id}`,
+          href: `/celulas/${myCell.id}`,
+          leaders: cellLeaders.length > 0 ? cellLeaders : undefined,
         }
       : undefined;
 
@@ -438,8 +499,24 @@ export default function DashboardV3Page() {
       : [
           { label: "Minha escala", href: "/minhas-escalas", icon: "calendar" },
           { label: "Minha célula", href: "/celulas", icon: "home" },
-          { label: "Pedir oração", href: "/pedidos-oracao", icon: "heart" },
+          { label: "Avisos", href: "/notificacoes", icon: "bell" },
         ];
+
+    const notices = notifications.slice(0, 6).map((notification) => {
+      const text = `${notification.title} ${notification.body} ${notification.action_url}`.toLowerCase();
+      const scope = text.includes("celula") || text.includes("célula") || text.includes("/celulas")
+        ? "Célula" as const
+        : text.includes("ministerio") || text.includes("ministério") || text.includes("escala") || text.includes("/escalas")
+        ? "Ministério" as const
+        : "Aviso" as const;
+      return {
+        title: notification.title,
+        body: notification.body,
+        time: formatRelative(notification.created_at),
+        href: notification.action_url || "/notificacoes",
+        scope,
+      };
+    });
 
     return {
       profileMode,
@@ -459,8 +536,9 @@ export default function DashboardV3Page() {
       cell,
       prayers,
       quickActions,
+      notices,
     };
-  }, [church.name, departments, events, members, notifications, scheduleMembers, schedules, unreadNotifications, user]);
+  }, [cellMembers, cells, church.name, departments, events, members, notifications, scheduleMembers, schedules, unreadNotifications, user]);
 
   if (loading) return <DashboardV3Skeleton />;
 
