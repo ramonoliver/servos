@@ -1347,9 +1347,8 @@ export function PersonalizedEmptyState() {
 }
 
 export function DashboardV3Home({ data }: { data: DashboardV3Data }) {
-  const showPastoralManagement = data.profileMode === "admin" || data.profileMode === "hybrid";
-  const showCellLife = data.profileMode === "hybrid" || data.profileMode === "cellMember";
   const showMemberHome = data.profileMode === "departmentMember" || data.profileMode === "cellMember";
+  const showHybridHome = data.profileMode === "hybrid";
 
   return (
     <div className="min-h-screen">
@@ -1361,25 +1360,21 @@ export function DashboardV3Home({ data }: { data: DashboardV3Data }) {
         />
         {data.profileMode === "connect" && <PersonalizedEmptyState />}
 
-        {showMemberHome ? (
+        {showHybridHome ? (
+          <HybridHomeSections data={data} />
+        ) : showMemberHome ? (
           <MemberHomeSections data={data} />
         ) : (
           <>
             <PriorityCards items={data.priorities} />
-
             <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(280px,340px)]">
-              {showPastoralManagement ? <PriorityList items={data.priorityItems} /> : <ActivityTimeline items={data.timeline} />}
-              {showPastoralManagement ? <ActivityTimeline items={data.timeline} /> : <PrayerRequestCard items={data.prayers} />}
+              <PriorityList items={data.priorityItems} />
+              <ActivityTimeline items={data.timeline} />
               <UpcomingEvents items={data.upcoming} />
             </section>
-
-            <section className="grid min-w-0 items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-              {showPastoralManagement ? <CarePeopleSection people={data.carePeople} /> : showCellLife ? <CellCard cell={data.cell} /> : <PrayerRequestCard items={data.prayers} />}
-              <div className={cn("space-y-6", showPastoralManagement && !showCellLife && "flex h-full flex-col")}>
-                {showCellLife && showPastoralManagement && <CellCard cell={data.cell} />}
-                <InsightCards items={data.insights} className={showPastoralManagement && !showCellLife ? "h-full" : undefined} />
-                {!showPastoralManagement && showCellLife && <PrayerRequestCard items={data.prayers} />}
-              </div>
+            <section className="grid min-w-0 items-stretch gap-5 xl:grid-cols-2">
+              <CarePeopleSection people={data.carePeople} />
+              <InsightCards items={data.insights} />
             </section>
           </>
         )}
