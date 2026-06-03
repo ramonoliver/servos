@@ -1513,11 +1513,10 @@ function MemberHomeSections({ data }: { data: DashboardV3Data }) {
     <>
       <MemberAgenda items={data.upcoming} />
       <section className="grid min-w-0 items-stretch gap-6 xl:grid-cols-2">
-        <MemberCellOverview cell={data.cell} />
-        <MemberPrayerList items={data.prayers} />
+        <MemberCellPanel cell={data.cell} />
+        <MemberPrayerPanel items={data.prayers} />
       </section>
-      <MemberServeSection />
-      <MemberDevotionalInvite />
+      <MemberMinistryGrid />
     </>
   );
 }
